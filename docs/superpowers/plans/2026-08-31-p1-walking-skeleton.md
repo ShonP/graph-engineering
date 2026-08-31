@@ -16,7 +16,7 @@ recorded in `docs/superpowers/spikes/`.
 
 - Everything is markdown or YAML. No Python, no build step, no test runner.
 - Agent `name:` frontmatter equals the filename stem. Agents live flat in `agents/`; they do not nest-discover.
-- Models: `opus` for `reviewer` and `pm-planner`, `sonnet` for `implementer`. `haiku` never.
+- Models: `opus` for `reviewer` and `planner`, `sonnet` for `implementer`. `haiku` never.
 - No em dashes in any authored file.
 - The spine names each agent's required skills in the dispatch prompt. An agent never chooses its own conditional skills.
 - Unconditional competencies go in `skills:` frontmatter; conditional ones are spine-named. (Spike 2026-08-31: preloading works, bare names suffice.)
@@ -36,15 +36,15 @@ There is no test suite, so verification is explicit and manual:
 
 ### Task 1: The three agents
 
-**Files:** create `agents/pm-planner.md`, `agents/implementer.md`, `agents/reviewer.md`
+**Files:** create `agents/planner.md`, `agents/implementer.md`, `agents/reviewer.md`
 
 Each carries frontmatter (`name`, `description`, `tools`, `model`, and `skills` only where a competency is unconditional) and a body stating its contract.
 
-- [ ] **`pm-planner`** (opus; Read, Grep, Glob, Bash, Write, Skill). Produces specs and plans; never writes implementation code. Two phases: `goal.md` (intent, audience, value, success metrics, non-goals, Open Questions) and `plan.md` (composing `superpowers:writing-plans`, not reimplementing it). Every open question ends spiked or written down as an explicit assumption - never silently resolved. Each task records files, stack (matched to the profile's `stacks` globs), acceptance criteria, and its parallel set. A task with no stack match is a planning error, because the spine derives skill routing from that match.
+- [ ] **`planner`** (opus; Read, Grep, Glob, Bash, Write, Skill). Produces specs and plans; never writes implementation code. Two phases: `goal.md` (intent, audience, value, success metrics, non-goals, Open Questions) and `plan.md` (composing `superpowers:writing-plans`, not reimplementing it). Every open question ends spiked or written down as an explicit assumption - never silently resolved. Each task records files, stack (matched to the profile's `stacks` globs), acceptance criteria, and its parallel set. A task with no stack match is a planning error, because the spine derives skill routing from that match.
 - [ ] **`implementer`** (sonnet; Read, Grep, Glob, Bash, Write, Edit, Skill). Implements ONE task. Before writing code: invoke `Skill` for every REQUIRED skill named in the dispatch, then Read the rule packs the profile names (path-scoped packs do not auto-load into a subagent). Then `superpowers:test-driven-development`. Precedence on conflict: house > vault-generated > community. Reports DONE / DONE_WITH_CONCERNS / BLOCKED / NEEDS_CONTEXT / NEEDS_SETUP, and returns `NEEDS_SETUP` rather than improvising a competency it was not given.
 - [ ] **`reviewer`** (opus; Read, Grep, Glob, Bash, Skill). Read-only. Preloads `review-protocol`, `security-review`, `privacy-review` in `skills:` frontmatter, since the profile's `always` lenses fire on every diff. Stack lenses arrive spine-named. Reads the diff ONCE applying every loaded lens in one pass - re-reading per lens is the cost this design exists to avoid. Refutes before surfacing: drops findings that do not reproduce, are pre-existing, hit a skip-rule, or sit below confidence 0.8. Reports `severity | file:line | failure scenario | rule reference | confidence`, ordered blocking, important, nit. Verdict PASS or CHANGES-REQUESTED. Returns `NEEDS_SETUP` instead of a verdict if a REQUIRED lens could not load, because a review missing a lens reads as coverage that did not happen.
 
-**Check:** three files; names match stems; models correct; only `reviewer` and `pm-planner` carry `skills:`; no em dashes.
+**Check:** three files; names match stems; models correct; only `reviewer` and `planner` carry `skills:`; no em dashes.
 
 ### Task 2: The reduced feature playbook
 
@@ -52,7 +52,7 @@ Each carries frontmatter (`name`, `description`, `tools`, `model`, and `skills` 
 
 Six nodes, each `## node: <id>` followed by `agent`, `in`, `out`, `gate`, `next`:
 
-`goal` (pm-planner, gate no) -> `plan` (pm-planner, **gate yes**) -> `implement` (implementer) -> `review` (reviewer) -> `fix` (implementer) -> `merge` (pm-planner, **gate yes**) -> END.
+`goal` (planner, gate no) -> `plan` (planner, **gate yes**) -> `implement` (implementer) -> `review` (reviewer) -> `fix` (implementer) -> `merge` (planner, **gate yes**) -> END.
 
 Open with a short note saying this is the reduced form and which nodes the full graph adds later (research, UX, qa, launch), so a reader is not left wondering what happened to the spec's diagram.
 

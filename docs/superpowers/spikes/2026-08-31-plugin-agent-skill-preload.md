@@ -100,7 +100,7 @@ competency an agent loads on every single dispatch gains nothing from the hop.
 | Agent | Preload | Spine-routed |
 |---|---|---|
 | `reviewer` | `review-protocol`, `security-review`, `privacy-review` (the profile's `always` lenses) | stack lenses by file extension |
-| `pm-planner` | `product-spec` | - |
+| `planner` | `product-spec` | - |
 | `qa` | `test-strategy` | playwright / api-contract / mobile-ui |
 | `implementer` | nothing is unconditional across stacks | everything |
 | `content-writer` | `content-strategy`, house voice | platform skill by target |

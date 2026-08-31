@@ -9,14 +9,14 @@ Later phases add the missing nodes. Nothing here changes when they do, because
 the engine reads whatever playbook it is given.
 
 ## node: goal
-agent: pm-planner
+agent: planner
 in: the owner's stated goal
 out: .graph/<run>/goal.md
 gate: no
 next: plan
 
 ## node: plan
-agent: pm-planner
+agent: planner
 in: .graph/<run>/goal.md
 out: .graph/<run>/plan.md
 gate: yes
@@ -44,7 +44,7 @@ gate: no
 next: merge
 
 ## node: merge
-agent: pm-planner
+agent: planner
 in: the reviewed diff and the gate verdict
 out: .graph/<run>/ledger.md
 gate: yes

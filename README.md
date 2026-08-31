@@ -53,14 +53,27 @@ of the same name. Edit, restart, test. No commit needed.
 
 ## Roster
 
+Shipped today:
+
 | Agent | Model | Job |
 |---|---|---|
-| `pm-planner` | opus | spec, then task-decomposed plan; never writes code |
-| `implementer` | sonnet | one task, test-first, with spine-named skills |
+| `planner` | fable | spec, then task-decomposed plan with per-task sizing; never writes code |
+| `implementer` | opus | one non-trivial task, test-first, with spine-named skills |
+| `implementer-simple` | sonnet | one SMALL task (mechanical, 1-2 files); escalates instead of pushing through |
 | `reviewer` | opus | reads the diff once through every lens it needs |
 
-Later phases add `researcher`, `ux-designer`, `qa`, `media-producer` and
-`content-writer`.
+The engine picks the implementer by the task's `size` in the plan: `small` goes
+to `implementer-simple`, everything else to `implementer`.
+
+Planned (later phases):
+
+| Agent | Phase | Job |
+|---|---|---|
+| `researcher` | P2 | spikes and open-question answers with strict turn budgets |
+| `ux-designer` | P2 | flows, states and copy before implementation |
+| `qa` | P3 | end-to-end verification (Playwright, API checks) after review passes |
+| `media-producer` | P4 | demo videos and images (Playwright recordings, Remotion) |
+| `content-writer` | P4 | short-attention posts for X/LinkedIn from shipped work |
 
 ## The profile is yours
 

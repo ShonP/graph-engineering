@@ -100,7 +100,7 @@ so the routing rule in 2.2 gains an exception that costs nothing:
 | Agent | Preloaded | Spine-routed |
 |---|---|---|
 | `reviewer` | `review-protocol`, `security-review`, `privacy-review` | stack lenses, by file extension |
-| `pm-planner` | `product-spec` | - |
+| `planner` | `product-spec` | - |
 | `qa` | `test-strategy` | playwright / api-contract / mobile-ui |
 | `content-writer` | `content-strategy`, house voice | platform skill, by target |
 | `implementer` | nothing - no competency is unconditional across stacks | everything |
@@ -122,16 +122,17 @@ notes and social posts are one competency (writing), demo video is another
 
 | Agent | Model | Modes / routing | Writes? |
 |---|---|---|---|
-| `pm-planner` | opus | product intent, spec, roadmap, task decomposition | specs only |
+| `planner` | fable | product intent, spec, roadmap, task decomposition | specs only |
 | `researcher` | sonnet | `ux` \| `tech` \| `competitor` \| `spike` | reports only |
 | `ux-designer` | sonnet | mockups, design rubric | mockups only |
-| `implementer` | sonnet | stack skills routed from task paths | yes |
+| `implementer` | opus | stack skills routed from task paths | yes |
+| `implementer-simple` | sonnet | same routing; small bounded tasks only, escalates otherwise | yes |
 | `reviewer` | opus | lens skills routed from diff extensions | no (read-only) |
 | `qa` | sonnet | playwright / api-contract / mobile-ui / prod-verify | tests only |
 | `media-producer` | sonnet | demo video, screenshots, generated images | assets only |
 | `content-writer` | sonnet | LinkedIn, X, blog, docs, release notes | copy only |
 
-Models follow the standing policy: sonnet implements, opus reviews, haiku never.
+Models follow the standing policy (2026-08-31): fable plans, opus implements non-trivial tasks and reviews, sonnet implements small bounded tasks (`implementer-simple`), haiku never. The planner marks each task `small` or `standard`; the engine routes accordingly.
 
 ### 3.1 Skill floor and the enablement gate
 
@@ -150,7 +151,7 @@ Audited status at design time:
 | `qa` | qa-skills / e2e-skills / test-skills / TestDino (adopt), compose-ui-testing-patterns, testing-compose-in-release-mode, superpowers TDD + verification | strong |
 | `ux-designer` | ui-ux-pro-max, design-rubric, frontend-design plugin | strong |
 | `media-producer` | creating-demo-videos (proven), image-gen (proven), chrome gif_creator, viral-short-form-video-master (adopt) | good; gap: remotion |
-| `pm-planner` | superpowers:brainstorming, superpowers:writing-plans | partial; owns none |
+| `planner` | superpowers:brainstorming, superpowers:writing-plans | partial; owns none |
 | `content-writer` | writing-short-form-posts (proven), content-strategy (vault-generated), linkedin-skills + x-skills (adopt) | good; gap: docs/release-notes |
 | `researcher` | koach /ux-research (proven), context7 MCP, superpowers spike path | partial; competitor mode bare |
 
@@ -282,9 +283,9 @@ Every node declares: `agent`, `mode` (optional), `skills` or `compose`, `in`,
 ### 5.1 feature
 
 ```
-pm-planner: goal.md
+planner: goal.md
   -> [ux-research | tech-research | competitor-research]   MAP, 3 parallel
-  -> pm-planner: plan.md
+  -> planner: plan.md
   -> GATE 1: owner approves the plan
   -> need UX? -> ux-designer -> GATE 2: owner approves the design
   -> worktree (superpowers:using-git-worktrees)
@@ -414,7 +415,7 @@ board: { platform: github, project: "Koach Graph Runs" }
 
 `localAgents` is how "additive" is enforced. Where koach already has an agent
 for a leg, the engine dispatches koach's; it supplies its own only for the legs
-koach lacks (pm-planner, researcher, ux-designer, qa, media-producer,
+koach lacks (planner, researcher, ux-designer, qa, media-producer,
 content-writer). A fresh repo leaves `localAgents` empty and gets the full
 plugin roster.
 

@@ -19,6 +19,7 @@ Execute a playbook. **The engine is playbook-agnostic:** it reads `graphs/<name>
 
 4. **Dispatch discipline.** For each node:
    - Resolve the agent through `localAgents` first, then the plugin roster.
+   - For implementation and fix nodes, pick the implementer by task size from the plan: `small` -> `implementer-simple` (sonnet), otherwise `implementer` (opus). An `ESCALATE` from `implementer-simple` re-dispatches the same task to `implementer` once, without counting as a fix round.
    - Derive the REQUIRED skill list from the profile's `routing`, matched against that task's files, plus the `always` entries.
    - Name those skills in the dispatch prompt as non-optional.
    - Pass the run directory, the profile path, the node's `in` artifacts, and the task's acceptance criteria.

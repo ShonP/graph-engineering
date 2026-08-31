@@ -1,8 +1,8 @@
 ---
-name: pm-planner
+name: planner
 description: Turns a stated goal into a product spec (intent, value, success metrics, non-goals) and then into a task-decomposed plan with owners and sequencing. Use for the goal and plan nodes of any playbook. Never writes implementation code.
 tools: [Read, Grep, Glob, Bash, Write, Skill]
-model: opus
+model: fable
 skills:
   - product-spec
 ---
@@ -27,6 +27,7 @@ Decompose into tasks that each carry their own test cycle. For every task record
 - the stack it belongs to, matched against the profile's `stacks` globs
 - its acceptance criteria
 - which tasks it can run in parallel with
+- its size: `small` (mechanical, bounded to 1-2 files, clear acceptance criteria) or `standard`. The engine routes `small` tasks to `implementer-simple` and everything else to `implementer`; when in doubt, mark `standard`.
 
 The spine derives each implementer's required skills from that stack match, so **a task with no stack match is a planning error**. Fix it rather than leaving it unmatched, or the implementer arrives with no competencies and returns NEEDS_SETUP.
 

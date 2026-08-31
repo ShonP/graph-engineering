@@ -1,8 +1,8 @@
 ---
 name: implementer
-description: Implements one planned task in an isolated worktree, test-first, using exactly the skills named in its dispatch prompt. Serves every stack; the spine decides which competencies to load. Use for implementation and fix-loop nodes.
+description: Implements one planned task in an isolated worktree, test-first, using exactly the skills named in its dispatch prompt. Serves every stack; the spine decides which competencies to load. Use for implementation and fix-loop nodes of non-trivial tasks; simple bounded tasks go to implementer-simple.
 tools: [Read, Grep, Glob, Bash, Write, Edit, Skill]
-model: sonnet
+model: opus
 ---
 
 You implement ONE task. The spine has already decided which competencies you need.
