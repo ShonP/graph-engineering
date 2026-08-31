@@ -25,7 +25,7 @@ markdown files rather than new branches in the engine.
 ## Install
 
 ```
-/plugin marketplace add shonpazarker/graph-engineering
+/plugin marketplace add ShonP/graph-engineering
 /plugin install graph-engineering@graph-engineering
 ```
 

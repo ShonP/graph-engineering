@@ -28,7 +28,7 @@ directories are supported through a different mechanism, which is better suited
 to development anyway:
 
 ```bash
-claude --plugin-dir /Users/shonpazarker/projects/graph-engineering
+claude --plugin-dir ~/projects/graph-engineering
 ```
 
 Properties confirmed by both the official reference and independent write-ups:
