@@ -68,6 +68,12 @@ Loads the working copy for that session with no install step, additively
 alongside your installed plugins, and takes precedence over an installed plugin
 of the same name. Edit, restart, test. No commit needed.
 
+**Releasing:** bump `version` in `.claude-plugin/plugin.json` with every push
+you want installs to pick up - `claude plugin update graph-engineering` compares
+versions, not commits, and reports "already at the latest version" when the
+number has not moved. Updating is a CLI command; the `/plugin` menu has no
+update option.
+
 ## Use
 
 ```
