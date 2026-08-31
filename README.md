@@ -72,7 +72,15 @@ of the same name. Edit, restart, test. No commit needed.
 you want installs to pick up - `claude plugin update graph-engineering` compares
 versions, not commits, and reports "already at the latest version" when the
 number has not moved. Updating is a CLI command; the `/plugin` menu has no
-update option.
+update option. If update still reports the old version, refresh the marketplace
+cache first:
+
+```
+claude plugin marketplace update graph-engineering
+claude plugin update graph-engineering
+```
+
+Then restart the session to apply.
 
 ## Use
 
