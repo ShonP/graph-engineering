@@ -4,6 +4,8 @@ An AI-native software organization as a Claude Code plugin: a roster of agents, 
 library of competencies, and playbooks that put them to work. Installed once,
 updated from one repo, reused across every project.
 
+![graph-engineering](docs/img/hero.png)
+
 ## What it is
 
 Four layers, each replaceable without touching the others:
@@ -21,6 +23,31 @@ ENGINE (/graph-ship)    playbook-agnostic: run nodes, honor gates, keep a ledger
 The engine does not know what a feature is. It reads a playbook and runs the
 nodes it finds, which is why a bug workflow and a content workflow are new
 markdown files rather than new branches in the engine.
+
+The feature playbook, the only one shipped so far:
+
+![feature playbook](docs/img/playbook.png)
+
+```mermaid
+flowchart LR
+    goal([goal]) --> plan{{"plan (gate)"}}
+    plan --> implement([implement])
+    implement --> review([review])
+    review -->|findings| fix([fix])
+    fix -.->|"max 3 rounds"| review
+    review -->|PASS| merge{{"merge (gate)"}}
+
+    subgraph agents [" "]
+        direction LR
+        a1["planner: goal, plan, merge"]
+        a2["implementer / implementer-simple: implement, fix"]
+        a3["reviewer: review"]
+    end
+```
+
+Gates (`plan`, `merge`) stop and wait for the owner. The engine derives each
+node's REQUIRED skills from the profile's routing table matched against the
+task's files - the agent never chooses its conditional skills.
 
 ## Install
 
