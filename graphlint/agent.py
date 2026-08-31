@@ -32,11 +32,21 @@ def split_frontmatter(text: str) -> tuple[dict | None, str, str | None]:
 
 def validate_agent(path: Path) -> list[str]:
     errors: list[str] = []
-    text = path.read_text()
-    front, body, err = split_frontmatter(text)
+
+    if not path.exists():
+        return [f"{path.name}: file is missing at {path}"]
+    if path.is_dir():
+        return [f"{path.name}: expected a file but found a directory at {path}"]
+    try:
+        text = path.read_text()
+    except UnicodeDecodeError:
+        return [f"{path.name}: file is not valid UTF-8"]
+
+    front, _, err = split_frontmatter(text)
     if err:
         return [f"{path.name}: {err}"]
-    assert front is not None
+    if front is None:
+        return errors
 
     for field in REQUIRED_FIELDS:
         if not front.get(field):
@@ -48,6 +58,10 @@ def validate_agent(path: Path) -> list[str]:
             errors.append(f"{path.name}: name must be a string, got {type(name).__name__}")
         elif name != path.stem:
             errors.append(f"{path.name}: name {name!r} must match the filename stem {path.stem!r}")
+
+    description = front.get("description")
+    if description is not None and not isinstance(description, str):
+        errors.append(f"{path.name}: description must be a string, got {type(description).__name__}")
 
     tools = front.get("tools")
     if tools is not None and not isinstance(tools, list):
@@ -70,4 +84,4 @@ def validate_agent(path: Path) -> list[str]:
 
 
 def agent_names(agents_dir: Path) -> set[str]:
-    return {p.stem for p in sorted(agents_dir.glob("*.md"))}
+    return {p.stem for p in agents_dir.glob("*.md")}
