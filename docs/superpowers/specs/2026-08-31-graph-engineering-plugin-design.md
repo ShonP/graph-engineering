@@ -89,6 +89,31 @@ the decision to the spine removes both the routing tax and the discipline risk.
 Adding Go later is one routing row plus its skills: no new agent, no engine
 change.
 
+### 2.3 Unconditional competencies preload; conditional ones route
+
+Preloading a plugin-local skill into a plugin agent works (spike, 2026-08-31),
+so the routing rule in 2.2 gains an exception that costs nothing:
+
+> **A competency an agent loads on every dispatch is declared in its `skills:`
+> frontmatter. A competency that depends on the task is named by the spine.**
+
+| Agent | Preloaded | Spine-routed |
+|---|---|---|
+| `reviewer` | `review-protocol`, `security-review`, `privacy-review` | stack lenses, by file extension |
+| `pm-planner` | `product-spec` | - |
+| `qa` | `test-strategy` | playwright / api-contract / mobile-ui |
+| `content-writer` | `content-strategy`, house voice | platform skill, by target |
+| `implementer` | nothing - no competency is unconditional across stacks | everything |
+| `researcher` | nothing - one skill per mode, and the mode is the dispatch | everything |
+| `ux-designer` | `design-rubric` | mockup and visual skills |
+| `media-producer` | nothing - medium decides | everything |
+
+This does not weaken 2.2. Conditional skills are still named by the spine, so
+an agent can never skip a load and write from priors; the exception only
+removes a pointless hop for competencies that were never in question. The
+reviewer is the hot path and gains the most: three fewer `Skill` invocations on
+every review.
+
 ## 3. Roster
 
 Eight agents. `releaser` was considered and dissolved: documentation, release
@@ -157,11 +182,19 @@ already exists for. Indexes:
 
 ### 4.2 Dependency model
 
-Adopted skills are **depended on**, not vendored: the plugin declares the
-upstream marketplaces it needs and upstream fixes arrive for free.
+Adopted skills are **depended on**, not vendored. `plugin.json` supports this
+natively (spike, 2026-08-31):
 
-Accepted consequence, stated once: external maintainers can change agent
-behavior on update without review, and a fresh machine needs every dependency
+```json
+{ "dependencies": ["qa-skills", { "name": "linkedin-skills", "version": "~1.2.0" }] }
+```
+
+Entries are a bare plugin name, or an object with `name` and a semver `version`
+constraint. Version constraints answer most of the risk this section originally
+accepted without a mitigation.
+
+Residual consequence: within a version constraint, an external maintainer can
+still change agent behavior, and a fresh machine needs every dependency
 installed before the graph works. Mitigations:
 
 1. `/graph-doctor` verifies required plugins are installed and names which
@@ -169,6 +202,8 @@ installed before the graph works. Mitigations:
 2. The profile records which upstream skill each routing row expects.
 3. A leg whose skill is absent reports `NEEDS_SETUP` rather than silently
    reviewing with no lens. This is the enablement gate applied to dependencies.
+4. Pin every dependency with a semver constraint, never a bare name, so an
+   upstream major cannot land unreviewed.
 
 Note recorded from the upstream index itself: these lists are curated, not
 audited.
@@ -427,20 +462,48 @@ Install: `/plugin marketplace add shonpazarker/graph-engineering` then
 arrive via `/plugin update`, tracked by `gitCommitSha` like every other
 marketplace already installed on this machine.
 
+Development loop (spike, 2026-08-31): a local directory is not a valid
+marketplace source, but it does not need to be. Start a session with
+
+```bash
+claude --plugin-dir ~/projects/graph-engineering
+```
+
+which loads the working copy for that session with no install step, additively
+alongside the installed plugins, and takes precedence over an installed plugin
+of the same name. Edit, restart, test - no commit required.
+
 ## 11. Open questions - P0 spikes
 
-All three are cheap, and each blocks a design decision. None may be assumed.
+Answers recorded in `docs/superpowers/spikes/`.
 
-1. Can a **plugin** agent preload **plugin-local** skills via `skills:`
-   frontmatter, and under what name (`graph-engineering:react-patterns`)? No
-   plugin in the local cache does this; koach proves it only for project-local
-   agents. Decides preload vs forced-`Skill` dispatch. Fallback: the agent body
-   instructs `Skill` by qualified name on its first turn.
-2. Does a **local directory** marketplace source work for the dev loop? The
-   local registry shows only GitHub-sourced marketplaces. Fallback: a private
-   GitHub repo with push-then-update - slower, certain.
-3. Does `plugin.json` support declaring dependencies on other plugins? If not,
-   `/graph-doctor` plus the README carry it.
+1. **Answered - yes, under either name form.** A canary plugin with two agents
+   differing only in how they name the same plugin-local skill (`spike-canary`
+   versus `spike-plugin:spike-canary`) had both return the canary phrase. Bare
+   names suffice within a plugin. See section 2.3.
+2. **Answered - no, and the answer is better.** A local directory is not a
+   marketplace source; `claude --plugin-dir <path>` loads the working copy for
+   a session, additively, taking precedence over an installed plugin of the
+   same name. See section 10.
+3. **Answered - yes.** `plugin.json` has a `dependencies` array with optional
+   semver constraints. See section 4.2.
+
+### 11.1 Capabilities the spikes surfaced
+
+The plugins reference documents agent frontmatter fields the design had not
+assumed, two of which it should now use:
+
+- **`maxTurns`** - a hard per-agent turn cap. This is the enforcement for the
+  spike protocol's "strict budget" in section 6.1, which was prose with no
+  mechanism behind it.
+- **`isolation: "worktree"`** - an agent can run in its own git worktree,
+  possibly cheaper than the spine creating one. To evaluate in P1.
+- Also available: `effort`, `disallowedTools`, `background`, `memory`.
+- Not available to plugin-shipped agents, for security reasons: `hooks`,
+  `mcpServers`, `permissionMode`.
+
+`plugin.json` likewise supports `userConfig` (values prompted at enable time),
+which suits the board project name - a per-install value, not a per-repo one.
 
 ## 12. Delivery phases
 
