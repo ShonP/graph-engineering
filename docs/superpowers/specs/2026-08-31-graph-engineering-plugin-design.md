@@ -124,9 +124,9 @@ Audited status at design time:
 | `reviewer` | review-testing-rules, koach REVIEW.md + 13 rule packs, swift-concurrency-pro, Trail of Bits x22 (adopt) | strong |
 | `qa` | qa-skills / e2e-skills / test-skills / TestDino (adopt), compose-ui-testing-patterns, testing-compose-in-release-mode, superpowers TDD + verification | strong |
 | `ux-designer` | ui-ux-pro-max, design-rubric, frontend-design plugin | strong |
-| `media-producer` | creating-demo-videos (proven), image-gen (proven), chrome gif_creator | good; gap: remotion |
+| `media-producer` | creating-demo-videos (proven), image-gen (proven), chrome gif_creator, viral-short-form-video-master (adopt) | good; gap: remotion |
 | `pm-planner` | superpowers:brainstorming, superpowers:writing-plans | partial; owns none |
-| `content-writer` | writing-short-form-posts (proven) | partial; no docs/release-notes |
+| `content-writer` | writing-short-form-posts (proven), content-strategy (vault-generated), linkedin-skills + x-skills (adopt) | good; gap: docs/release-notes |
 | `researcher` | koach /ux-research (proven), context7 MCP, superpowers spike path | partial; competitor mode bare |
 
 The three partials get their missing skills authored in the phase that first
@@ -135,6 +135,7 @@ needs them - never deferred past the phase that enables the agent:
 - `competitor-research`, `product-spec` -> P2 (feature's research leg)
 - `docs-writer`, `release-notes` -> P5 (launch)
 - `remotion-video` -> P5 (content)
+- `content-strategy` (generated from the Hormozi vault) -> P5 (launch/content)
 
 `task-decomposition` is explicitly NOT authored: `superpowers:writing-plans`
 already is that skill.
@@ -184,6 +185,40 @@ supabase-postgres-best-practices, swiftui-pro, compose-* (subset),
 ui-ux-pro-max, design-rubric, creating-demo-videos, writing-short-form-posts,
 plus the five global rule packs (frontend, backend, architecture-resilience,
 agent-workflow, review-testing), which are already generic.
+
+### 4.4 Content competency stack
+
+`content-writer` and `media-producer` draw on three layers that are
+complementary, not competing:
+
+| Layer | Source | Job |
+|---|---|---|
+| Strategy | Hormozi vault via `vault-skill-factory` -> `content-strategy` | hook / retain / reward, what earns attention, opening discipline |
+| Platform mechanics | sergebulaev/linkedin-skills, sergebulaev/x-skills (MIT, adopt) | the fold, 280 vs thread refit, cadence, AI-tell humanizer |
+| House voice | koach `writing-short-form-posts` (harvest) | the voice these posts are actually written in |
+| Video hook | viral-short-form-video-master (adopt) -> `media-producer` | 1.3s hook rule, per-platform algorithm notes; applies to feature demos too |
+
+Source pages for the generated strategy skill:
+`frameworks/hook-retain-reward-framework`, `frameworks/multimedia-content-method`,
+`claims/copywriting-the-opening-of-promotional-content-deserves-disproportionate`,
+`topics/retention`, and the short-vs-long-form conversion claims.
+
+Routing: `content-strategy` and the house voice skill are always on for
+`content-writer` (cheap, universally applicable); the platform skill loads by
+target only - a LinkedIn post never pulls x-skills.
+
+Note: x-skills' 2026 AI-tell list leads with em dashes, which koach already
+blocks at pre-push. The rules agree; the house rule remains authoritative.
+
+### 4.5 Competency precedence
+
+Where two skills conflict:
+
+> **house (koach-harvested) > vault-generated > community (adopted).**
+
+A community skill never overrides the house voice, the house rules, or a gate.
+The engine states the precedence in every dispatch prompt that loads more than
+one overlapping competency.
 
 ## 5. Playbooks
 
@@ -428,7 +463,9 @@ ux-designer and the design gate. Authors `competitor-research`, `product-spec`.
 
 **P5 - Playbooks + release competencies.** `bug`, `launch`, `content`.
 media-producer and content-writer enabled. Authors `docs-writer`,
-`release-notes`, `remotion-video`.
+`release-notes`, `remotion-video`; generates `content-strategy` from the
+Hormozi vault via `vault-skill-factory`; adopts linkedin-skills, x-skills and
+viral-short-form-video-master.
 
 Every phase opens with a skill-sourcing pass and ends with a real task run
 through the graph in koach - additive, so koach's own loop is never at risk.
