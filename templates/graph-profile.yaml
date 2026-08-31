@@ -25,9 +25,27 @@ docsPath: "docs/superpowers"
 # dispatch hop. Everything else is matched by file extension.
 routing:
   "**/*.{ts,tsx}":
-    impl: [react-patterns, tanstack-query, tanstack-router]
-    review: [react-lens, a11y-i18n]
-    qa: [playwright-e2e]
+    impl: [tanstack-query-rules, tanstack-router]
+    review: [tanstack-query-rules]
+    qa: []
+  "**/*.swift":
+    impl: [swiftui-pro]
+    review: [swiftui-pro]
+    qa: []
+  "**/*.{kt,kts}":
+    impl: [compose-state, compose-ui, kotlin-concurrency]
+    review: [compose-performance, compose-state]
+    qa: [compose-build-and-test]
+  "**/*.sql":
+    impl: [supabase-postgres-best-practices, supabase]
+    review: [supabase-postgres-best-practices]
+    qa: []
+  # Data-touching changes pull the consent and erasure lenses in addition to
+  # the always-on privacy-review, which only classifies.
+  "**/{migrations,schemas}/**":
+    impl: [gdpr-erasure-retention]
+    review: [gdpr-erasure-retention, gdpr-consent]
+    qa: []
   always:
     review: [review-protocol, security-review, privacy-review]
 
