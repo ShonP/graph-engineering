@@ -41,6 +41,19 @@ coverage is imaginary.
 Watch for a witness that a *different* guard also catches. It proves nothing
 about the guard it is named for.
 
+## Always-on lenses
+
+Security and privacy load as their own skills. Two more lenses apply with no
+skill load, on every diff they touch:
+
+- **Accessibility** (any UI diff): interactive elements have roles/labels and a
+  keyboard path; focus is managed on navigation and dialogs; loading/empty/error
+  states exist; reduced-motion is respected; contrast holds. A UI control a
+  screen reader cannot name is Blocking, not a nit.
+- **Implementer non-negotiables**: unvalidated boundary input, missing authz on
+  a new endpoint, PII in logs/analytics/fixtures, secrets in code. These are
+  stated implementation duties, so finding one is Blocking by definition.
+
 ## Format
 
 ```

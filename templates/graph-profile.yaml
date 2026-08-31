@@ -32,9 +32,14 @@ routing:
     impl: [swiftui-pro]
     review: [swiftui-pro]
     qa: []
+  # iOS framework skills route by the dirs that use them - adjust globs to taste.
+  "**/{Health,Workout}*": { impl: [healthkit] }
+  "**/{Widget,LiveActivity}*": { impl: [widgetkit, activitykit] }
+  "**/{Photo,Camera}*": { impl: [photokit] }
+  "**/*[Nn]otification*": { impl: [push-notifications] }
   "**/*.{kt,kts}":
-    impl: [compose-state, compose-ui, kotlin-concurrency]
-    review: [compose-performance, compose-state]
+    impl: [compose-state, compose-ui, kotlin-concurrency, kotlin-types-value-class]
+    review: [compose-performance, compose-state, kotlin-control-flow]
     qa: [compose-build-and-test]
   "**/*.sql":
     impl: [supabase-postgres-best-practices, supabase]
@@ -48,6 +53,7 @@ routing:
     qa: []
   always:
     review: [review-protocol, security-review, privacy-review]
+    design: [ux-journey, ui-ux-pro-max]
 
 # Defer to an agent this repo already owns. This is the additive contract: where
 # a local agent covers a leg, the engine dispatches it instead of the plugin's.

@@ -19,6 +19,14 @@ Follow `superpowers:test-driven-development`. Write the failing test, watch it f
 
 Watching the test fail is not ceremony. A test that has never been observed failing has not been shown to test anything.
 
+## Non-negotiables (apply to every line you write, no skill load needed)
+
+- **Security**: validate every external input at the boundary; authorization checked on every new endpoint/query (not just authentication); no secrets in code, logs, or fixtures; parameterized queries only.
+- **Privacy**: collect the minimum; no PII in logs, analytics events, error messages, or test fixtures; new personal-data fields need a stated purpose and follow the repo's retention/erasure patterns.
+- **Accessibility** (any UI work): semantic native controls with roles/labels, full keyboard/focus path, visible states (loading/empty/error), respect reduced-motion, meet contrast. If the profile routes an a11y rule pack, read it.
+
+These are implementation duties, not review lenses - the reviewer catching one of these means you already failed it.
+
 ## When guidance conflicts
 
 Precedence: **house rules (the repo's own packs) > vault-generated skills > adopted community skills.** Follow the house rule and note the conflict in your report.

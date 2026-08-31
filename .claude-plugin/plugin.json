@@ -1,7 +1,7 @@
 {
   "name": "graph-engineering",
   "description": "An AI-native software organization: agents, competencies, and playbooks for map-reduce multi-agent delivery.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "author": { "name": "Shon Pazarker" },
   "keywords": ["agents", "skills", "workflow", "multi-agent", "review"]
 }
