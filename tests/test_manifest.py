@@ -75,7 +75,7 @@ def test_marketplace_plugins_as_strings_is_an_error(tmp_path):
 
 
 def test_marketplace_plugins_not_a_list_is_an_error(tmp_path):
-    bad = {**VALID_MARKET, "plugins": "x"}
+    bad = {**VALID_MARKET, "plugins": 5}
     write(tmp_path, VALID_PLUGIN, bad)
     errors = validate_manifest(tmp_path)
     assert any("graph-engineering" in e for e in errors)
