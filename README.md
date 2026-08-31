@@ -80,27 +80,26 @@ of the same name. Edit, restart, test. No commit needed.
 
 ## Roster
 
-Shipped today:
+The full organization - nine agents:
 
-| Agent | Model | Job |
-|---|---|---|
-| `planner` | fable | spec, then task-decomposed plan with per-task sizing; never writes code |
-| `implementer` | opus | one non-trivial task, test-first, with spine-named skills |
-| `implementer-simple` | sonnet | one SMALL task (mechanical, 1-2 files); escalates instead of pushing through |
-| `reviewer` | opus | reads the diff once through every lens it needs |
+| Agent | Model | Job | Writes |
+|---|---|---|---|
+| `planner` | fable | spec, then task-decomposed plan with per-task sizing | specs only |
+| `researcher` | sonnet | one bounded question, four modes: ux / tech / competitor / spike (strict turn budget) | reports only |
+| `ux-designer` | sonnet | experience spec before implementation; variant exploration scored against the house rubric | mockups only |
+| `implementer` | opus | one non-trivial task, test-first, with spine-named skills | yes |
+| `implementer-simple` | sonnet | one SMALL task (mechanical, 1-2 files); escalates instead of pushing through | yes |
+| `reviewer` | opus | reads the diff once through every lens it needs | no (read-only) |
+| `qa` | sonnet | acceptance criteria verified on a RUNNING system, evidence per criterion | tests only |
+| `media-producer` | sonnet | short-attention media: 1.3s hook, ≤30-90s cuts, captions always, media built as code | assets only |
+| `content-writer` | sonnet | short-attention copy grounded in the voice doc and real numbers; never publishes | copy only |
 
 The engine picks the implementer by the task's `size` in the plan: `small` goes
-to `implementer-simple`, everything else to `implementer`.
+to `implementer-simple`, everything else to `implementer`. Every agent below its
+skill floor returns `NEEDS_SETUP` instead of improvising.
 
-Planned (later phases):
-
-| Agent | Phase | Job |
-|---|---|---|
-| `researcher` | P2 | spikes and open-question answers with strict turn budgets |
-| `ux-designer` | P2 | flows, states and copy before implementation |
-| `qa` | P3 | end-to-end verification (Playwright, API checks) after review passes |
-| `media-producer` | P4 | demo videos and images (Playwright recordings, Remotion) |
-| `content-writer` | P4 | short-attention posts for X/LinkedIn from shipped work |
+Still planned: the `bug`, `launch` and `content` playbooks that put the back
+half of the roster to work, board sync, and `/graph-doctor`.
 
 ## The profile is yours
 

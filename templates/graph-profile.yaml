@@ -60,6 +60,13 @@ gates:
   merge: owner
   publication: owner
 
+# Content grounding. The voice doc holds who the author is and what they have
+# actually shipped - content-writer refuses to draft without it (NEEDS_SETUP),
+# because ungrounded posts are generic and generic is the failure mode.
+content:
+  voiceDoc: "docs/AUTHOR.md"
+  platforms: [x, linkedin]
+
 board:
   platform: github
   project: "Graph Runs"

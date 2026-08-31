@@ -129,7 +129,7 @@ notes and social posts are one competency (writing), demo video is another
 | `implementer-simple` | sonnet | same routing; small bounded tasks only, escalates otherwise | yes |
 | `reviewer` | opus | lens skills routed from diff extensions | no (read-only) |
 | `qa` | sonnet | playwright / api-contract / mobile-ui / prod-verify | tests only |
-| `media-producer` | sonnet | demo video, screenshots, generated images | assets only |
+| `media-producer` | sonnet | short-attention media: demo video, social cuts, screenshots, generated images | assets only |
 | `content-writer` | sonnet | LinkedIn, X, blog, docs, release notes | copy only |
 
 Models follow the standing policy (2026-08-31): fable plans, opus implements non-trivial tasks and reviews, sonnet implements small bounded tasks (`implementer-simple`), haiku never. The planner marks each task `small` or `standard`; the engine routes accordingly.
@@ -148,20 +148,22 @@ Audited status at design time:
 |---|---|---|
 | `implementer` | tanstack-query-rules, tanstack-router, supabase, supabase-postgres-best-practices, swiftui-pro, 25x compose-*, frontend-rules, backend-rules, architecture-resilience-rules, swift-ios-skills x3, cloudflare | strong |
 | `reviewer` | review-testing-rules, koach REVIEW.md + 13 rule packs, swift-concurrency-pro, Trail of Bits x22 (adopt) | strong |
-| `qa` | qa-skills / e2e-skills / test-skills / TestDino (adopt), compose-ui-testing-patterns, testing-compose-in-release-mode, superpowers TDD + verification | strong |
-| `ux-designer` | ui-ux-pro-max, design-rubric, frontend-design plugin | strong |
-| `media-producer` | creating-demo-videos (proven), image-gen (proven), chrome gif_creator, viral-short-form-video-master (adopt) | good; gap: remotion |
+| `qa` | `qa-verification` (authored 2026-08-31, evidence-per-criterion protocol), stack qa routing, superpowers TDD + verification | strong |
+| `ux-designer` | `ux-journey` (harvested 2026-08-31 from koach /ux-research), explore mode in the agent body; house design system via profile rules | strong |
+| `media-producer` | `short-attention-media` (authored 2026-08-31: 1.3s hook, length caps, captions, media-as-code, frame verification - distilled from koach creating-demo-videos + short-form research) | strong |
 | `planner` | superpowers:brainstorming, superpowers:writing-plans | partial; owns none |
-| `content-writer` | writing-short-form-posts (proven), content-strategy (vault-generated), linkedin-skills + x-skills (adopt) | good; gap: docs/release-notes |
-| `researcher` | koach /ux-research (proven), context7 MCP, superpowers spike path | partial; competitor mode bare |
+| `content-writer` | `short-form-posts` (harvested 2026-08-31 from koach writing-short-form-posts, voice doc scrubbed to `profile.content.voiceDoc`) + x-mechanics reference | good; gap: docs/release-notes |
+| `researcher` | mode protocols in the agent body (authored 2026-08-31), `ux-journey` for ux mode, spike protocol §6.1 | strong |
 
-The three partials get their missing skills authored in the phase that first
-needs them - never deferred past the phase that enables the agent:
+Full roster shipped 2026-08-31; remaining gaps get their skills authored in the
+phase that first needs them - never deferred past the phase that enables the leg:
 
-- `competitor-research`, `product-spec` -> P2 (feature's research leg)
 - `docs-writer`, `release-notes` -> P5 (launch)
-- `remotion-video` -> P5 (content)
 - `content-strategy` (generated from the Hormozi vault) -> P5 (launch/content)
+
+`ui-ux-pro-max` (1.8MB data+scripts) was deliberately NOT vendored: the plugin
+is markdown-only, and its UX-judgment value was distilled into `ux-journey` +
+the explore mode. A repo that has it keeps using it through its own rules.
 
 `task-decomposition` is explicitly NOT authored: `superpowers:writing-plans`
 already is that skill.
