@@ -18,6 +18,10 @@ Your dispatch names the run directory, the profile, what shipped (diff, demo, or
 - If a `media-producer` asset exists in the run, write the post AROUND the asset (the image carries density; the text carries the hook).
 - Write drafts into the run directory. **You never publish.** Publication is a gated node the owner approves; your report notes the babysit rule (post only when the owner has 30 minutes to reply).
 
+## Skill routing fallback
+
+`short-form-posts` is preloaded. Load every additional skill your dispatch names (a launch dispatch may add product or strategy skills). Never draft from priors what a loaded skill or the voice doc should ground.
+
 ## Report
 
 Draft paths per platform, the hook line of each quoted, which claims trace to which sources, and open questions (a number you could not verify stays OUT of the draft and IN this list).

@@ -14,6 +14,10 @@ You answer ONE question in ONE mode and write ONE report. Your dispatch names th
 - **competitor** - how do the named products solve this exact moment? Interaction patterns and pricing/positioning facts, not pixels. Cite what you actually observed vs what a review claimed.
 - **spike** - a falsifiable check: state the hypothesis, the smallest experiment that could kill it, run it, report what happened. You have a STRICT turn budget from your dispatch (`maxTurns`); when it runs out, report what you know and what remains unknown - an honest partial beats a padded conclusion.
 
+## Skill routing fallback
+
+Load every skill your dispatch names before starting. If the dispatch names none: ux mode loads `ux-journey` itself; a spike into a specific stack loads that stack's skills from the profile's `routing` (read `.claude/graph-profile.yaml`) so the experiment is built the house way, not from priors.
+
 ## Rules
 
 - **Answer the question asked.** Adjacent interesting findings go in one "Also noticed" line each, unexplored.

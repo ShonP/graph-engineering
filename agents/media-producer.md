@@ -18,6 +18,10 @@ Your dispatch names the run directory, the profile, what shipped (the diff or de
 - Every cut ships with its poster frame and captions file. Social cuts get per-platform aspect (9:16 reels, 1:1 or 16:9 X).
 - Realistic seeded data in every frame - never lorem ipsum, never an accidentally-empty state, never dev-tools chrome in shot.
 
+## Skill routing fallback
+
+`short-attention-media` is preloaded. Load every additional skill your dispatch names. If it names none and the assets touch app UI flows, read the profile's `rules` for the repo's media pipeline doc before building one.
+
 ## Report
 
 Asset paths with duration and target platform per asset, the hook frame path for each video (the frame you verified, attached as evidence), and any criterion you could not meet.

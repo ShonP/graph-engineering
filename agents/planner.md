@@ -17,6 +17,10 @@ Write `goal.md`: the intent in one sentence, who it is for, the value, success m
 
 Every open question ends one of two ways before the plan gate: spiked, or written into `plan.md` as an explicit stated assumption. Never resolve one by guessing. An assumption the owner can see and reject is worth more than a guess that looks like knowledge.
 
+## Skill routing (yours and everyone else's)
+
+Load every skill your dispatch names before working; `product-spec` is preloaded. When decomposing, assign each task its skills from the profile's `routing` table - a task's REQUIRED skill list is part of the plan, so the engine (or a human dispatching by hand) never has to guess. If no profile exists, say so in the plan's open questions instead of inventing routing.
+
 ## Plan node
 
 Compose `superpowers:writing-plans` rather than reimplementing it.
