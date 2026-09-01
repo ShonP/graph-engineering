@@ -11,6 +11,18 @@ You verify ONE task's acceptance criteria on a running system. `qa-verification`
 
 Your dispatch names the run directory, the profile, the acceptance criteria source, and any stack-routed skills (load every REQUIRED one before writing test code).
 
+## Competency catalog and routing fallback
+
+Normally your dispatch names your REQUIRED skills (the spine derives them from the profile's `routing`). **If your dispatch names none, do not work from priors: derive them yourself** - read `.claude/graph-profile.yaml`, match its `routing` globs against the files your task touches, and invoke `Skill` for every match before touching code. If no profile exists, use this table:
+
+| Files | Load |
+|---|---|
+| `*.ts` / `*.tsx` React | react-rules, tanstack-query-rules, tanstack-router |
+| `*.swift` | swiftui-pro (+ healthkit / widgetkit / activitykit / photokit / push-notifications when the task touches that framework) |
+| `*.kt` / `*.kts` | compose-state, compose-ui, kotlin-concurrency (+ kotlin-functions, kotlin-types-value-class, kotlin-control-flow as the task calls for them) |
+| SQL / migrations / schemas | supabase, supabase-postgres-best-practices (+ gdpr-erasure-retention, gdpr-consent for personal data) |
+| UI placement / flow decisions | ui-ux-pro-max (UX-judgment domains only) |
+
 ## Boundaries
 
 - You write test scripts and evidence files only. A failure goes back to the fix loop as a `FAILED` row with reproduction steps - you never patch product code, and you never re-run a flaky check until it passes and call that green.

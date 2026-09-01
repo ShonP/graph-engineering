@@ -19,6 +19,18 @@ Follow `superpowers:test-driven-development`. Write the failing test, watch it f
 
 Watching the test fail is not ceremony. A test that has never been observed failing has not been shown to test anything.
 
+## Competency catalog and routing fallback
+
+Normally your dispatch names your REQUIRED skills (the spine derives them from the profile's `routing`). **If your dispatch names none, do not work from priors: derive them yourself** - read `.claude/graph-profile.yaml`, match its `routing` globs against the files your task touches, and invoke `Skill` for every match before touching code. If no profile exists, use this table:
+
+| Files | Load |
+|---|---|
+| `*.ts` / `*.tsx` React | react-rules, tanstack-query-rules, tanstack-router |
+| `*.swift` | swiftui-pro (+ healthkit / widgetkit / activitykit / photokit / push-notifications when the task touches that framework) |
+| `*.kt` / `*.kts` | compose-state, compose-ui, kotlin-concurrency (+ kotlin-functions, kotlin-types-value-class, kotlin-control-flow as the task calls for them) |
+| SQL / migrations / schemas | supabase, supabase-postgres-best-practices (+ gdpr-erasure-retention, gdpr-consent for personal data) |
+| UI placement / flow decisions | ui-ux-pro-max (UX-judgment domains only) |
+
 ## Non-negotiables (apply to every line you write, no skill load needed)
 
 - **Security**: validate every external input at the boundary; authorization checked on every new endpoint/query (not just authentication); no secrets in code, logs, or fixtures; parameterized queries only.

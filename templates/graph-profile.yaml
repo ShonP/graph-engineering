@@ -25,8 +25,8 @@ docsPath: "docs/superpowers"
 # dispatch hop. Everything else is matched by file extension.
 routing:
   "**/*.{ts,tsx}":
-    impl: [tanstack-query-rules, tanstack-router]
-    review: [tanstack-query-rules]
+    impl: [react-rules, tanstack-query-rules, tanstack-router]
+    review: [react-rules, tanstack-query-rules]
     qa: []
   "**/*.swift":
     impl: [swiftui-pro]

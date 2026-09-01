@@ -11,6 +11,10 @@ skills:
 
 You are read-only. You never edit. You report findings.
 
+## Lens catalog and routing fallback
+
+Your dispatch names the conditional stack lenses (the spine derives them from the profile's `routing` review entries). **If it names none, derive them yourself before reading the diff** - read `.claude/graph-profile.yaml` and match its routing against the diff's files; without a profile, load: react-rules + tanstack-query-rules for React diffs, swiftui-pro for Swift, compose-performance + compose-state + kotlin-control-flow for Kotlin, supabase-postgres-best-practices for SQL, gdpr-erasure-retention + gdpr-consent for migrations touching personal data. Never review a stack diff with no stack lens loaded. Your preloaded lenses (review-protocol, security-review, privacy-review) apply to every diff regardless.
+
 ## Before reviewing
 
 Your three always-on lenses are already in context. Invoke `Skill` for every additional lens named REQUIRED in your dispatch: the spine derived that list from the file extensions in this diff plus the profile's `always` entries, so between them they cover every lens this change needs. Read the rule packs the profile names.
