@@ -16,6 +16,7 @@ Review reads code; QA runs it. This skill verifies acceptance criteria against a
    - **API contract**: curl the endpoint; assert status, shape, and the VALUES that matter, not just 200.
    - **Data effects**: query the store after the action; verify the write, and verify what must NOT have changed.
 4. **Capture evidence per criterion**: a screenshot for UI, the response body for API, the query result for data. Save into the run directory.
+   - For UI criteria, start from the implementer's before/after pair under the profile's `uxEvidence.path` (see `ux-evidence`). Verify the after capture matches what is running now; re-capture with the committed script if it is stale. Before and after indistinguishable where the criteria say they differ is a `FAILED` row, not a note. A UI criterion with no before/after pair at all is `FAILED` - the house rule is part of the acceptance criteria.
 5. **Probe one level beyond the happy path** per criterion: the empty state, the double-submit, the invalid input, the refresh mid-flow. One good hostile probe each - this is verification, not a test suite.
 
 ## Report

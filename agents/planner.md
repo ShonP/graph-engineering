@@ -29,7 +29,7 @@ Decompose into tasks that each carry their own test cycle. For every task record
 
 - the files it touches
 - the stack it belongs to, matched against the profile's `stacks` globs
-- its acceptance criteria
+- its acceptance criteria - for any task a user can see, one criterion is always "before/after evidence captured per `ux-evidence`", so no one has to remember the house rule
 - which tasks it can run in parallel with
 - its size: `small` (mechanical, bounded to 1-2 files, clear acceptance criteria) or `standard`. The engine routes `small` tasks to `implementer-simple` and everything else to `implementer`; when in doubt, mark `standard`.
 
@@ -39,7 +39,7 @@ Scale the plan to the work. A one-line fix does not need a five-task plan, and w
 
 ## Merge node
 
-Present the reviewed diff, the gate verdict, and what remains unresolved. State plainly whether anything was parked rather than fixed. The owner decides; you do not merge.
+Present the reviewed diff, the gate verdict, and what remains unresolved. For any change a user can see, present the before/after evidence pairs (profile `uxEvidence.path`, mirrored in `.graph/<run>/assets/`) beside the diff - the owner approves what they can see, not what they can infer. No pairs on a UI change means the merge gate is not ready to present; send it back to the fix loop. State plainly whether anything was parked rather than fixed. The owner decides; you do not merge.
 
 ## Report
 

@@ -115,6 +115,21 @@ skill floor returns `NEEDS_SETUP` instead of improvising.
 Still planned: the `bug`, `launch` and `content` playbooks that put the back
 half of the roster to work, board sync, and `/graph-doctor`.
 
+## House rules
+
+Some competencies are not routed by file type; they are the organization's
+standing rules and every agent carries them:
+
+- **UX evidence.** Every change a user can see ships before/after evidence -
+  screenshot pairs for static changes, ≤30s recording pairs for flows - captured
+  as code, committed under the profile's `uxEvidence.path` (default
+  `docs/ux/changes`) and embedded in the PR body. The implementer captures
+  *before* on the base commit, first, before touching UI. The reviewer treats a
+  missing pair on a UI diff as Blocking. `skills/process/ux-evidence`.
+- **Security, privacy, accessibility** are implementer non-negotiables and
+  always-on review lenses; see `agents/implementer.md` and
+  `skills/process/review-protocol`.
+
 ## The profile is yours
 
 `.claude/graph-profile.yaml` lives in your repo. A plugin update replaces agents,

@@ -17,6 +17,12 @@ rules: [".claude/rules/*.md"]
 # Where specs and plans go. Override when the repo does not use docs/.
 docsPath: "docs/superpowers"
 
+# House rule: every change a user can see ships before/after evidence
+# (screenshots, or <=30s recordings for flows), captured as code and committed
+# here as <path>/<date>-<slug>/, embedded in the PR body. See `ux-evidence`.
+uxEvidence:
+  path: "docs/ux/changes"
+
 # The spine reads this to name each agent's REQUIRED skills in its dispatch.
 # Agents never choose their own conditional skills: an agent that picks can skip
 # loading and write from priors instead.
@@ -24,23 +30,25 @@ docsPath: "docs/superpowers"
 # `always` lenses are preloaded in the reviewer's frontmatter, so they cost no
 # dispatch hop. Everything else is matched by file extension.
 routing:
+  # ux-evidence rides on every UI-bearing extension: the implementer captures,
+  # the reviewer checks, qa verifies against the running system.
   "**/*.{ts,tsx}":
-    impl: [react-rules, tanstack-query-rules, tanstack-router]
-    review: [react-rules, tanstack-query-rules]
-    qa: []
+    impl: [react-rules, tanstack-query-rules, tanstack-router, ux-evidence]
+    review: [react-rules, tanstack-query-rules, ux-evidence]
+    qa: [ux-evidence]
   "**/*.swift":
-    impl: [swiftui-pro]
-    review: [swiftui-pro]
-    qa: []
+    impl: [swiftui-pro, ux-evidence]
+    review: [swiftui-pro, ux-evidence]
+    qa: [ux-evidence]
   # iOS framework skills route by the dirs that use them - adjust globs to taste.
   "**/{Health,Workout}*": { impl: [healthkit] }
   "**/{Widget,LiveActivity}*": { impl: [widgetkit, activitykit] }
   "**/{Photo,Camera}*": { impl: [photokit] }
   "**/*[Nn]otification*": { impl: [push-notifications] }
   "**/*.{kt,kts}":
-    impl: [compose-state, compose-ui, kotlin-concurrency, kotlin-types-value-class]
-    review: [compose-performance, compose-state, kotlin-control-flow]
-    qa: [compose-build-and-test]
+    impl: [compose-state, compose-ui, kotlin-concurrency, kotlin-types-value-class, ux-evidence]
+    review: [compose-performance, compose-state, kotlin-control-flow, ux-evidence]
+    qa: [compose-build-and-test, ux-evidence]
   "**/*.sql":
     impl: [supabase-postgres-best-practices, supabase]
     review: [supabase-postgres-best-practices]

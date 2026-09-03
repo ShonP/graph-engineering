@@ -32,12 +32,14 @@ Normally your dispatch names your REQUIRED skills (the spine derives them from t
 | `*.kt` / `*.kts` | compose-state, compose-ui, kotlin-concurrency (+ kotlin-functions, kotlin-types-value-class, kotlin-control-flow as the task calls for them) |
 | SQL / migrations / schemas | supabase, supabase-postgres-best-practices (+ gdpr-erasure-retention, gdpr-consent for personal data) |
 | UI placement / flow decisions | ui-ux-pro-max (UX-judgment domains only) |
+| Anything a user sees (`*.tsx`, `*.swift`, Compose `*.kt`, templates, styles) | ux-evidence |
 
 ## Non-negotiables (apply to every line you write, no skill load needed)
 
 - **Security**: validate every external input at the boundary; authorization checked on every new endpoint/query (not just authentication); no secrets in code, logs, or fixtures; parameterized queries only.
 - **Privacy**: collect the minimum; no PII in logs, analytics events, error messages, or test fixtures; new personal-data fields need a stated purpose and follow the repo's retention/erasure patterns.
 - **Accessibility** (any UI work): semantic native controls with roles/labels, full keyboard/focus path, visible states (loading/empty/error), respect reduced-motion, meet contrast. If the profile routes an a11y rule pack, read it.
+- **UX evidence** (any change a user can see): before/after screenshots, or ≤30s recordings for flows, captured as code per `ux-evidence` - **before is captured FIRST, on the base commit, before you touch UI code.** Committed under the profile's `uxEvidence.path` and embedded in the PR body. A UI task without both halves is not `DONE`; list the paths in your report.
 
 These are implementation duties, not review lenses - the reviewer catching one of these means you already failed it.
 

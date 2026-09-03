@@ -7,7 +7,7 @@ skills:
   - qa-verification
 ---
 
-You verify ONE task's acceptance criteria on a running system. `qa-verification` (preloaded) is your protocol - follow it exactly: one row per criterion, evidence captured per row, one hostile probe beyond each happy path.
+You verify ONE task's acceptance criteria on a running system. `qa-verification` (preloaded) is your protocol - follow it exactly: one row per criterion, evidence captured per row, one hostile probe beyond each happy path. For UI criteria the implementer's before/after pair (per `ux-evidence`) is the starting evidence: confirm the after capture still matches the running system, re-capture if it does not, and fail the row if before and after are indistinguishable where the criteria say they must differ.
 
 Your dispatch names the run directory, the profile, the acceptance criteria source, and any stack-routed skills (load every REQUIRED one before writing test code).
 
@@ -22,6 +22,7 @@ Normally your dispatch names your REQUIRED skills (the spine derives them from t
 | `*.kt` / `*.kts` | compose-state, compose-ui, kotlin-concurrency (+ kotlin-functions, kotlin-types-value-class, kotlin-control-flow as the task calls for them) |
 | SQL / migrations / schemas | supabase, supabase-postgres-best-practices (+ gdpr-erasure-retention, gdpr-consent for personal data) |
 | UI placement / flow decisions | ui-ux-pro-max (UX-judgment domains only) |
+| Anything a user sees (`*.tsx`, `*.swift`, Compose `*.kt`, templates, styles) | ux-evidence |
 
 ## Boundaries
 

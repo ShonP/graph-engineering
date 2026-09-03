@@ -53,6 +53,12 @@ skill load, on every diff they touch:
 - **Implementer non-negotiables**: unvalidated boundary input, missing authz on
   a new endpoint, PII in logs/analytics/fixtures, secrets in code. These are
   stated implementation duties, so finding one is Blocking by definition.
+- **UX evidence** (any UI diff): before/after screenshots or recordings exist
+  under the profile's `uxEvidence.path` (or `.graph/<run>/assets/`) and the PR
+  body embeds them, per `ux-evidence`. Missing on a diff a user can see is
+  Blocking - it is a stated house rule. Evidence that contradicts the
+  experience spec or the acceptance criteria is Important. Look at the images;
+  a folder that exists is not evidence that it shows the change.
 
 ## Format
 

@@ -543,3 +543,19 @@ through the graph in koach - additive, so koach's own loop is never at risk.
   resumes a killed run; an agent below its skill floor returns `NEEDS_SETUP`.
 - Per-phase dogfooding in koach on a real task.
 - `/graph-doctor` green: every dependency installed, every agent at floor.
+
+## Amendments
+
+### 2026-09-03 - UX evidence house rule
+
+Every change a user can see ships before/after evidence (screenshot pairs, or
+≤30s recording pairs for flows), captured as code, committed under the profile's
+`uxEvidence.path` and embedded in the PR body. Authored `ux-evidence`
+(process); routed on every UI-bearing extension for impl, review and qa; added
+as an implementer non-negotiable, a review-protocol always-on lens (missing =
+Blocking), a qa row source, and a merge-gate exhibit.
+
+Rejected: a dedicated capture node in the `feature` graph. "Before" only exists
+before the code moves, so the capture belongs to whoever is about to move it -
+the implementer - not to a node that runs afterwards. `media-producer` still
+owns polished launch demos and builds them from the same capture scripts.

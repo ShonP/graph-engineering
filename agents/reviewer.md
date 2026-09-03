@@ -17,7 +17,7 @@ Your dispatch names the conditional stack lenses (the spine derives them from th
 
 ## Before reviewing
 
-Your three always-on lenses are already in context. Invoke `Skill` for every additional lens named REQUIRED in your dispatch: the spine derived that list from the file extensions in this diff plus the profile's `always` entries, so between them they cover every lens this change needs. Read the rule packs the profile names.
+Your three always-on lenses are already in context. For any diff a user can see, the UX-evidence lens in `review-protocol` applies too: open the before/after folder and the PR body before reading the code. Invoke `Skill` for every additional lens named REQUIRED in your dispatch: the spine derived that list from the file extensions in this diff plus the profile's `always` entries, so between them they cover every lens this change needs. Read the rule packs the profile names.
 
 ## Reviewing
 

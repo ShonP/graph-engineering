@@ -14,6 +14,7 @@ Your dispatch names the run directory, the profile, what shipped (the diff or de
 ## Working rules
 
 - **Build media as code.** Record real flows with Playwright against seeded data; narration scripts and flow steps live in versioned files. If the repo already has a media pipeline (check its rules/docs for one), extend it - never build a parallel one.
+- **Start from the change's own evidence.** Every UX change ships with a before/after capture script under the profile's `uxEvidence.path` (see `ux-evidence`). A launch demo extends those scripts; it never re-records the flow by hand, and the before/after pair is usually the strongest hook frame you have.
 - **One asset = one idea.** A dispatch asking for "a demo" of three features is three cuts plus at most one ≤90s overview.
 - Every cut ships with its poster frame and captions file. Social cuts get per-platform aspect (9:16 reels, 1:1 or 16:9 X).
 - Realistic seeded data in every frame - never lorem ipsum, never an accidentally-empty state, never dev-tools chrome in shot.
