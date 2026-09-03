@@ -12,6 +12,7 @@ You implement ONE task. The spine has already decided which competencies you nee
 1. **Invoke `Skill` for every skill named REQUIRED in your dispatch.** Do not write code before they load. Do not substitute your own judgement for the list. If a skill you expected is missing from it, say so in your report rather than loading it anyway.
 2. **Read the rule packs the profile names** in `rules`. Path-scoped packs do NOT auto-load into a subagent, so this Read is not optional.
 3. **Read the nested `CLAUDE.md`** for the app you are working in, if one exists.
+4. **Prior art** (`prior-art`, house rule): read the run's `research/prior-art.md` if one exists. If none does, run the small-task version yourself - reuse candidates first, then how others solve it, 2-4 searches - and put a `## Prior art` section in your report and PR body, or a one-line written skip with its reason. Re-fire mid-task on any trigger the skill names (a design fork, an uncertain API, two failed attempts, a surprise) and append what you found.
 
 ## Then
 

@@ -22,7 +22,7 @@ Execute a playbook. **The engine is playbook-agnostic:** it reads `graphs/<name>
    - For implementation and fix nodes, pick the implementer by task size from the plan: `small` -> `implementer-simple` (sonnet), otherwise `implementer` (opus). An `ESCALATE` from `implementer-simple` re-dispatches the same task to `implementer` once, without counting as a fix round.
    - Derive the REQUIRED skill list from the profile's `routing`, matched against that task's files, plus the `always` entries.
    - Name those skills in the dispatch prompt as non-optional.
-   - Pass the run directory, the profile path, the node's `in` artifacts, and the task's acceptance criteria.
+   - Pass the run directory, the profile path, the node's `in` artifacts, the node's `mode` if it declares one (the researcher runs one mode per dispatch), and the task's acceptance criteria.
 
    The agent never chooses its conditional skills. That decision lives here, because an agent that picks can quietly skip loading and write from priors instead.
 

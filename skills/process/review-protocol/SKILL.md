@@ -53,6 +53,11 @@ skill load, on every diff they touch:
 - **Implementer non-negotiables**: unvalidated boundary input, missing authz on
   a new endpoint, PII in logs/analytics/fixtures, secrets in code. These are
   stated implementation duties, so finding one is Blocking by definition.
+- **Prior art** (every diff): the plan or PR carries a prior-art note per
+  `prior-art` - reuse candidates weighed, sources with rungs, spikes with
+  verdicts - or a written skip reason that fits the skip rule. Missing is
+  Important. New code that re-implements an available, adequate library,
+  skill or platform feature is Important, and the finding names the candidate.
 - **UX evidence** (any UI diff): before/after screenshots or recordings exist
   under the profile's `uxEvidence.path` (or `.graph/<run>/assets/`) and the PR
   body embeds them, per `ux-evidence`. Missing on a diff a user can see is

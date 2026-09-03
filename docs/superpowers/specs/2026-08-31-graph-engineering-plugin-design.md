@@ -559,3 +559,22 @@ Rejected: a dedicated capture node in the `feature` graph. "Before" only exists
 before the code moves, so the capture belongs to whoever is about to move it -
 the implementer - not to a node that runs afterwards. `media-producer` still
 owns polished launch demos and builds them from the same capture scripts.
+
+### 2026-09-03 - Prior-art house rule; research MAP enters the feature graph
+
+No ask starts from priors. Authored `prior-art` (process): fires at the start
+of every task and at mid-task forks; reuse candidates checked before anything
+else; a source ladder (ran it > docs with version > maintainer intent > named,
+dated, cited author > anonymous); a per-claim skepticism checklist; spikes for
+load-bearing claims with VALIDATED / PARTIAL / INVALIDATED verdicts; a
+prior-art note in every plan or PR, or a written skip. Preloaded in planner,
+`always.impl` in the profile, an always-on review lens, and the researcher's
+tech mode now opens with reuse candidates. The §5.1 research MAP (ux | tech |
+competitor, parallel) moved from "later phase" into `graphs/feature.md`.
+
+Prior art for the rule itself: Hermes Agent's spike skill (adopted its skip
+rule and verdict vocabulary; not a Claude Code skill, so not vendored);
+VoltAgent's competitive-analyst subagent (rejected - marketing SWOT, minimal
+source skepticism); the plugin's own `researcher` agent (reused - the skill is
+a protocol over it, not a second researcher). Rejected: a hard turn budget in
+the skill; budgets stay in the dispatch, scaled to the ask.

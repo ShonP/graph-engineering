@@ -60,6 +60,9 @@ routing:
     review: [gdpr-erasure-retention, gdpr-consent]
     qa: []
   always:
+    # prior-art is the research-before-work house rule: the planner has it
+    # preloaded, every implementer loads it, the reviewer checks for its note.
+    impl: [prior-art]
     review: [review-protocol, security-review, privacy-review]
     design: [ux-journey, ui-ux-pro-max]
 

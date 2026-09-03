@@ -30,7 +30,8 @@ The feature playbook, the only one shipped so far:
 
 ```mermaid
 flowchart LR
-    goal([goal]) --> plan{{"plan (gate)"}}
+    goal([goal]) --> rux([research-ux]) & rtech([research-tech]) & rcomp([research-competitor])
+    rux & rtech & rcomp --> plan{{"plan (gate)"}}
     plan --> implement([implement])
     implement --> review([review])
     review -->|findings| fix([fix])
@@ -40,6 +41,7 @@ flowchart LR
     subgraph agents [" "]
         direction LR
         a1["planner: goal, plan, merge"]
+        a0["researcher: research-ux / tech / competitor (parallel)"]
         a2["implementer / implementer-simple: implement, fix"]
         a3["reviewer: review"]
     end
@@ -126,6 +128,12 @@ standing rules and every agent carries them:
   `docs/ux/changes`) and embedded in the PR body. The implementer captures
   *before* on the base commit, first, before touching UI. The reviewer treats a
   missing pair on a UI diff as Blocking. `skills/process/ux-evidence`.
+- **Prior art.** No ask starts from priors. At the start of every task, and
+  again at every mid-task fork, look at what others do - reuse candidates
+  first (an existing skill, plugin or library), then competitors, open source,
+  docs, articles - rank each source, run the skepticism checklist, spike any
+  load-bearing claim, and write the prior-art note. The feature graph opens
+  with a three-way research MAP for this reason. `skills/process/prior-art`.
 - **Security, privacy, accessibility** are implementer non-negotiables and
   always-on review lenses; see `agents/implementer.md` and
   `skills/process/review-protocol`.
