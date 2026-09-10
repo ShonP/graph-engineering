@@ -210,7 +210,16 @@ helm template <release> <chart> -f values.yaml | kubectl apply --dry-run=server 
 
 # 3. Prove every values key you set exists in the chart at that exact version.
 helm show values <repo>/<chart> --version <v> > /tmp/chart-values.yaml
-yq '.<the.key.you.set>' /tmp/chart-values.yaml     # expect a value, never `null`
+# Use has(): a bare `yq '.a.b'` prints `null` for BOTH "key absent" and "key present and null",
+# and so does `yq '.a.b // "MISSING"'`, because yq's `//` treats an explicit null as falsy.
+# Only has() separates the two, and the difference is the whole point: an absent key is your
+# typo, a present-and-null key is a real chart default you are allowed to set.
+yq '.<parent> | has("<leaf>")' /tmp/chart-values.yaml   # expect: true
+yq '.<the.key.you.set> // "MISSING"' /tmp/chart-values.yaml  # MISSING = absent OR null
+# Measured on loki 18.12.1, which has `global.imageRegistry: null` and no `global.nosuchKey`:
+#   yq '.global.imageRegistry'                 -> null       yq '.global.nosuchKey'  -> null
+#   yq '.global.imageRegistry // "MISSING"'    -> MISSING     ... // "MISSING"       -> MISSING
+#   yq '.global | has("imageRegistry")'        -> true        ... has("nosuchKey")   -> false
 # For an Argo CD Application, read the keys straight out of the manifest:
 yq '.spec.source.helm.valuesObject | keys' <app>.yaml
 
