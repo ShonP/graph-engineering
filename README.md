@@ -117,6 +117,64 @@ skill floor returns `NEEDS_SETUP` instead of improvising.
 Still planned: the `bug`, `launch` and `content` playbooks that put the back
 half of the roster to work, board sync, and `/graph-doctor`.
 
+## Competencies
+
+Skills live under `skills/<group>/<name>/SKILL.md`. The group is filing only; what
+routes a skill to a task is the profile's routing table, matched against the
+task's files. The directory name is the routing name, and
+`scripts/check-skill-frontmatter.sh` enforces that the frontmatter `name` agrees
+with it.
+
+| Group | Skills | Routed by |
+|---|---|---|
+| `ios` | swiftui-pro, healthkit, widgetkit, activitykit, photokit, push-notifications | `**/*.swift`, plus dir globs per framework |
+| `android` | compose-state, compose-ui, compose-performance, compose-build-and-test, kotlin-concurrency, kotlin-control-flow, kotlin-functions, kotlin-types-value-class | `**/*.{kt,kts}` |
+| `react` | react-rules, tanstack-query-rules, tanstack-router | `**/*.{ts,tsx}` |
+| `supabase` | supabase, supabase-postgres-best-practices | `**/*.sql` |
+| `python` | uv, pydantic, pydantic-house-rules, fastapi, building-pydantic-ai-agents, pydantic-ai-harness | `**/*.py`, `**/{pyproject.toml,uv.lock,.python-version}` |
+| `agents` | microsoft-agent-framework | `**/agents/**/*.py` |
+| `k8s-gitops` | argocd, helm, kubectl, kustomize, cloudnativepg, envoy-gateway, agent-router, sops-age | `argocd/**`, `manifests/**`, `**/Chart.yaml`, `**/kustomization.{yaml,yml}`, `**/*.enc.yaml` |
+| `temporal` | temporal-developer | `**/{workflows,activities}/**/*.py` |
+| `qa` | playwright-cli, playwright-trace, playwright-component-testing, bruno | `tests/**/*.spec.ts`, `playwright.config.ts`, `**/*.bru` |
+| `observability` | promql, loki, tempo | `observability/**`, `**/dashboards/**/*.json`, `**/*rule*.{yaml,yml}` |
+| `security` | security-review | `always.review` |
+| `privacy` | privacy-review, gdpr-consent, gdpr-erasure-retention | `always.review`, `**/{migrations,schemas}/**` |
+| `ux` | ux-journey, ui-ux-pro-max | `always.design` |
+| `content` | short-form-posts, short-attention-media | the content playbook |
+| `process` | prior-art, review-protocol, ux-evidence, product-spec, qa-verification | `always` |
+| `rules` | backend-rules, frontend-rules, architecture-resilience-rules, agent-workflow-rules, review-testing-rules | ride along on their stack's rows; `review-testing-rules` is on `always.impl` |
+
+**Provenance.** Some of these are written here from the vendor's own docs; some
+are vendored from upstream. A vendored tree carries a `SOURCE.md` naming the
+upstream repo, the pinned commit, the license, and a copy-paste refresh recipe,
+plus the upstream `LICENSE` (and `NOTICE` where the license requires it). A
+vendored file is never edited, not even to fix it: a house rule that contradicts
+one lives in a sibling skill, which spec 4.5 precedence (house >
+vault-generated > community) makes win. `skills/python/pydantic-house-rules` is
+the worked example.
+
+**One thing to set on the host.** The vendored Playwright skills declare
+`allowed-tools: ... Bash(npx:*) Bash(npm:*)`, and `npx <package>` fetches and
+runs arbitrary registry code. A skill's `allowed-tools` applies whenever that
+skill is active, and per [Configure
+permissions](https://code.claude.com/docs/en/permissions) "workspace trust never
+gates a skill's allowed-tools in any session". A sibling house-rules skill cannot
+narrow it either, because `allowed-tools` only applies while its own skill is
+active. The control that binds is a permission rule in the consuming repo's
+`.claude/settings.json`, since a matching `ask` rule prompts regardless of what a
+skill granted:
+
+```json
+{ "permissions": { "ask": ["Bash(npx:*)", "Bash(npm:*)"] } }
+```
+
+`ask` rules only restrict, so unlike `allow` rules they take effect without the
+workspace trust dialog. `/graph-init` prints this whenever it routes the QA row.
+
+How each skill was sourced, and what was rejected:
+`docs/superpowers/plans/2026-09-10-stack-skills.md` and
+`docs/research/2026-09-10-stack-skills-sourcing.md`.
+
 ## House rules
 
 Some competencies are not routed by file type; they are the organization's
