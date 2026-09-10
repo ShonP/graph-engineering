@@ -153,9 +153,9 @@ for script in "$LINT" "$STOP" "$HANDOFF"; do
   bash -n "$script" 2>/dev/null
   check "parses as bash: $(basename "$script")" 0 $?
 done
-python3 -m py_compile "$HOOKS_DIR/scripts/resolve_touched_project.py" 2>/dev/null
-check "resolve_touched_project.py compiles" 0 $?
-rm -rf "$HOOKS_DIR/scripts/__pycache__"
+python3 -c 'import ast, sys; ast.parse(open(sys.argv[1]).read(), sys.argv[1])' \
+  "$HOOKS_DIR/scripts/resolve_touched_project.py" 2>/dev/null
+check "resolve_touched_project.py parses" 0 $?
 
 # shellcheck source=cases-resolver.sh
 . "$TESTS_DIR/cases-resolver.sh"
