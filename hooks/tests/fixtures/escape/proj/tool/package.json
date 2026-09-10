@@ -1,0 +1,8 @@
+{
+  "name": "fixture-nested-project",
+  "private": true,
+  "scripts": {
+    "lint": "sh ./ran.sh INNER_LINT_RAN",
+    "typecheck": "sh ./ran.sh INNER_TYPECHECK_RAN"
+  }
+}

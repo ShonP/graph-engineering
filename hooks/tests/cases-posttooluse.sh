@@ -91,6 +91,55 @@ row "PostToolUse" "sibling path sharing the project-dir prefix" "$RC"
 check_no_file "prefix sibling: nothing ran" \
   "$FIX/py-evil/EVIL_LINT_RAN" "$FIX/py-evil/EVIL_TYPECHECK_RAN"
 
+# The upward-walk bound. The session project here has no project file of its
+# own and its PARENT does, so any walk that does not stop at
+# CLAUDE_PROJECT_DIR runs a foreign project's scripts.
+ESCAPE_MARKERS=(
+  "$FIX/escape/ESCAPED_LINT_RAN"
+  "$FIX/escape/ESCAPED_TYPECHECK_RAN"
+)
+
+reset_markers
+run_hook "$LINT" "$FIX/escape/proj" "$(post_json "$FIX/escape/proj/src/touched.py")"
+check "file under a project whose parent has package.json -> exit 0" 0 "$RC"
+row "PostToolUse" "file in a project whose parent has package.json" "$RC"
+check_no_file "the walk stopped at the project root" "${ESCAPE_MARKERS[@]}"
+
+reset_markers
+run_hook "$LINT" "$FIX/escape/proj" "$(post_json "$FIX/escape/proj")"
+check "file_path equal to CLAUDE_PROJECT_DIR -> exit 0" 0 "$RC"
+row "PostToolUse" "file_path equal to CLAUDE_PROJECT_DIR" "$RC"
+check_no_file "file_path equal to the project: nothing ran" "${ESCAPE_MARKERS[@]}"
+
+reset_markers
+run_hook "$LINT" "$FIX/escape/proj" "$(post_json "$FIX/escape/proj/sub")"
+check "file_path that is a directory -> exit 0" 0 "$RC"
+row "PostToolUse" "file_path that is a directory" "$RC"
+check_no_file "a directory path: nothing ran" "${ESCAPE_MARKERS[@]}"
+
+reset_markers
+run_hook "$LINT" "$FIX/escape/proj" "$(post_json "$FIX/escape/proj/tool/nested")"
+check "directory beside a package.json -> exit 0" 0 "$RC"
+row "PostToolUse" "directory whose parent declares lint" "$RC"
+check_no_file "a directory path: the nearest project did not run it" \
+  "$FIX/escape/proj/tool/INNER_LINT_RAN" "$FIX/escape/proj/tool/INNER_TYPECHECK_RAN"
+
+reset_markers
+run_hook "$LINT" "$FIX/escape/proj" "$(post_json "$FIX/escape/proj/tool/ghost.ts")"
+check "file_path that does not exist -> exit 0" 0 "$RC"
+row "PostToolUse" "file_path that does not exist" "$RC"
+check_no_file "a missing file: the nearest project did not run it" \
+  "$FIX/escape/proj/tool/INNER_LINT_RAN" "$FIX/escape/proj/tool/INNER_TYPECHECK_RAN"
+
+# The positive half: a real file inside the nested project is still linted by it,
+# so the bound narrows the walk without disabling it.
+reset_markers
+run_hook "$LINT" "$FIX/escape/proj" "$(post_json "$FIX/escape/proj/tool/real.ts")"
+check "real file in a nested project -> exit 0" 0 "$RC"
+row "PostToolUse" "real file in a project nested inside the bound" "$RC"
+check_file "the nested project ran lint" "$FIX/escape/proj/tool/INNER_LINT_RAN"
+check_no_file "the nested project did not reach the ancestor" "${ESCAPE_MARKERS[@]}"
+
 reset_markers
 run_hook "$LINT" "$FIX/py" "$(event_json PostToolUse)"
 check "input with no file_path -> exit 0" 0 "$RC"

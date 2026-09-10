@@ -96,7 +96,8 @@ skip() { # skip <label> <reason>
 row() { ROWS+=("$1|$2|$3"); }
 
 reset_markers() {
-  find "$WORK" -name 'RAN_*' -o -name 'OUTSIDE_*' -o -name 'EVIL_*' |
+  find "$WORK" \( -name 'RAN_*' -o -name 'OUTSIDE_*' -o -name 'EVIL_*' \
+    -o -name 'ESCAPED_*' -o -name 'INNER_*' \) |
     while read -r marker; do rm -f "$marker"; done
 }
 
@@ -148,7 +149,16 @@ for script in "$LINT" "$STOP" "$HANDOFF"; do
 done
 python3 -m json.tool "$HOOKS_DIR/hooks.json" >/dev/null 2>&1
 check "hooks.json parses as JSON" 0 $?
+for script in "$LINT" "$STOP" "$HANDOFF"; do
+  bash -n "$script" 2>/dev/null
+  check "parses as bash: $(basename "$script")" 0 $?
+done
+python3 -m py_compile "$HOOKS_DIR/scripts/resolve_touched_project.py" 2>/dev/null
+check "resolve_touched_project.py compiles" 0 $?
+rm -rf "$HOOKS_DIR/scripts/__pycache__"
 
+# shellcheck source=cases-resolver.sh
+. "$TESTS_DIR/cases-resolver.sh"
 # shellcheck source=cases-posttooluse.sh
 . "$TESTS_DIR/cases-posttooluse.sh"
 # shellcheck source=cases-stop.sh

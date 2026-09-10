@@ -32,7 +32,8 @@
 #      npm 11.12.1 strips a leading `--` and pnpm 10.33.3 forwards it to the
 #      script as a literal first argument, so the bare form is the one that
 #      behaves the same on both.
-# Anything else, including a file outside $CLAUDE_PROJECT_DIR: exit 0 in silence.
+# Anything else exits 0 in silence: a path outside $CLAUDE_PROJECT_DIR, the
+# project directory itself, a directory, or a path that is not a regular file.
 #
 # Least privilege: the only commands this hook runs are the project's own named
 # scripts, from the project directory that declares them, inside the session's
@@ -50,56 +51,13 @@ PROJECT_DIR="${CLAUDE_PROJECT_DIR:-}"
 [ -n "$PROJECT_DIR" ] || exit 0
 [ -d "$PROJECT_DIR" ] || exit 0
 
-# Resolve tool_input.file_path, enforce the project-directory bound, and find the
-# nearest project file. Prints two lines on success: the directory, then the kind.
+# Resolve tool_input.file_path, enforce the project-directory bound, and find
+# the nearest project file. Prints two lines on success: the directory, then the
+# kind. The bound lives in that file, with its own unit cases.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 RESOLVED=""
-if ! RESOLVED="$(HOOK_INPUT="$HOOK_INPUT" CLAUDE_PROJECT_DIR="$PROJECT_DIR" python3 -c '
-import json
-import os
-import sys
-
-try:
-    data = json.loads(os.environ["HOOK_INPUT"])
-except Exception:
-    sys.exit(0)
-if not isinstance(data, dict):
-    sys.exit(0)
-
-tool_input = data.get("tool_input")
-if not isinstance(tool_input, dict):
-    sys.exit(0)
-raw = tool_input.get("file_path")
-if not isinstance(raw, str) or not raw or "\n" in raw or "\x00" in raw:
-    sys.exit(0)
-if not os.path.isabs(raw):
-    sys.exit(0)
-
-try:
-    project = os.path.realpath(os.environ["CLAUDE_PROJECT_DIR"])
-    touched = os.path.realpath(raw)
-except OSError:
-    sys.exit(0)
-
-# Containment: equal, or under the project directory with a separator between.
-# The separator is what keeps a sibling such as /repo-evil out of /repo.
-if touched != project and not touched.startswith(project + os.sep):
-    sys.exit(0)
-
-directory = os.path.dirname(touched)
-while True:
-    if os.path.isfile(os.path.join(directory, "pyproject.toml")):
-        print(directory)
-        print("pyproject")
-        break
-    if os.path.isfile(os.path.join(directory, "package.json")):
-        print(directory)
-        print("package")
-        break
-    parent = os.path.dirname(directory)
-    if directory == project or parent == directory:
-        break
-    directory = parent
-' 2>/dev/null)"; then
+if ! RESOLVED="$(HOOK_INPUT="$HOOK_INPUT" CLAUDE_PROJECT_DIR="$PROJECT_DIR" \
+  python3 "$SCRIPT_DIR/resolve_touched_project.py" 2>/dev/null)"; then
   exit 0
 fi
 
@@ -109,6 +67,8 @@ PROJECT_KIND="$(printf '%s\n' "$RESOLVED" | sed -n '2p')"
 [ -n "$PROJECT_FILE_DIR" ] || exit 0
 [ -d "$PROJECT_FILE_DIR" ] || exit 0
 
+# Safe to re-derive: the resolver above only returns a directory when this same
+# path passed the bound and was a real file.
 TOUCHED_FILE="$(HOOK_INPUT="$HOOK_INPUT" python3 -c '
 import json
 import os
