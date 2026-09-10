@@ -21,6 +21,13 @@
     "./skills/supabase",
     "./skills/ux",
     "./skills/content",
-    "./skills/process"
+    "./skills/process",
+    "./skills/python",
+    "./skills/agents",
+    "./skills/k8s-gitops",
+    "./skills/temporal",
+    "./skills/qa",
+    "./skills/observability",
+    "./skills/rules"
   ]
 }
