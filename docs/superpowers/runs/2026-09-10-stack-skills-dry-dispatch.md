@@ -54,6 +54,8 @@ The per-file table, the resolved paths and the verbatim matcher output are in
 [`2026-09-10-stack-skills-dry-dispatch-table.md`](2026-09-10-stack-skills-dry-dispatch-table.md),
 split out to keep both files under the 250-line house limit.
 
+`scripts/check-routing-resolves.sh` makes this repeatable: it fails on any routing- or agent-referenced name that does not resolve to one `skills/*/<name>/SKILL.md`.
+
 Two results worth pulling forward:
 
 - `tests/81-cnpg.sh` and `docs/HANDOFF.md` match no row and get `always` only.

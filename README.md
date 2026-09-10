@@ -151,7 +151,8 @@ Skills live under `skills/<group>/<name>/SKILL.md`. The group is filing only; wh
 routes a skill to a task is the profile's routing table, matched against the
 task's files. The directory name is the routing name, and
 `scripts/check-skill-frontmatter.sh` enforces that the frontmatter `name` agrees
-with it.
+with it, and `scripts/check-routing-resolves.sh` checks that every name the
+routing table and the roster reference actually resolves to one skill.
 
 | Group | Skills | Routed by |
 |---|---|---|
