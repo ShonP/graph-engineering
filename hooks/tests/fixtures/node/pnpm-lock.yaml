@@ -1,0 +1,2 @@
+# Fixture lockfile: its presence is what selects pnpm.
+lockfileVersion: "9.0"

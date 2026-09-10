@@ -5,3 +5,10 @@ node_modules/
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# Markers the hook test fixtures write if their scripts are ever run in place
+# (the suite itself runs them in a mktemp copy and leaves nothing behind).
+hooks/tests/fixtures/**/RAN_*
+hooks/tests/fixtures/**/OUTSIDE_*
+hooks/tests/fixtures/**/EVIL_*
+hooks/tests/fixtures/**/PASS
