@@ -18,11 +18,19 @@ Sources (fetched 2026-09-10, curl, all HTTP 200):
 - https://docs.pydantic.dev/latest/concepts/models/ - "Models | Pydantic Docs"
 - https://docs.pydantic.dev/latest/concepts/dataclasses/ - "Dataclasses | Pydantic Docs"
 - https://docs.pydantic.dev/latest/concepts/serialization/ - "Serialization | Pydantic Docs"
+- https://docs.pydantic.dev/latest/concepts/fields/ - "Fields | Pydantic Docs"
 - https://docs.pydantic.dev/latest/api/types/ - "Pydantic Types | Pydantic Docs"
+- https://docs.python.org/3.14/library/uuid.html - "uuid - UUID objects according to RFC 9562 - Python 3.14.7 documentation"
+- https://github.com/aminalaee/uuid-utils - "GitHub - aminalaee/uuid-utils: Fast, drop-in replacement for Python's uuid module, powered by Rust."
+- https://github.com/oittaa/uuid6-python - "GitHub - oittaa/uuid6-python: New time-based UUID formats which are suited for use as a database key"
+
+The Python title is recorded with hyphens where the page uses em dashes, which this repo's files
+do not carry. The two packages are cited by repository because `pypi.org/project/<name>/` served a
+bot challenge that day; PyPI JSON read `uuid-utils` 1.0.0 and `uuid6` 2025.0.1 (Python >=3.10 and
+>=3.9).
 
 In-repo sources: `skills/python/pydantic/SKILL.md` (the vendored skill, pin `9e9390ee`) and
-`skills/temporal/temporal-developer/references/python/data-handling.md` (the vendored
-Temporal SDK reference, section "Pydantic Integration").
+`skills/temporal/temporal-developer/references/python/data-handling.md`, "Pydantic Integration".
 
 ## What this overrides
 
@@ -46,20 +54,19 @@ Precedence, spec 4.5 (`docs/superpowers/specs/2026-08-31-graph-engineering-plugi
 point it loses. Everything it says that this skill does not contradict is still binding, and
 the vendored file is never edited to express the override.
 
-The reason the house takes the other side: one validation and serialization model across
-settings, contracts, HTTP boundaries and workflow payloads costs less than two. Static type
-checking catches mismatches at the call sites it can see; it does not catch the payload that
-crossed a queue, a workflow history replay or a config file.
+The reason: one validation and serialization model across settings, contracts, HTTP boundaries
+and workflow payloads costs less than two. Static type checking catches mismatches at call sites
+it can see, not the payload that crossed a queue, a workflow history replay or a config file.
 
 ## When to apply
 
-- Any Python file that declares a data shape: request and response models, service
-  contracts, settings, workflow and activity payloads, internal state, value objects.
-- Reviewing a diff that adds `@dataclass`, `TypedDict`, `NamedTuple` or a bare `dict` as a
-  domain type.
+- Any Python file that declares a data shape: request and response models, service contracts,
+  settings, workflow and activity payloads, internal state, value objects.
+- Reviewing a diff that adds `@dataclass`, `TypedDict`, `NamedTuple` or a bare `dict` as a domain
+  type.
 - Wiring a Temporal client, worker or codec.
-- Not for: plain functions, protocols and ABCs with no data fields, or third-party types you
-  do not own. Those are unaffected.
+- Not for: plain functions, protocols and ABCs with no data fields, or third-party types you do
+  not own.
 
 ## Rules
 
@@ -88,26 +95,51 @@ crossed a queue, a workflow history replay or a config file.
    reference defines as `Annotated[UUID, UuidVersion(7)]` and documents as a UUID that must
    be version 7. A `str` id field validates nothing; a bare `uuid.UUID` field accepts any
    version. https://docs.pydantic.dev/latest/api/types/#pydantic.types.UUID7
-7. **Temporal workflow and activity inputs and outputs are `BaseModel` subclasses, and every
+7. **Name the generator, because the annotation does not produce values and the Pydantic docs
+   are silent on generation.** `uuid.uuid7()` is stdlib only from Python 3.14 ("Added in
+   version 3.14"); below that the stdlib offers no v7 generator at all, and `uuid.uuid4` is
+   the thing a hurried hand reaches for.
+   https://docs.python.org/3.14/library/uuid.html#uuid.uuid7
+   - Python 3.14 and up: `from uuid import uuid7`.
+   - Below 3.14: `from uuid_utils.compat import uuid7` (https://github.com/aminalaee/uuid-utils)
+     or `from uuid6 import uuid7` (https://github.com/oittaa/uuid6-python). Use the
+     `uuid_utils.compat` module, not `uuid_utils` itself: the top-level `uuid7()` returns a
+     `uuid_utils.UUID`, which Pydantic rejects with `UUID input should be a string, bytes or
+     UUID object`, while `uuid_utils.compat.uuid7()` returns a stdlib `uuid.UUID`.
+   - One project module exports `uuid7` behind that version check; models import it from there.
+8. **Pydantic does not validate defaults, so a v7 field with a v4 default is silently wrong.**
+   The docs say it plainly: "By default, Pydantic will not validate default values." Every
+   `UUID7` field carries `validate_default=True` beside its `default_factory`, as does any
+   other constrained field with a default.
+   https://docs.pydantic.dev/latest/concepts/fields/#validate-default-values
+   ```python
+   id: UUID7 = Field(default_factory=uuid7, validate_default=True)
+   ```
+   Without it, `Field(default_factory=uuid.uuid4)` on a `UUID7` field stores a version 4 id
+   with no error; with it, construction raises `UUID version 7 expected [type=uuid_version]`.
+9. **Temporal workflow and activity inputs and outputs are `BaseModel` subclasses, and every
    client is constructed with `data_converter=pydantic_data_converter` from
    `temporalio.contrib.pydantic`.** The converter has to be passed on the client, the worker
    and the codec server that share a history, or a replay decodes payloads the workflow code
    cannot read. `skills/temporal/temporal-developer/references/python/data-handling.md`,
    "Pydantic Integration".
-8. **Reading from an ORM row or another attribute-bearing object is a model concern, not a
+10. **Reading from an ORM row or another attribute-bearing object is a model concern, not a
    reason to introduce a plain class.** Enable `from_attributes` in the model config, or pass
    `from_attributes=True` to `model_validate`.
    https://docs.pydantic.dev/latest/concepts/models/#arbitrary-class-instances
-9. **Where a field must not be silently coerced, say so.** Pydantic casts input to the
+11. **Where a field must not be silently coerced, say so.** Pydantic casts input to the
    declared type by design and the docs note this can lose information (`a: int` accepts
    `3.000`); strict mode turns that off for the fields that cannot afford it.
    https://docs.pydantic.dev/latest/concepts/models/#data-conversion
-10. **Mechanics are inherited, not restated.** Field constraints and metadata, field and
+12. **Mechanics are inherited, not restated.** Field constraints and metadata, field and
     model validators, collections and unions, forward annotations, model subclasses and
     discriminated unions: read `skills/python/pydantic/SKILL.md`. This skill deliberately
     does not duplicate them, so there is one place for them to be right.
 
-### If a third-party API operates on your instance as a stdlib dataclass
+### The framework adapter exception
+
+The only exemption from rule 1. It carries this name here, in the code comment it requires and
+in `Verify` check 4, so a grep for the phrase lands on all three.
 
 If a library calls `dataclasses.replace()` or `dataclasses.fields()` on an object you hand
 it, that object must be a stdlib dataclass and rule 1 cannot reach it. The vendored
@@ -116,6 +148,17 @@ it, that object must be a stdlib dataclass and rule 1 cannot reach it. The vendo
 (`references/CAPABILITIES-AND-HOOKS.md`). In that case the dataclass holds wiring only, which
 is clients, per-run counters and configuration primitives. Any domain data it carries is a
 `BaseModel` field on it, and the dataclass never crosses a serialization boundary.
+
+An exempt `@dataclass` carries a comment naming the library call that forces it, on the line
+above the decorator, so the exemption is checkable in a diff rather than judged by eye:
+
+```python
+# framework adapter exception: pydantic_ai calls dataclasses.replace() in for_run()
+@dataclass
+class RequestCounter(AbstractCapability[Any]): ...
+```
+
+A `@dataclass` with no such comment is a finding, whatever its author intended.
 
 ## Anti-patterns
 
@@ -131,6 +174,9 @@ is clients, per-run counters and configuration primitives. Any domain data it ca
   satisfies neither: the model methods are gone and every call site grows a `TypeAdapter`.
 - `id: str` on a model. Any string validates, so a truncated or v4 id gets stored and the
   time ordering UUIDv7 exists for is quietly gone.
+- `id: UUID7 = Field(default_factory=uuid.uuid4)`. The same failure through the front door:
+  defaults skip validation, so the annotation never runs and a v4 id is stored without an
+  error. `validate_default=True` plus a v7 factory is what makes the annotation bite.
 - A Temporal client built without `pydantic_data_converter` while the workflow signatures
   use models. It fails at payload conversion, not at wiring time, so it usually surfaces in
   a worker log rather than a test.
@@ -138,22 +184,66 @@ is clients, per-run counters and configuration primitives. Any domain data it ca
 ## Verify
 
 ```bash
-# 1. no stdlib dataclasses in application code. Expect no output.
-#    A hit is a finding unless it is the framework adapter case named above.
-grep -rn '@dataclass\|from dataclasses' src/
-
-# 2. Pydantic v2 is what is installed. Expect a bound method line, not an ImportError.
+# 1. Pydantic v2 is what is installed. Expect a bound method line, not an ImportError.
 uv run python -c 'from pydantic import BaseModel; print(BaseModel.model_validate)'
 # <bound method BaseModel.model_validate of <class 'pydantic.main.BaseModel'>>
 
-# 3. the UUIDv7 annotated type resolves. Expect the Annotated alias.
+# 2. the UUIDv7 annotated type resolves. Expect the Annotated alias.
 uv run python -c 'from pydantic import UUID7; print(UUID7)'
 # typing.Annotated[uuid.UUID, UuidVersion(uuid_version=7)]
 
-# 4. every Temporal client passes the converter. Expect the two counts to be equal.
-grep -rc 'Client.connect' src/ | awk -F: '{s+=$2} END {print "clients:", s}'
-grep -rc 'pydantic_data_converter' src/ | awk -F: '{s+=$2} END {print "converters:", s}'
-
-# 5. no domain TypedDicts. Expect no output.
+# 3. no domain TypedDicts. Expect no output.
 grep -rn 'TypedDict' src/
+
+# 4. no stdlib dataclasses outside the framework adapter exception. Expect no output;
+#    a @dataclass whose preceding line carries the comment is skipped, one without is printed.
+python3 - src <<'PY'
+import pathlib, sys
+bad = []
+for f in pathlib.Path(sys.argv[1]).rglob('*.py'):
+    lines = f.read_text().splitlines()
+    for i, line in enumerate(lines):
+        if not line.lstrip().startswith('@dataclass'):
+            continue
+        if 'framework adapter exception:' not in (lines[i - 1] if i else ''):
+            bad.append(f'{f}:{i + 1}')
+if bad:
+    print('@dataclass without the framework adapter exception comment:', *bad, sep='\n  ')
+    sys.exit(1)
+PY
+```
+
+5. Every id default really produces a v7. One assertion per model with an id, in the test
+   suite rather than a shell, since it has to construct the model:
+
+```python
+def test_id_default_is_v7() -> None:
+    assert Order().id.version == 7   # fails loudly on a uuid4 default_factory
+```
+
+6. Every Temporal client passes the converter. Counting symbols does not work: a wired file
+   mentions `pydantic_data_converter` twice (import plus keyword) against one `Client.connect`,
+   so a count comparison false-alarms on correct code and passes when one of two clients omits
+   the keyword. Check the call site instead:
+
+```bash
+python3 - src <<'PY'
+import ast, pathlib, sys
+bad = []
+for f in pathlib.Path(sys.argv[1]).rglob('*.py'):
+    for node in ast.walk(ast.parse(f.read_text())):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
+            continue
+        if ast.unparse(node.func) != 'Client.connect':
+            continue
+        kw = next((k.value for k in node.keywords if k.arg == 'data_converter'), None)
+        if kw is None or not ast.unparse(kw).endswith('pydantic_data_converter'):
+            bad.append(f'{f}:{node.lineno}')
+if bad:
+    print('Client.connect without data_converter=pydantic_data_converter:', *bad, sep='\n  ')
+    sys.exit(1)
+print('all Temporal clients pass pydantic_data_converter')
+PY
+# correct wiring  -> "all Temporal clients pass pydantic_data_converter", exit 0
+# one bare client -> "Client.connect without data_converter=...: src/bad/client.py:8", exit 1
 ```
