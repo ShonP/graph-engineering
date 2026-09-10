@@ -40,7 +40,7 @@ Produces `.claude/graph-profile.yaml` from `templates/graph-profile.yaml`.
 
 5. **Detect the docs convention.** If the repo has no `docs/` but has another specs directory, set `docsPath` to it rather than assuming.
 
-6. **Build the routing table,** keeping only rows whose files actually occur in this repo. A row for a stack the repo does not contain is a lie about what is here, and it will route an agent to a competency that cannot help it. Drop `**/templates/**/*.{yaml,yml,tpl}` unless a `Chart.yaml` was found: in plenty of repos `templates/` means something other than a Helm chart. Check a row you are unsure about with `wcmatch.glob.globmatch(path, key, flags=GLOBSTAR | BRACE | DOTGLOB)` and not with `git ls-files`, whose pathspec globs have no brace expansion.
+6. **Build the routing table,** keeping only rows whose files actually occur in this repo. A row for a stack the repo does not contain is a lie about what is here, and it will route an agent to a competency that cannot help it. Keep `**/{chart,charts}/**/templates/**/*.{yaml,yml,tpl}` only when a `Chart.yaml` was found, and re-anchor it if this repo keeps its charts somewhere other than `chart/` or `charts/`: the anchor is what stops it matching every other meaning of `templates/`. Check a row you are unsure about with `wcmatch.glob.globmatch(path, key, flags=GLOBSTAR | BRACE | DOTGLOB)` and not with `git ls-files`, whose pathspec globs have no brace expansion.
 
 7. **Print the Playwright permission recommendation** whenever the QA row survived step 6. Say this, verbatim:
 

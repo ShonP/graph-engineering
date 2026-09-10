@@ -101,12 +101,14 @@ routing:
     impl: [kubectl, kustomize]
     review: [kubectl]
     qa: [kubectl]
-  # Helm: a chart's metadata, and its rendered templates. Drop the templates row
-  # in a repo where templates/ means something other than a Helm chart.
+  # Helm: a chart's metadata, and the templates it renders. The templates row is
+  # anchored under chart/ or charts/ on purpose: a bare **/templates/** also
+  # matches every other meaning of the word, including this plugin's own
+  # templates/graph-profile.yaml, and would route helm at a profile edit.
   "**/Chart.yaml":
     impl: [helm]
     review: [helm]
-  "**/templates/**/*.{yaml,yml,tpl}":
+  "**/{chart,charts}/**/templates/**/*.{yaml,yml,tpl}":
     impl: [helm]
     review: [helm]
   "**/kustomization.{yaml,yml}":
@@ -124,7 +126,10 @@ routing:
     impl: [cloudnativepg]
     review: [cloudnativepg]
   # Envoy Gateway: manifests named by kind, plus the gateway-* directories that
-  # hold the policies and their exemptions.
+  # hold the policies and their exemptions. An Argo CD Application named after a
+  # gateway (argocd/apps/gateway-auth.yaml) matches the kind row too; that is a
+  # known false positive and it is harmless, because the Application renders
+  # those very manifests and rows are additive.
   "**/{httproute,securitypolicy,backendtlspolicy,backendtrafficpolicy,clienttrafficpolicy,gateway,gatewayclass,referencegrant}*.{yaml,yml}":
     impl: [envoy-gateway]
     review: [envoy-gateway, security-review]
