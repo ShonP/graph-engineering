@@ -511,14 +511,16 @@ Docs (200 on 2026-09-10): https://docs.usebruno.com/bru-cli/overview "Bruno CLI 
 **Size:** standard. **Stack:** skills. **REQUIRED:** prior-art, superpowers:writing-skills, review-testing-rules.
 **Files:** `skills/rules/{backend-rules,architecture-resilience-rules,agent-workflow-rules,review-testing-rules}/SKILL.md`; delete `skills/rules/.gitkeep`.
 
-Sources: `~/.claude/skills/<name>/SKILL.md` (43, 78, 28, 46 lines on 2026-09-10). Spec 4.3 names five packs including `frontend-rules`; that one is out of this ask (see Open questions).
+Sources: `~/.claude/skills/<name>/SKILL.md` (43, 78, 28, 46 lines on 2026-09-10). Spec 4.3 names five packs including `frontend-rules`; that one was out of this ask (see Open questions) until the coordinator ruled on 2026-09-10 that it ships here too, so a plugin-only repo resolves every routing row. `frontend-rules` (53 lines) is harvested by the same recipe in its own commit, `Harvest the frontend rule pack into skills/rules`.
 
 - [ ] Copy each file verbatim, then the scrub pass: grep for `koach`, `@equival`, `packages/`, `he+en`, `openwiki`; none are expected (the packs are generic), record the grep result. Keep `name` and `description` unchanged: spec 4.3 says the packs MOVE into the plugin, and the forge profile's existing rows (`architecture-resilience-rules`, `review-testing-rules`) must resolve without edits.
 - [ ] Add one line under the H1 of each: `Harvested from the owner's global rule packs on 2026-09-10 (spec 4.3); the plugin copy is the portable one.`
 - [ ] Name collision, resolved by the reviewer's reproduction on 2026-09-10: on this machine a bare `review-testing-rules` resolves to `~/.claude/skills/review-testing-rules` (the global copy) while plugin skills answer to the `graph-engineering:` prefix. Interim consequence: harmless, the two copies are byte-identical apart from the provenance line. Record in the report that dispatches may write `graph-engineering:<name>` to force the plugin copy, and that Task 20 is the owner's step that removes the ambiguity.
 - [ ] Commit: `Harvest the backend, architecture-resilience, agent-workflow and review-testing rule packs`.
 
-**Acceptance:** verification 1, 3, 6; `diff <(sed 1,5d ~/.claude/skills/<name>/SKILL.md) <(sed 1,6d skills/rules/<name>/SKILL.md)` is empty for each (only the provenance line differs), pasted in the report.
+**Acceptance:** verification 1, 3, 6; `diff -r ~/.claude/skills/<name> skills/rules/<name>` shows exactly one added line for each, the provenance line (`6a7` plus that line) and zero modified lines, pasted in the report.
+
+Corrected 2026-09-10, during the task, from `diff <(sed 1,5d ~/.claude/skills/<name>/SKILL.md) <(sed 1,6d skills/rules/<name>/SKILL.md)` is empty. That form can never be empty for any placement of an added line under the H1: it drops five lines from the source (frontmatter plus the blank) and six from the copy, so the copy's first surviving line is always compared against the source's H1. Its best case is the one changed line the original parenthetical describes. `diff -r` states the same intent without the off-by-one and also catches an added or missing file, which the `sed` form cannot see.
 
 ### Task 20: Owner step: retire the four global rule packs
 
