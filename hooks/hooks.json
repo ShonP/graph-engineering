@@ -1,0 +1,45 @@
+{
+  "description": "graph-engineering: lint on edit, test before stop, handoff on session start",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lint-touched-file.sh",
+            "args": [],
+            "timeout": 120,
+            "statusMessage": "Linting the file you just touched"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/test-before-stop.sh",
+            "args": [],
+            "timeout": 600,
+            "statusMessage": "Running the project test script"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/print-handoff.sh",
+            "args": [],
+            "timeout": 15,
+            "statusMessage": "Reading docs/HANDOFF.md"
+          }
+        ]
+      }
+    ]
+  }
+}
