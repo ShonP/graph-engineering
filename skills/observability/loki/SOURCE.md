@@ -1,12 +1,12 @@
 # SOURCE
 - Upstream: https://github.com/grafana/skills
 - Subtree: skills/grafana-lgtm/loki
-- Commit: 51d33e71e191b409bbd25fc7be2684c610d18166 (untagged; the repo has zero git tags, which is why the plan vendors instead of declaring a plugin dependency), committed 2026-08-18
+- Commit: 51d33e71e191b409bbd25fc7be2684c610d18166 (untagged; the repo has zero git tags, which is why the plan vendors instead of declaring a plugin dependency), committed 2026-08-18 UTC
 - Vendored: 2026-09-10, plan 2026-09-10-stack-skills Task 16
 - License: Apache-2.0 (also declared in the skill's own frontmatter `license:` field); LICENSE alongside, copied from the upstream repository root `LICENSE`; the upstream root has no NOTICE file, checked at this SHA, so Apache-2.0 section 4(d) adds nothing to carry
 - Refresh:
   ```bash
-  S=<scratch>; P=/Users/shonpazarker/projects/graph-engineering
+  S=<scratch>; P=$(git rev-parse --show-toplevel)   # run from anywhere inside this repo
   git clone --filter=blob:none --no-checkout https://github.com/grafana/skills $S/grafana-skills
   cd $S/grafana-skills && git sparse-checkout init --cone && git sparse-checkout set skills/grafana-lgtm/loki
   git checkout 51d33e71e191b409bbd25fc7be2684c610d18166

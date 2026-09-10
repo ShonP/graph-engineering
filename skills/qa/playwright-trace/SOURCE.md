@@ -1,12 +1,12 @@
 # SOURCE
 - Upstream: https://github.com/microsoft/playwright
 - Subtree: packages/playwright-core/src/tools/skills/playwright-trace
-- Commit: af74c938e45f3e759dc2521993f201389eb16cb6 (untagged from this skill's point of view; the repo tags releases of the library, not of the skills, so this SHA is the pin), committed 2026-09-09
+- Commit: af74c938e45f3e759dc2521993f201389eb16cb6 (untagged from this skill's point of view; the repo tags releases of the library, not of the skills, so this SHA is the pin), committed 2026-09-10 UTC (2026-09-09T17:19:41-07:00 committer time)
 - Vendored: 2026-09-10, plan 2026-09-10-stack-skills Task 14
 - License: Apache-2.0; LICENSE alongside, copied from the upstream repository root `LICENSE`; NOTICE alongside, copied from the upstream repository root `NOTICE`, because Apache-2.0 section 4(d) requires the NOTICE text to travel with every redistribution
 - Refresh:
   ```bash
-  S=<scratch>; P=/Users/shonpazarker/projects/graph-engineering
+  S=<scratch>; P=$(git rev-parse --show-toplevel)   # run from anywhere inside this repo
   git clone --filter=blob:none --no-checkout https://github.com/microsoft/playwright $S/playwright
   cd $S/playwright && git sparse-checkout init --cone && git sparse-checkout set packages/playwright-core/src/tools/skills
   git checkout af74c938e45f3e759dc2521993f201389eb16cb6
@@ -15,4 +15,12 @@
   cp $S/playwright/NOTICE $P/skills/qa/playwright-trace/NOTICE
   # rewrite SOURCE.md, then run the recipe's step 5
   ```
-- Local changes: none. The upstream frontmatter is kept byte-identical, including the `allowed-tools` field where the upstream sets one. House overrides, if any, live in a separate `skills/qa/*-house-rules` skill (spec 4.5 precedence); none exists today.
+- Local changes: none. The upstream frontmatter is kept byte-identical.
+- Grant: this skill's frontmatter sets `allowed-tools: Bash(npx:*)`. `npx <package>` fetches and executes arbitrary registry code, so the grant is broad and is recorded here deliberately rather than absorbed.
+- Tool grant, and how it is closed: `allowed-tools` lets the skill run those commands without a permission prompt for the turn that invokes it, and workspace trust does not gate the field. A sibling `*-house-rules` skill cannot narrow it: a skill's `allowed-tools` (and `disallowed-tools`) apply only while that same skill is active, so spec 4.5 precedence has no purchase on this field. The binding control is a host permission rule, because a matching `ask` or `deny` rule aborts the invocation regardless of `allowed-tools`. This plugin's recommendation, shipped in the README and the `/graph-init` output by Task 18, is:
+
+  ```json
+  { "permissions": { "ask": ["Bash(npx:*)", "Bash(npm:*)"] } }
+  ```
+
+  That restores the prompt on the two commands worth prompting on while leaving the skill fully usable. Not registering the skill is the other control. Editing the vendored file is not: it would break the refresh contract and the Apache-2.0 provenance.
