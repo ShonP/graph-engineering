@@ -89,7 +89,7 @@ Spiked           :
 
 ## Global constraints
 
-- Everything is markdown or YAML, with one exception this plan introduces: `hooks/hooks.json` and the shell scripts it calls under `hooks/scripts/` are plugin hook components (plugins reference, Hooks) and are the only executable content. No Python, no build step. Vendoring is a documented shell recipe, not a script in the repo.
+- Everything is markdown or YAML, with two exceptions this plan introduces. First, `hooks/hooks.json` and the shell scripts it calls under `hooks/scripts/` are plugin hook components (plugins reference, Hooks). Second, `scripts/check-skill-frontmatter.sh` is the frontmatter gate that `claude plugin validate` turned out not to provide (verification item 1); it is bash plus python3 with no new dependencies and is not shipped as a plugin component. Those are the only executable content. No build step. Vendoring stays a documented shell recipe, not a script in the repo.
 - No em dashes in any authored file. Vendored files are exempt and never edited.
 - Every new skill directory name equals its `SKILL.md` frontmatter `name` (Claude Code takes the invocation name from `name`, falling back to the directory; the two must agree so routing rows are unambiguous).
 - Routing names in `templates/graph-profile.yaml` are those frontmatter names.
@@ -107,11 +107,13 @@ stacks:
   agents:    { paths: ["agents/**"] }
   commands:  { paths: ["commands/**"] }
   hooks:     { paths: ["hooks/**"] }
+  scripts:   { paths: ["scripts/**"] }
   docs:      { paths: ["docs/**", "README.md"] }
 routing:
   "skills/**/SKILL.md": { impl: [superpowers:writing-skills, review-testing-rules], review: [review-testing-rules] }
   "**/*.{yaml,yml,json,md}": { impl: [review-testing-rules], review: [review-testing-rules] }
   "hooks/**": { impl: [review-testing-rules, security-review], review: [review-testing-rules, security-review] }
+  "scripts/**": { impl: [review-testing-rules, security-review], review: [review-testing-rules, security-review] }
   always: { impl: [prior-art], review: [review-protocol, security-review, privacy-review] }
 ```
 
@@ -122,7 +124,7 @@ routing:
 
 ```bash
 S=/private/tmp/claude-501/-Users-shonpazarker-projects/882da8d8-5a59-43be-b2ab-b69f22cd4b97/scratchpad
-P=/Users/shonpazarker/projects/graph-engineering
+P=$(git rev-parse --show-toplevel)   # repo-relative, so the recipe runs for anyone who clones this plugin
 # 1. clone at the pinned SHA (sparse for monorepos; drop the sparse lines for a whole-repo vendor)
 git clone --filter=blob:none --no-checkout https://github.com/<org>/<repo> $S/vendor-<repo>
 cd $S/vendor-<repo>
@@ -130,7 +132,10 @@ git sparse-checkout init --cone && git sparse-checkout set <subtree> [<subtree>.
 git checkout <SHA>
 # 2. copy the subtree into the skill directory (one rsync per skill); never the clone's .git
 rsync -a --delete --exclude .git $S/vendor-<repo>/<subtree>/ $P/skills/<group>/<name>/
-#    (alternative with no rsync flags to get wrong: git -C $S/vendor-<repo> archive <SHA> <subtree> | tar -x -C <staging>)
+# 2b. export the pin to a pristine tree; this, not the working clone, is what step 5 compares against
+rm -rf $S/export-<repo> && mkdir -p $S/export-<repo>
+git -C $S/vendor-<repo> archive <SHA> <subtree> | tar -x -C $S/export-<repo>
+#    (for a whole-repo vendor drop <subtree>: git -C $S/vendor-<repo> archive <SHA> | tar -x -C $S/export-<repo>)
 # 3. license, and NOTICE where the upstream root has one, alongside when the subtree has none
 cp $S/vendor-<repo>/LICENSE $P/skills/<group>/<name>/LICENSE
 test -f $S/vendor-<repo>/NOTICE && cp $S/vendor-<repo>/NOTICE $P/skills/<group>/<name>/NOTICE
@@ -139,13 +144,15 @@ $EDITOR $P/skills/<group>/<name>/SOURCE.md
 # 5. verify: the clone is still at the pin and clean, the copy is byte-identical, and git sees files not a gitlink
 git -C $S/vendor-<repo> status --porcelain            # expect empty
 git -C $S/vendor-<repo> rev-parse HEAD                 # expect the SOURCE.md SHA
-cd $P && git diff --no-index --stat $S/vendor-<repo>/<subtree> skills/<group>/<name>
+cd $P && git diff --no-index --stat $S/export-<repo>/<subtree> skills/<group>/<name>   # the export, never the clone
 find skills/<group>/<name> -name .git                  # expect empty
 git add skills/<group>/<name> && git ls-files skills/<group>/<name> | wc -l   # expect > 0
 git ls-files -s skills/<group>/<name> | grep -c '^160000'                    # expect 0
 ```
 
-Acceptance for step 5, all six lines pasted in the report: clean status and the pinned SHA; the `--stat` output names only `SOURCE.md`, `LICENSE` and, where the upstream has one, `NOTICE` as new files and zero modified files (`git diff --no-index` exits 1 on those additions, which is expected; any other line fails the task); no `.git` entry under the vendored tree; `git ls-files` counts more than zero files; no `160000` (gitlink) mode. The reviewer reproduced the failure this guards against: a whole-repo rsync without `--exclude .git` commits an embedded-repository pointer and zero files while the old diff acceptance still passed.
+Acceptance for step 5, all six lines pasted in the report: clean status and the pinned SHA; the `--stat` output names only `SOURCE.md`, `LICENSE`, where the upstream has one `NOTICE`, and for a whole-repo vendor the paths the copy deliberately excluded (`.github/**` in Task 6), and zero modified files (`git diff --no-index` exits 1 on those additions, which is expected; any other line fails the task); no `.git` entry under the vendored tree; `git ls-files` counts more than zero files; no `160000` (gitlink) mode.
+
+The comparison target is the step 2b `git archive` export, never the working clone. `rsync --exclude .git` is still how the copy is made; the export is only how byte-identity is demonstrated. This is not cosmetic. Diffing a whole-repo vendor against the working clone emits the clone's own `.git/**` as ~33 deletion lines on top of the intended ones, which fails the acceptance as written even though the tree is correct, and, worse, trains the reader to scroll past deletion lines. That reader is exactly the one who will miss a real `.git` leak, which is the failure this step exists to catch: the reviewer reproduced it, a whole-repo rsync without `--exclude .git` commits an embedded-repository pointer and zero files while the old diff acceptance still passed. Against the export, a correct whole-repo vendor yields exactly the intended lines (Task 6: three, two `.github/**` deletions and one `SOURCE.md` addition). Task 21 folds the same sentence into the spec 4.2 amendment, which today says "byte-identical" without saying how byte-identity is demonstrated.
 
 `SOURCE.md` shape (every field filled, none left as a placeholder):
 
@@ -156,8 +163,9 @@ Acceptance for step 5, all six lines pasted in the report: clean status and the 
 - Commit: <full SHA> (<tag or "untagged">), committed <ISO date>
 - Vendored: <ISO date>, plan 2026-09-10-stack-skills Task <n>
 - License: <SPDX id>; LICENSE alongside, copied from <upstream path>; NOTICE alongside where the upstream root has one (Playwright does)
-- Refresh: the five recipe commands above with this repo's values filled in
-- Local changes: none. House overrides, if any, live in <skill path> (spec 4.5 precedence).
+- Refresh: the six recipe commands above (1, 2, 2b, 3, 4, 5) with this repo's values filled in, using `P=$(git rev-parse --show-toplevel)` rather than an absolute home path
+- Local changes: none. House overrides, if any, live in <skill path> (spec 4.5 precedence), except where the field cannot be overridden by another skill: see the next line.
+- Tool grant (only when the upstream frontmatter sets `allowed-tools` or `disallowed-tools`): quote the grant verbatim and say what it lets run without a prompt. A sibling `*-house-rules` skill CANNOT narrow it, because those fields apply only while their own skill is active, so spec 4.5 precedence has no purchase here. The binding control is a host permission rule: a matching `ask` or `deny` rule aborts the invocation regardless of `allowed-tools`. Name the rule this plugin recommends and where it ships.
 ```
 
 ## Written skill: required shape (Tasks 1, 2, 3, 4, 5, 7, 9, 11, 12, 13, 15)
@@ -185,9 +193,13 @@ Written skills carry the plugin's MIT license (plugin.json author is the owner);
 
 ## Verification, per task
 
-1. `claude plugin validate /Users/shonpazarker/projects/graph-engineering` exits 0 (validates `plugin.json` and every skill's frontmatter).
+1. `claude plugin validate <repo root>` exits 0. It checks the manifest's JSON shape and that every `skills[]` path exists; it reaches through the marketplace manifest to `plugins[0] plugin.json -> skills[N]`, so the repo root is the right path to pass. **It does not read a single `SKILL.md`.** The reviewer reproduced that: a `SKILL.md` with no `name`, no `description` and a bogus key passes, including under `--strict`; only deleting a registered directory fails it (`skills[14]: Path not found: ./skills/observability`). So the frontmatter guard is a separate script:
+
+   `scripts/check-skill-frontmatter.sh` exits 0. Bash plus python3, no new dependencies. It walks every `skills/**/SKILL.md` and fails the run when one has no frontmatter block, no non-empty `name`, no non-empty `description`, or a `name` that differs from its directory's name (it understands folded and literal block scalars, so `description: >` counts as present). Any task that adds or vendors a `SKILL.md` runs it; Task 23's dry dispatch runs it as a gate.
+
+   Known pre-existing failures on master, not introduced by this plan and not for a vendor task to fix: `skills/react/tanstack-query-rules/SKILL.md` declares `name: tanstack-query-best-practices` and `skills/react/tanstack-router/SKILL.md` declares `name: tanstack-router-best-practices`, while `templates/graph-profile.yaml` and all three agent fallback tables route on the directory names. Tasks 18 and 19 own routing names and own this fix; until they land, the script reports exactly these two and a vendor task's report says so rather than the script being loosened.
 2. `python3 -m json.tool .claude-plugin/plugin.json > /dev/null` exits 0.
-3. For every new `SKILL.md`: `head -4` shows `name:` equal to the directory basename and a non-empty `description:`.
+3. For every new `SKILL.md`: `head -4` shows `name:` equal to the directory basename and a non-empty `description:`. This is the by-eye form of item 1's script; the script is what the gate runs.
 4. Written skills: every URL in the Sources block was fetched in-task (the implementer's report lists URL and title); `grep -c '^- http' SKILL.md` equals the number of titles recorded.
 5. Vendored trees: the recipe's step 5 result, pasted into the report.
 6. `grep -rn $'\xe2\x80\x94' <authored files>` returns nothing (no em dashes).
@@ -347,7 +359,7 @@ Docs to fetch (index https://theagentrouter.ai/docs/ returned 200 on 2026-09-10 
 - [ ] Step 5: expected additions `SOURCE.md` only; expected deletions `.github/**` only (say so in the report); zero modified files; no `.git` under the tree; `git ls-files` counts the 110 upstream files minus `.github/**` plus `SOURCE.md`; no `160000` mode.
 - [ ] Commit: `Vendor temporal-developer skill at v0.6.2`.
 
-**Acceptance:** verification 1, 3, 5; `claude plugin validate` accepts the upstream frontmatter (it has an extra `version` field; if validate rejects it, ESCALATE rather than edit the file).
+**Acceptance:** verification 1, 3, 5. The upstream frontmatter carries an extra `version: 0.6.2` key. `claude plugin validate` cannot rule on that, since it never opens a `SKILL.md`, and `scripts/check-skill-frontmatter.sh` only checks `name` and `description`, so neither is evidence the loader accepts the key. Whether the loader accepts it is answered in Task 23's dry dispatch, where the skills are actually loaded; if it rejects the key there, ESCALATE rather than edit the file.
 
 ### Task 7: Write `uv`
 
@@ -465,7 +477,7 @@ Docs (200 on 2026-09-10): https://learn.microsoft.com/en-us/agent-framework/over
 - [ ] Step 5 per skill: additions `SOURCE.md`, `LICENSE` and `NOTICE` only. (grafana/skills, pydantic/skills, fastapi and temporal have no root NOTICE, checked 2026-09-10, so their tasks add two files, not three.)
 - [ ] Commit: `Vendor the playwright-cli, playwright-trace and playwright-component-testing skills`.
 
-**Acceptance:** verification 1, 3, 5 for each; if `claude plugin validate` rejects `allowed-tools`, ESCALATE (never edit).
+**Acceptance:** verification 1, 3, 5 for each. `claude plugin validate` cannot rule on `allowed-tools`, since it never opens a `SKILL.md`; whether the loader accepts the field is answered in Task 23's dry dispatch, and if it rejects it there, ESCALATE (never edit). The grant itself is a separate question from acceptance: each `SOURCE.md` states it verbatim and names the host permission rule that closes it, and Task 18 ships `{ "permissions": { "ask": ["Bash(npx:*)", "Bash(npm:*)"] } }` in the README and the `/graph-init` output. A sibling house-rules skill cannot narrow another skill's `allowed-tools`.
 
 ### Task 15: Write `bruno`
 
@@ -667,12 +679,14 @@ This is the gate for the whole plan: `/graph-ship` step 4 resolution, done by ha
 - [ ] Sample file list (existing forge files first, then the plan-5 shapes): `argocd/root.yaml`, `argocd/apps/loki.yaml`, `argocd/values-health-data.yaml`, `manifests/forge-pg/cluster.yaml`, `manifests/forge-pg-backup/scheduledbackup.yaml`, `manifests/gateway-auth/securitypolicy-bugsink.yaml`, `manifests/gateway-exemptions/httproute-gatus-health.yaml`, `manifests/forge-secrets/secrets/nats-auth.enc.yaml`, `.sops.yaml`, `manifests/ntfy/kustomization.yaml`, `observability/kustomization.yaml`, `observability/dashboards/cnpg-cluster.json`, `tests/81-cnpg.sh`, `docs/HANDOFF.md`; plan-5 shapes: `charts/temporal/Chart.yaml`, `manifests/temporal/httproute.yaml`, `manifests/ai-gateway/backend-foundry.yaml`, `apps/codec-server/pyproject.toml`, `apps/codec-server/src/codec/workflows/encode.py`, `apps/codec-server/src/codec/agents/router.py`, `tests/e2e/login.spec.ts`, `tests/api/health.bru`.
 - [ ] Match by machine, not by hand: `uv run --with wcmatch python match.py` in the scratchpad, where `match.py` parses the routing keys out of `templates/graph-profile.yaml` and runs `wcmatch.glob.globmatch(path, key, flags=GLOBSTAR | BRACE | DOTGLOB)` over the sample list; paste its output. The template states this dialect in a comment (globstar plus brace expansion, minimatch-style; git pathspec has no brace expansion, so `git ls-files` is not a valid checker for these rows). The planner ran this matcher on 2026-09-10 against the rows in Task 18: every sample file matched its intended rows; the one miss it found (`apps/codec-server/pyproject.toml` needs the `**/` prefix) is already fixed in Task 18; `tests/81-cnpg.sh` and `docs/HANDOFF.md` match only `always` in the template, which is expected because forge's own profile carries the `**/*.sh` and `docs/**` rows.
 - [ ] For each file: the rows it matches, the REQUIRED list per role (impl, review, qa) as the union plus `always`, and for every name the resolved path `skills/<group>/<name>/SKILL.md` with its frontmatter `name`. One table. Any name with no path is a `NEEDS_SETUP` and fails the task.
-- [ ] `claude plugin validate /Users/shonpazarker/projects/graph-engineering` exit 0, output pasted (this run also covers `hooks/hooks.json` from Task 22).
+- [ ] `claude plugin validate /Users/shonpazarker/projects/graph-engineering` exit 0, output pasted (this run also covers `hooks/hooks.json` from Task 22). Remember what it does and does not do: manifest JSON shape plus `skills[]` path existence, never a `SKILL.md`.
+- [ ] `scripts/check-skill-frontmatter.sh` exit 0, output pasted. This is the gate's real frontmatter check, and it must be green here, which means the two pre-existing `skills/react/tanstack-*` name mismatches recorded in verification item 1 have been closed by Tasks 18 and 19 before this task runs. A non-zero exit fails the gate; loosening the script instead is not an option.
+- [ ] The loader questions the vendor tasks deferred here, answered by actually loading the skills: does the loader accept `temporal-developer`'s extra `version: 0.6.2` frontmatter key, and the Playwright skills' `allowed-tools`? Record what happens, and whether the invocation name each skill answers to is its frontmatter `name` or its directory basename. Rung-1 observation to check against, made 2026-09-10 while the plugin was installed at 0.7.0: `skills/react/tanstack-query-rules` (frontmatter `name: tanstack-query-best-practices`) was exposed to a running agent as `graph-engineering:tanstack-query-rules`, the DIRECTORY name, which is the opposite of the plan's prior-art note ("skill invocation name = frontmatter `name`, fallback directory basename"). Whichever way it resolves, the house constraint that the two agree is what makes routing rows unambiguous, and it is what the frontmatter script enforces.
 - [ ] Start `claude --plugin-dir /Users/shonpazarker/projects/graph-engineering` in a scratch directory (the owner's shell blocks `-p`, so this is an interactive step) and invoke each new skill once by its `/name` shortcut; record the first line each returned. For the four harvested packs, record which copy the bare name resolves to after the owner's Task 20 step, and that the `graph-engineering:<name>` form loads the plugin copy.
 - [ ] Record the forge follow-up the owner runs in the forge repo, not here: `/graph-init --force` or a hand edit adding the rows to `~/projects/forge-platform/.claude/graph-profile.yaml`, plus the stack additions (`apps/**` for Python, `charts/**` for Helm) when plan 5 creates them.
 - [ ] Commit: `Record the stack-skills dry dispatch: every routing row resolves`.
 
-**Acceptance:** zero unresolved names; the matcher output; the validate output; the per-skill load lines; the harvested-pack resolution answer; the forge follow-up list.
+**Acceptance:** zero unresolved names; the matcher output; the validate output; `scripts/check-skill-frontmatter.sh` exit 0 with its output; the per-skill load lines including the `version` and `allowed-tools` answers and the invocation-name observation; the harvested-pack resolution answer; the forge follow-up list.
 
 ---
 
