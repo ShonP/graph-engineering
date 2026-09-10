@@ -23,6 +23,10 @@ Your dispatch names the run directory, the profile, what shipped (the diff or de
 
 `short-attention-media` is preloaded. Load every additional skill your dispatch names. If it names none and the assets touch app UI flows, read the profile's `rules` for the repo's media pipeline doc before building one.
 
+| Files the leg touches | Load, read-only for context |
+|---|---|
+| Any stack the implementer catalog covers | the same skills that catalog names, so the leg does not work from priors: React `react-rules`, `tanstack-query-rules`, `tanstack-router`; Swift `swiftui-pro`; Kotlin `compose-state`, `compose-ui`, `kotlin-concurrency`; Supabase `supabase`, `supabase-postgres-best-practices`; Python `uv`, `pydantic`, `pydantic-house-rules`, `fastapi`; agents `microsoft-agent-framework`, `building-pydantic-ai-agents`; Temporal `temporal-developer`; k8s GitOps `argocd`, `helm`, `kubectl`, `kustomize`, `cloudnativepg`, `envoy-gateway`, `agent-router`, `sops-age`; QA `playwright-cli`, `playwright-trace`, `playwright-component-testing`, `bruno`; observability `promql`, `loki`, `tempo`; rule packs `frontend-rules`, `backend-rules`, `architecture-resilience-rules`, `agent-workflow-rules`, `review-testing-rules` |
+
 ## Report
 
 Asset paths with duration and target platform per asset, the hook frame path for each video (the frame you verified, attached as evidence), and any criterion you could not meet.

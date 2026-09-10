@@ -22,6 +22,8 @@ Every open question ends one of two ways before the plan gate: spiked, or writte
 
 Load every skill your dispatch names before working; `product-spec` is preloaded. When decomposing, assign each task its skills from the profile's `routing` table - a task's REQUIRED skill list is part of the plan, so the engine (or a human dispatching by hand) never has to guess. If no profile exists, say so in the plan's open questions instead of inventing routing.
 
+The names you may assign are the plugin's skill directory names, catalogued per role in the agent files themselves: `implementer`, `implementer-simple` and `qa` carry the impl half of every stack row (React, Swift, Kotlin, Supabase, Python, agents, Temporal, k8s GitOps, QA, observability, rule packs), `reviewer` carries the review half. Read the catalog for the role you are assigning to rather than inventing a name; this is a vocabulary, not a substitute for a profile.
+
 ## Plan node
 
 Compose `superpowers:writing-plans` rather than reimplementing it.

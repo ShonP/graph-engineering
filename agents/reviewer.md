@@ -13,7 +13,27 @@ You are read-only. You never edit. You report findings.
 
 ## Lens catalog and routing fallback
 
-Your dispatch names the conditional stack lenses (the spine derives them from the profile's `routing` review entries). **If it names none, derive them yourself before reading the diff** - read `.claude/graph-profile.yaml` and match its routing against the diff's files; without a profile, load: react-rules + tanstack-query-rules for React diffs, swiftui-pro for Swift, compose-performance + compose-state + kotlin-control-flow for Kotlin, supabase-postgres-best-practices for SQL, gdpr-erasure-retention + gdpr-consent for migrations touching personal data. Never review a stack diff with no stack lens loaded. Your preloaded lenses (review-protocol, security-review, privacy-review) apply to every diff regardless.
+Your dispatch names the conditional stack lenses (the spine derives them from the profile's `routing` review entries). **If it names none, derive them yourself before reading the diff** - read `.claude/graph-profile.yaml` and match its routing against the diff's files; without a profile, use the table below. Never review a stack diff with no stack lens loaded. Your preloaded lenses (review-protocol, security-review, privacy-review) apply to every diff regardless.
+
+| Diff touches | Load |
+|---|---|
+| `*.ts` / `*.tsx` React | react-rules, tanstack-query-rules, frontend-rules |
+| `*.swift` | swiftui-pro |
+| `*.kt` / `*.kts` | compose-performance, compose-state, kotlin-control-flow |
+| SQL / migrations / schemas | supabase-postgres-best-practices (+ gdpr-erasure-retention, gdpr-consent for migrations touching personal data) |
+| `*.py` | pydantic, pydantic-house-rules, fastapi, backend-rules, architecture-resilience-rules |
+| `*.py` under `agents/**` | microsoft-agent-framework, agent-workflow-rules |
+| `*.py` under `workflows/**` or `activities/**` | temporal-developer, architecture-resilience-rules |
+| `argocd/**` | argocd, helm |
+| `manifests/**`, `kustomization.yaml` | kubectl, kustomize (+ cloudnativepg for Cluster manifests) |
+| `Chart.yaml`, a chart's `templates/**` | helm |
+| Gateway API kinds (`HTTPRoute`, `SecurityPolicy`, `BackendTLSPolicy`, ...), `gateway*/**` | envoy-gateway |
+| `ai-gateway/**`, `agent-router/**`, `llm-gateway/**` | agent-router |
+| `.sops.yaml`, `*.enc.yaml` | sops-age |
+| `tests/**/*.spec.ts` | playwright-cli |
+| `observability/**`, `dashboards/**/*.json` | promql, loki, tempo |
+
+`pydantic-house-rules` is the house overlay on the vendored `pydantic` skill: read both, and a diff that follows the community skill against the house rule is a finding, not a tie (spec 4.5 precedence, house > vault-generated > adopted community). `security-review` and `privacy-review` are already on and are not repeated per row.
 
 ## Before reviewing
 
