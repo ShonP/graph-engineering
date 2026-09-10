@@ -29,12 +29,19 @@ uxEvidence:
 #
 # `always` lenses are preloaded in the reviewer's frontmatter, so they cost no
 # dispatch hop. Everything else is matched by file extension.
+#
+# Glob dialect: globstar (`**`) plus brace expansion, minimatch-style, matched
+# against repo-relative paths. Check a row with
+#   wcmatch.glob.globmatch(path, key, flags=GLOBSTAR | BRACE | DOTGLOB)
+# `git ls-files <pattern>` is NOT a valid checker: git pathspec globs have no
+# brace expansion, so every braced row here silently matches nothing there.
+# A path may match several rows; the union of their skills is what gets routed.
 routing:
   # ux-evidence rides on every UI-bearing extension: the implementer captures,
   # the reviewer checks, qa verifies against the running system.
   "**/*.{ts,tsx}":
-    impl: [react-rules, tanstack-query-rules, tanstack-router, ux-evidence]
-    review: [react-rules, tanstack-query-rules, ux-evidence]
+    impl: [react-rules, tanstack-query-rules, tanstack-router, frontend-rules, ux-evidence]
+    review: [react-rules, tanstack-query-rules, frontend-rules, ux-evidence]
     qa: [ux-evidence]
   "**/*.swift":
     impl: [swiftui-pro, ux-evidence]
@@ -59,10 +66,109 @@ routing:
     impl: [gdpr-erasure-retention]
     review: [gdpr-erasure-retention, gdpr-consent]
     qa: []
+  # Python: uv projects, Pydantic v2, FastAPI. pydantic-house-rules rides beside
+  # the vendored pydantic skill on every row that routes it, and wins where they
+  # disagree - spec 4.5 precedence is house > vault-generated > community, so the
+  # house "v2 models everywhere, no dataclasses" overrides the vendored dataclass
+  # advice. The vendored file is never edited to say that.
+  "**/*.py":
+    impl: [uv, pydantic, pydantic-house-rules, fastapi, backend-rules, architecture-resilience-rules]
+    review: [pydantic, pydantic-house-rules, fastapi, backend-rules, architecture-resilience-rules]
+    qa: []
+  # Project and lock files: environment and dependency work is uv's, not the
+  # framework's.
+  "**/{pyproject.toml,uv.lock,.python-version}":
+    impl: [uv]
+    review: [uv]
+  # Agents: Microsoft Agent Framework by house default, Pydantic AI when the repo
+  # uses it. Both ride on top of the **/*.py row above.
+  "**/agents/**/*.py":
+    impl: [microsoft-agent-framework, building-pydantic-ai-agents, agent-workflow-rules]
+    review: [microsoft-agent-framework, agent-workflow-rules]
+  # Temporal: the workflow and activity directories, where determinism and the
+  # Pydantic data converter are the whole game.
+  "**/{workflows,activities}/**/*.py":
+    impl: [temporal-developer, pydantic-house-rules, architecture-resilience-rules]
+    review: [temporal-developer, architecture-resilience-rules]
+  # GitOps: Argo CD Applications. Argo renders Helm and kustomize, so both ride
+  # along; kubectl is on the qa half because verification happens on a cluster.
+  "argocd/**/*.{yaml,yml}":
+    impl: [argocd, helm, kubectl, architecture-resilience-rules]
+    review: [argocd, helm]
+    qa: [kubectl]
+  # Plain Kubernetes manifests, kustomize overlays included.
+  "manifests/**":
+    impl: [kubectl, kustomize]
+    review: [kubectl]
+    qa: [kubectl]
+  # Helm: a chart's metadata, and the templates it renders. The templates row is
+  # anchored under chart/ or charts/ on purpose: a bare **/templates/** also
+  # matches every other meaning of the word, including this plugin's own
+  # templates/graph-profile.yaml, and would route helm at a profile edit.
+  "**/Chart.yaml":
+    impl: [helm]
+    review: [helm]
+  "**/{chart,charts}/**/templates/**/*.{yaml,yml,tpl}":
+    impl: [helm]
+    review: [helm]
+  "**/kustomization.{yaml,yml}":
+    impl: [kustomize]
+    review: [kustomize]
+  # CloudNativePG: a glob cannot see `apiVersion: postgresql.cnpg.io`, so route on
+  # the directory that holds your Cluster manifests (forge: manifests/forge-pg*).
+  "**/{postgres,cnpg}/**":
+    impl: [cloudnativepg]
+    review: [cloudnativepg]
+  "**/*-pg/**":
+    impl: [cloudnativepg]
+    review: [cloudnativepg]
+  "**/*-pg-*/**":
+    impl: [cloudnativepg]
+    review: [cloudnativepg]
+  # Envoy Gateway: manifests named by kind, plus the gateway-* directories that
+  # hold the policies and their exemptions. An Argo CD Application named after a
+  # gateway (argocd/apps/gateway-auth.yaml) matches the kind row too; that is a
+  # known false positive and it is harmless, because the Application renders
+  # those very manifests and rows are additive.
+  "**/{httproute,securitypolicy,backendtlspolicy,backendtrafficpolicy,clienttrafficpolicy,gateway,gatewayclass,referencegrant}*.{yaml,yml}":
+    impl: [envoy-gateway]
+    review: [envoy-gateway, security-review]
+  "**/{gateway,gateway-*}/**":
+    impl: [envoy-gateway]
+    review: [envoy-gateway, security-review]
+  # LLM gateway: agent-router, the successor to Envoy AI Gateway.
+  "**/{ai-gateway,agent-router,llm-gateway}/**":
+    impl: [agent-router, envoy-gateway]
+    review: [agent-router, security-review]
+  # Secrets: sops + age. security-review is always on and is repeated here on
+  # purpose, because a secrets diff is where it earns its keep.
+  "{.sops.yaml,**/*.enc.yaml,**/*.enc.yml}":
+    impl: [sops-age]
+    review: [sops-age, security-review]
+    qa: []
+  # QA: Playwright specs. The **/*.{ts,tsx} row above also matches them; the union
+  # is intended, a spec is still TypeScript.
+  "{tests/**/*.spec.ts,playwright.config.ts}":
+    impl: [playwright-cli, playwright-component-testing]
+    review: [playwright-cli]
+    qa: [playwright-cli, playwright-trace, ux-evidence]
+  # API collections: Bruno runs them in CI, so it is an implementation and a qa
+  # competency both.
+  "{**/*.bru,**/bruno.json}":
+    impl: [bruno]
+    qa: [bruno]
+  # Observability: PromQL for metrics and alert rules, LogQL for logs, TraceQL for
+  # traces. Dashboards are JSON, alert rules are YAML.
+  "{observability/**,**/dashboards/**/*.json,**/*rule*.{yaml,yml}}":
+    impl: [promql, loki, tempo]
+    review: [promql, loki, tempo]
+    qa: [promql, loki, tempo]
   always:
     # prior-art is the research-before-work house rule: the planner has it
     # preloaded, every implementer loads it, the reviewer checks for its note.
-    impl: [prior-art]
+    # review-testing-rules is the pack every task in every stack reads; it is
+    # portable now that it ships in the plugin instead of one machine's ~/.claude.
+    impl: [prior-art, review-testing-rules]
     review: [review-protocol, security-review, privacy-review]
     design: [ux-journey, ui-ux-pro-max]
 

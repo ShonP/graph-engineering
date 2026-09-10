@@ -229,7 +229,7 @@ Written skills carry the plugin's MIT license (plugin.json author is the owner);
 | 17 | Harvest the four rule packs into `skills/rules` | rules | standard | implementer | 1-16 | 0 |
 | 18 | Routing rows, `/graph-init` detection, README, version 0.8.0 | templates, commands, docs, manifest | standard | implementer | 19, 20 | 1-17 |
 | 19 | Agent fallback catalogs, all nine agent files | agents | standard | implementer | 18, 20 | 1-17 |
-| 20 | Owner step: retire the four global rule packs | docs | small | implementer-simple (owner executes) | 18, 19, 21, 22 | 17 |
+| 20 | Owner step: retire the five global rule packs | docs | small | implementer-simple (owner executes) | 18, 19, 21, 22 | 17 |
 | 21 | Spec 4.2 amendment: vendoring bare and untagged upstreams | docs | small | implementer-simple | 1-19, 20, 22 | 0 |
 | 22 | `hooks/hooks.json`: lint on edit, test before stop, handoff on start | hooks | standard | implementer | 11-21 | 7, 8, 9, 10 |
 | 23 | Dry dispatch against a forge file list | docs | standard | implementer | none | 18, 19, 20, 21, 22 |
@@ -522,15 +522,15 @@ Sources: `~/.claude/skills/<name>/SKILL.md` (43, 78, 28, 46 lines on 2026-09-10)
 
 Corrected 2026-09-10, during the task, from `diff <(sed 1,5d ~/.claude/skills/<name>/SKILL.md) <(sed 1,6d skills/rules/<name>/SKILL.md)` is empty. That form can never be empty for any placement of an added line under the H1: it drops five lines from the source (frontmatter plus the blank) and six from the copy, so the copy's first surviving line is always compared against the source's H1. Its best case is the one changed line the original parenthetical describes. `diff -r` states the same intent without the off-by-one and also catches an added or missing file, which the `sed` form cannot see.
 
-### Task 20: Owner step: retire the four global rule packs
+### Task 20: Owner step: retire the five global rule packs
 
 **Size:** small. **Stack:** docs. **REQUIRED:** prior-art, review-testing-rules. **After:** Task 17. **Owner-executed** (it edits `~/.claude`, which no agent touches); the implementer-simple lane only writes the instructions and records the result.
 **Files:** `docs/superpowers/runs/2026-09-10-rule-pack-move.md`.
 
 Spec 4.3 says the global packs move into the plugin, not copy. Until the global copies are gone, a bare `backend-rules` on this machine resolves to `~/.claude/skills/backend-rules` (reviewer reproduction, 2026-09-10) and the plugin copy is reachable only as `graph-engineering:backend-rules`.
 
-- [ ] Write the run doc with the manual step, verbatim for the owner: after Task 17 is merged and `claude plugin update graph-engineering` (or a `--plugin-dir` session) shows the four plugin skills, run `rm -r ~/.claude/skills/{backend-rules,architecture-resilience-rules,agent-workflow-rules,review-testing-rules}` and `~/.claude/CLAUDE.md`'s "On-Demand Rule Packs" list keeps working because the plugin supplies the same names.
-- [ ] Record the interim facts: bare names resolve to the global copy (identical content, harmless); dispatches may use the `graph-engineering:` prefix to force the plugin copy; `frontend-rules` stays global until its own harvest.
+- [ ] Write the run doc with the manual step, verbatim for the owner: after Task 17 is merged and `claude plugin update graph-engineering` (or a `--plugin-dir` session) shows the five plugin skills, run `rm -r ~/.claude/skills/{backend-rules,frontend-rules,architecture-resilience-rules,agent-workflow-rules,review-testing-rules}` and `~/.claude/CLAUDE.md`'s "On-Demand Rule Packs" list keeps working because the plugin supplies the same names.
+- [ ] Record the interim facts: bare names resolve to the global copy (identical content, harmless); dispatches may use the `graph-engineering:` prefix to force the plugin copy. All five packs spec 4.3 names are in the plugin: `frontend-rules` was harvested by Task 17's second commit on the coordinator's 2026-09-10 ruling, so it is retired with the other four rather than left behind.
 - [ ] Owner runs the step and confirms in a `--plugin-dir` session that `/review-testing-rules` now answers with the plugin cache path; the confirmation line goes into the run doc.
 - [ ] Commit: `Record the rule-pack move and the owner step that retires the global copies`.
 
@@ -669,7 +669,7 @@ Docs to fetch (200 on 2026-09-10): https://code.claude.com/docs/en/hooks (markdo
 - [ ] Verify in the scratchpad with four throwaway projects: uv (`uv init`, `[project.scripts] test = ...` failing then passing), npm (`scripts.test` `exit 1` then `exit 0`), Taskfile (`test:` task failing then passing), and one with nothing; run each script by piping a hand-written JSON input (`echo '{"tool_input":{"file_path":"..."}}' | CLAUDE_PROJECT_DIR=<dir> hooks/scripts/lint-touched-file.sh`) and record exit codes: lint 0 in every case including a `file_path` outside `CLAUDE_PROJECT_DIR` (and confirm no script ran for the outside path); test-before-stop 2 then 0 for each of the three conventions, 0 for the empty project; print-handoff prints 40 lines then exits 0 without the file. Then `claude plugin validate /Users/shonpazarker/projects/graph-engineering` exit 0, and one interactive `claude --plugin-dir` session in the Taskfile project (forge's shape) showing the SessionStart text and a blocked Stop.
 - [ ] Commit: `Add plugin hooks: lint on edit, test before stop, handoff on session start`.
 
-**Acceptance:** verification 1, 2 (hooks.json is valid JSON), 6; the recorded exit codes for all four projects and the outside-path case; the loop-cap sentence cites "Stop input"; the four doc pages named above are listed with titles in the README paragraph or the script headers; the scripts pass `shellcheck` if installed (say so if not).
+**Acceptance:** verification 1, 2 (hooks.json is valid JSON), 6; the recorded exit codes for all four projects and the outside-path case; the loop-cap sentence cites "Stop input"; the four doc pages named above are listed with titles in the README paragraph or the script headers; the scripts pass `shellcheck` if installed (say so if not); `bash hooks/tests/run-tests.sh` exits 0 from the repo root and from `/`, being the committed regression suite for all three hooks (bash and python3 only, `uv`/`pnpm`/`task` stubbed under `hooks/tests/fixtures/stubs/`).
 
 ### Task 23: Dry dispatch against a forge file list
 
@@ -697,10 +697,10 @@ This is the gate for the whole plan: `/graph-ship` step 4 resolution, done by ha
 ## Open questions (each ends spiked or as a stated assumption before the gate)
 
 1. **pydantic trio as dependencies?** Assumption A1 above: vendored, because no `{name}--v{version}` tag exists. Owner may reject.
-2. **`frontend-rules` harvest.** Spec 4.3 names five packs; this ask names four. Assumption: `frontend-rules` is harvested in a later react-group task, since `react-rules` already covers most of it. Owner may pull it into Task 17.
+2. **`frontend-rules` harvest.** CLOSED 2026-09-10: the coordinator ruled it ships with Task 17, in its own commit, so all five packs spec 4.3 names are in the plugin. Task 18 routes it on `**/*.{ts,tsx}` and Task 20 retires five global copies, not four.
 3. **CNPG doc version.** Chart appVersion says 1.29.1, forge's HANDOFF says 1.30. Task 3 resolves it in-task from the cluster or chart and cites that version; assumption until then: 1.29.
 4. **agent-router doc location.** `theagentrouter.ai` served an untitled page; Task 5 may have to cite the GitHub repo's docs at tag `v1.1.0`. Assumption: repo docs at a tag count as vendor docs.
-5. **Name collision with the owner's global packs.** Resolved by reproduction (reviewer, 2026-09-10): a bare name resolves to the global copy; the plugin copy answers to `graph-engineering:<name>`. Task 20 is the owner's manual step that deletes the four global copies; until then the collision is harmless because the content is identical.
+5. **Name collision with the owner's global packs.** Resolved by reproduction (reviewer, 2026-09-10): a bare name resolves to the global copy; the plugin copy answers to `graph-engineering:<name>`. Task 20 is the owner's manual step that deletes the five global copies; until then the collision is harmless because the content is identical.
 6. **Vendor tasks marked `small`.** Reasoning in the task table; owner may flip to `standard`.
 7. **`**/*.{ts,tsx}` also matches `tests/**/*.spec.ts`,** so react skills load on Playwright specs. Assumption: the union is acceptable in the template and narrowed per repo.
 8. **No profile in this repo.** The stack map in Global Constraints stands in; the owner runs `/graph-init` here so future runs do not need a planner-supplied map.

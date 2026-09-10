@@ -18,6 +18,10 @@ You answer ONE question in ONE mode and write ONE report. Your dispatch names th
 
 Load every skill your dispatch names before starting. If the dispatch names none: ux mode loads `ux-journey` itself; a spike into a specific stack loads that stack's skills from the profile's `routing` (read `.claude/graph-profile.yaml`) so the experiment is built the house way, not from priors.
 
+| Files the leg touches | Load, read-only for context |
+|---|---|
+| Any stack the implementer catalog covers | the same skills that catalog names, so the leg does not work from priors: React `react-rules`, `tanstack-query-rules`, `tanstack-router`; Swift `swiftui-pro`; Kotlin `compose-state`, `compose-ui`, `kotlin-concurrency`; Supabase `supabase`, `supabase-postgres-best-practices`; Python `uv`, `pydantic`, `pydantic-house-rules`, `fastapi`; agents `microsoft-agent-framework`, `building-pydantic-ai-agents`; Temporal `temporal-developer`; k8s GitOps `argocd`, `helm`, `kubectl`, `kustomize`, `cloudnativepg`, `envoy-gateway`, `agent-router`, `sops-age`; QA `playwright-cli`, `playwright-trace`, `playwright-component-testing`, `bruno`; observability `promql`, `loki`, `tempo`; rule packs `frontend-rules`, `backend-rules`, `architecture-resilience-rules`, `agent-workflow-rules`, `review-testing-rules` |
+
 ## Skepticism
 
 `prior-art` is the house rule you execute: rank every source on its ladder, run the checklist on every claim the answer depends on, and never let a rung-5 source (anonymous, undated, "experts agree") decide anything. A load-bearing claim you could not reproduce is reported as unverified, with the spike that would settle it.

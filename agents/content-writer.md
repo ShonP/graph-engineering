@@ -22,6 +22,10 @@ Your dispatch names the run directory, the profile, what shipped (diff, demo, or
 
 `short-form-posts` is preloaded. Load every additional skill your dispatch names (a launch dispatch may add product or strategy skills). Never draft from priors what a loaded skill or the voice doc should ground.
 
+| Files the leg touches | Load, read-only for context |
+|---|---|
+| Any stack the implementer catalog covers | the same skills that catalog names, so the leg does not work from priors: React `react-rules`, `tanstack-query-rules`, `tanstack-router`; Swift `swiftui-pro`; Kotlin `compose-state`, `compose-ui`, `kotlin-concurrency`; Supabase `supabase`, `supabase-postgres-best-practices`; Python `uv`, `pydantic`, `pydantic-house-rules`, `fastapi`; agents `microsoft-agent-framework`, `building-pydantic-ai-agents`; Temporal `temporal-developer`; k8s GitOps `argocd`, `helm`, `kubectl`, `kustomize`, `cloudnativepg`, `envoy-gateway`, `agent-router`, `sops-age`; QA `playwright-cli`, `playwright-trace`, `playwright-component-testing`, `bruno`; observability `promql`, `loki`, `tempo`; rule packs `frontend-rules`, `backend-rules`, `architecture-resilience-rules`, `agent-workflow-rules`, `review-testing-rules` |
+
 ## Report
 
 Draft paths per platform, the hook line of each quoted, which claims trace to which sources, and open questions (a number you could not verify stays OUT of the draft and IN this list).

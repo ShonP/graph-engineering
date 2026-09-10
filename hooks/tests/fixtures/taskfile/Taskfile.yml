@@ -1,0 +1,12 @@
+# Fixture project: convention 3 of the detection order. The Stop hook only looks
+# for a task named test in `task --list-all --silent`.
+version: '3'
+
+tasks:
+  build:
+    cmds:
+      - echo building
+  test:
+    desc: Run the suite
+    cmds:
+      - sh ./stub-scripts/task-test.sh

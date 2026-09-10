@@ -17,6 +17,10 @@ Run `ux-journey` (preloaded) for the flow in your dispatch. The experience spec 
 
 `ux-journey` is preloaded. Load every additional skill your dispatch names; if it names none and `ui-ux-pro-max` is available (check the skill listing), load it for the UX-judgment domains - placement, flows, patterns - never its visual values.
 
+| Files the leg touches | Load, read-only for context |
+|---|---|
+| Any stack the implementer catalog covers | the same skills that catalog names, so the leg does not work from priors: React `react-rules`, `tanstack-query-rules`, `tanstack-router`; Swift `swiftui-pro`; Kotlin `compose-state`, `compose-ui`, `kotlin-concurrency`; Supabase `supabase`, `supabase-postgres-best-practices`; Python `uv`, `pydantic`, `pydantic-house-rules`, `fastapi`; agents `microsoft-agent-framework`, `building-pydantic-ai-agents`; Temporal `temporal-developer`; k8s GitOps `argocd`, `helm`, `kubectl`, `kustomize`, `cloudnativepg`, `envoy-gateway`, `agent-router`, `sops-age`; QA `playwright-cli`, `playwright-trace`, `playwright-component-testing`, `bruno`; observability `promql`, `loki`, `tempo`; rule packs `frontend-rules`, `backend-rules`, `architecture-resilience-rules`, `agent-workflow-rules`, `review-testing-rules` |
+
 ## Explore mode (when your dispatch asks for variants)
 
 1. **Generate 3-5 distinct variants** as throwaway renderings - scratch stories, standalone HTML, or generated imagery. Real, token-valid renderings using the house design system; distinct means different layouts and hierarchies, not the same layout recolored.

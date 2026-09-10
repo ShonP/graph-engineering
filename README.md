@@ -94,6 +94,34 @@ Then restart the session to apply.
 `/graph-ship --resume <run-id>` picks a run back up from its ledger.
 `/graph-ship --auto-merge` relaxes only the merge gate, only for that run.
 
+## Hooks
+
+Installing this plugin turns on three hooks, and they run your repository's own
+scripts. Read this before enabling it on a repo you did not write.
+
+| When | What runs | If it is unhappy |
+|---|---|---|
+| after every `Edit` or `Write` | your `lint`, then your `typecheck`, on the file just touched | nothing is blocked. The output comes back to Claude as context beside the tool result |
+| before Claude stops | your whole `test` script | the turn is blocked with exit 2 and Claude keeps working until the suite is green, or until Claude Code ends the turn after 8 consecutive blocks (hooks reference, "Stop input") |
+| at session start | the first 40 lines of `docs/HANDOFF.md`, when that file exists | nothing |
+
+The edit hook acts only on a real file strictly inside `$CLAUDE_PROJECT_DIR`, so
+an edit inside a scratch clone of somebody else's repo never runs that repo's
+scripts. The stop hook looks in the project root and nowhere else. Neither runs
+anything unless your repo declares the script under one of three conventions
+(`pyproject.toml`, `package.json`, `Taskfile.yml`), so a repo with none of them
+sees no change at all.
+
+Two costs to know before you install. A suite that is red for reasons unrelated
+to the current task blocks up to 8 turns, running your full test command each
+time; and a slow suite is paid on every stop. To turn them off, disable the
+plugin with `claude plugin disable graph-engineering`, or every hook in a scope
+with `"disableAllHooks": true` in that scope's settings file (hooks reference,
+"Disable or remove hooks").
+
+Detection order, the project-directory bound, the dependency list and the test
+command: [`hooks/README.md`](hooks/README.md).
+
 ## Roster
 
 The full organization - nine agents:
@@ -116,6 +144,65 @@ skill floor returns `NEEDS_SETUP` instead of improvising.
 
 Still planned: the `bug`, `launch` and `content` playbooks that put the back
 half of the roster to work, board sync, and `/graph-doctor`.
+
+## Competencies
+
+Skills live under `skills/<group>/<name>/SKILL.md`. The group is filing only; what
+routes a skill to a task is the profile's routing table, matched against the
+task's files. The directory name is the routing name, and
+`scripts/check-skill-frontmatter.sh` enforces that the frontmatter `name` agrees
+with it.
+
+| Group | Skills | Routed by |
+|---|---|---|
+| `ios` | swiftui-pro, healthkit, widgetkit, activitykit, photokit, push-notifications | `**/*.swift`, plus dir globs per framework |
+| `android` | compose-state, compose-ui, compose-performance, compose-build-and-test, kotlin-concurrency, kotlin-control-flow, kotlin-functions, kotlin-types-value-class | `**/*.{kt,kts}` |
+| `react` | react-rules, tanstack-query-rules, tanstack-router | `**/*.{ts,tsx}` |
+| `supabase` | supabase, supabase-postgres-best-practices | `**/*.sql` |
+| `python` | uv, pydantic, pydantic-house-rules, fastapi, building-pydantic-ai-agents, pydantic-ai-harness | `**/*.py`, `**/{pyproject.toml,uv.lock,.python-version}`; building-pydantic-ai-agents on `**/agents/**/*.py`; pydantic-ai-harness by the agent catalogs only, no routing row |
+| `agents` | microsoft-agent-framework | `**/agents/**/*.py` |
+| `k8s-gitops` | argocd, helm, kubectl, kustomize, cloudnativepg, envoy-gateway, agent-router, sops-age | `argocd/**`, `manifests/**`, `**/Chart.yaml`, `**/kustomization.{yaml,yml}`, `**/*.enc.yaml` |
+| `temporal` | temporal-developer | `**/{workflows,activities}/**/*.py` |
+| `qa` | playwright-cli, playwright-trace, playwright-component-testing, bruno | `tests/**/*.spec.ts`, `playwright.config.ts`, `**/*.bru` |
+| `observability` | promql, loki, tempo | `observability/**`, `**/dashboards/**/*.json`, `**/*rule*.{yaml,yml}` |
+| `security` | security-review | `always.review` |
+| `privacy` | privacy-review, gdpr-consent, gdpr-erasure-retention | `always.review`, `**/{migrations,schemas}/**` |
+| `ux` | ux-journey, ui-ux-pro-max | `always.design` |
+| `content` | short-form-posts, short-attention-media | the content playbook |
+| `process` | prior-art, review-protocol, ux-evidence, product-spec, qa-verification | prior-art on `always.impl`, review-protocol on `always.review`, ux-evidence on every UI-bearing row; product-spec preloaded by `planner`, qa-verification preloaded by `qa` |
+| `rules` | backend-rules, frontend-rules, architecture-resilience-rules, agent-workflow-rules, review-testing-rules | ride along on their stack's rows; `review-testing-rules` is on `always.impl` |
+
+**Provenance.** Some of these are written here from the vendor's own docs; some
+are vendored from upstream. A vendored tree carries a `SOURCE.md` naming the
+upstream repo, the pinned commit, the license, and a copy-paste refresh recipe,
+plus the upstream `LICENSE` (and `NOTICE` where the license requires it). A
+vendored file is never edited, not even to fix it: a house rule that contradicts
+one lives in a sibling skill, which spec 4.5 precedence (house >
+vault-generated > community) makes win. `skills/python/pydantic-house-rules` is
+the worked example.
+
+**One thing to set on the host.** The vendored Playwright skills declare
+`allowed-tools: ... Bash(npx:*) Bash(npm:*)`, and `npx <package>` fetches and
+runs arbitrary registry code. A skill's `allowed-tools` applies whenever that
+skill is active, and per [Configure
+permissions](https://code.claude.com/docs/en/permissions) "workspace trust never
+gates a skill's allowed-tools in any session". A sibling house-rules skill cannot
+narrow it either, because `allowed-tools` only applies while its own skill is
+active. The control that binds is a permission rule in the consuming repo's
+`.claude/settings.json`: per [Extend Claude with
+skills](https://code.claude.com/docs/en/skills), "a matching ask or deny rule
+still aborts the invocation regardless of `allowed-tools`":
+
+```json
+{ "permissions": { "ask": ["Bash(npx:*)", "Bash(npm:*)"] } }
+```
+
+`ask` rules only restrict, so unlike `allow` rules they take effect without the
+workspace trust dialog. `/graph-init` prints this whenever it routes the QA row.
+
+How each skill was sourced, and what was rejected:
+`docs/superpowers/plans/2026-09-10-stack-skills.md` and
+`docs/research/2026-09-10-stack-skills-sourcing.md`.
 
 ## House rules
 

@@ -1,0 +1,8 @@
+{
+  "name": "fixture-ancestor-project",
+  "private": true,
+  "scripts": {
+    "lint": "sh ./ran.sh ESCAPED_LINT_RAN",
+    "typecheck": "sh ./ran.sh ESCAPED_TYPECHECK_RAN"
+  }
+}

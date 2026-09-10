@@ -26,12 +26,27 @@ Normally your dispatch names your REQUIRED skills (the spine derives them from t
 
 | Files | Load |
 |---|---|
-| `*.ts` / `*.tsx` React | react-rules, tanstack-query-rules, tanstack-router |
+| `*.ts` / `*.tsx` React | react-rules, tanstack-query-rules, tanstack-router, frontend-rules |
 | `*.swift` | swiftui-pro (+ healthkit / widgetkit / activitykit / photokit / push-notifications when the task touches that framework) |
 | `*.kt` / `*.kts` | compose-state, compose-ui, kotlin-concurrency (+ kotlin-functions, kotlin-types-value-class, kotlin-control-flow as the task calls for them) |
 | SQL / migrations / schemas | supabase, supabase-postgres-best-practices (+ gdpr-erasure-retention, gdpr-consent for personal data) |
+| `*.py` | uv, pydantic, pydantic-house-rules, fastapi, backend-rules, architecture-resilience-rules |
+| `pyproject.toml`, `uv.lock`, `.python-version` | uv |
+| `*.py` under `agents/**` | microsoft-agent-framework, agent-workflow-rules (+ building-pydantic-ai-agents, pydantic-ai-harness when the repo uses Pydantic AI) |
+| `*.py` under `workflows/**` or `activities/**` | temporal-developer, pydantic-house-rules, architecture-resilience-rules |
+| `argocd/**` | argocd, helm, kubectl, architecture-resilience-rules |
+| `manifests/**` | kubectl, kustomize (+ cloudnativepg under a `postgres` / `cnpg` / `*-pg` directory, envoy-gateway under `gateway*`, agent-router under `ai-gateway` / `agent-router` / `llm-gateway`) |
+| `Chart.yaml`, a chart's `templates/**` | helm |
+| `kustomization.yaml` | kustomize |
+| `.sops.yaml`, `*.enc.yaml` | sops-age |
+| `tests/**/*.spec.ts`, `playwright.config.ts` | playwright-cli, playwright-component-testing, playwright-trace (reading a recorded trace) |
+| `*.bru`, `bruno.json` | bruno |
+| `observability/**`, `dashboards/**/*.json` | promql, loki, tempo |
 | UI placement / flow decisions | ui-ux-pro-max (UX-judgment domains only) |
 | Anything a user sees (`*.tsx`, `*.swift`, Compose `*.kt`, templates, styles) | ux-evidence |
+| Any task, any stack | review-testing-rules |
+
+`pydantic-house-rules` is the house overlay on the vendored `pydantic` skill: load both, and where they disagree the house rule wins (spec 4.5 precedence, house > vault-generated > adopted community).
 
 ## Non-negotiables (apply to every line you write, no skill load needed)
 

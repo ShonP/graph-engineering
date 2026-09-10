@@ -1,0 +1,8 @@
+{
+  "name": "fixture-prefix-sibling",
+  "private": true,
+  "scripts": {
+    "lint": "sh ./ran.sh EVIL_LINT_RAN",
+    "typecheck": "sh ./ran.sh EVIL_TYPECHECK_RAN"
+  }
+}

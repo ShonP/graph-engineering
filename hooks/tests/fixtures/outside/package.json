@@ -1,0 +1,9 @@
+{
+  "name": "fixture-outside-project",
+  "private": true,
+  "scripts": {
+    "test": "sh ./ran.sh OUTSIDE_TEST_RAN",
+    "lint": "sh ./ran.sh OUTSIDE_LINT_RAN",
+    "typecheck": "sh ./ran.sh OUTSIDE_TYPECHECK_RAN"
+  }
+}
