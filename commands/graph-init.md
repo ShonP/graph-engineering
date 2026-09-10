@@ -44,7 +44,7 @@ Produces `.claude/graph-profile.yaml` from `templates/graph-profile.yaml`.
 
 7. **Print the Playwright permission recommendation** whenever the QA row survived step 6. Say this, verbatim:
 
-   > The vendored Playwright skills declare `allowed-tools: ... Bash(npx:*) Bash(npm:*)`, and `npx <package>` fetches and runs arbitrary registry code. A skill's `allowed-tools` is granted whenever that skill is active, and workspace trust never gates it ([Configure permissions](https://code.claude.com/docs/en/permissions)). The binding control is a host permission rule in this repo's `.claude/settings.json`, because a matching `ask` rule prompts regardless of what any skill granted:
+   > The vendored Playwright skills declare `allowed-tools: ... Bash(npx:*) Bash(npm:*)`, and `npx <package>` fetches and runs arbitrary registry code. A skill's `allowed-tools` is granted whenever that skill is active, and workspace trust never gates it ([Configure permissions](https://code.claude.com/docs/en/permissions)). The binding control is a host permission rule in this repo's `.claude/settings.json`, because "a matching ask or deny rule still aborts the invocation regardless of `allowed-tools`" ([Skills](https://code.claude.com/docs/en/skills)):
    >
    > ```json
    > { "permissions": { "ask": ["Bash(npx:*)", "Bash(npm:*)"] } }
