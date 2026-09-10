@@ -1,0 +1,11 @@
+# Fixture project: declares test, lint and typecheck under [project.scripts],
+# which is convention 1 of the hooks' detection order.
+[project]
+name = "fixture-uv-project"
+version = "0.1.0"
+requires-python = ">=3.11"
+
+[project.scripts]
+test = "fixture_uv_project:run_test"
+lint = "fixture_uv_project:run_lint"
+typecheck = "fixture_uv_project:run_typecheck"

@@ -1,0 +1,9 @@
+{
+  "name": "fixture-node-project",
+  "private": true,
+  "scripts": {
+    "test": "sh ./test.sh",
+    "lint": "sh ./lint.sh",
+    "typecheck": "sh ./typecheck.sh"
+  }
+}

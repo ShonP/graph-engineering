@@ -30,7 +30,10 @@ so `PostToolUse` skips a Taskfile project in silence.
 The file argument is passed with no `--` separator: measured on 2026-09-10,
 npm 11.12.1 strips a leading `--` while pnpm 10.33.3 forwards it to the script as
 a literal first argument, so the bare form is the one that behaves the same on
-both.
+both. Open question, not a rule: yarn and bun were not measured, because neither
+was installed on the machine where this was written. The bare form is what their
+docs describe, but if a yarn or bun repo sees a mangled lint argument, that pair
+is where to look first.
 
 When nothing matches, or when the tool a project needs (`uv`, the package
 manager, `task`) is not installed, the hook exits 0 and prints nothing.
@@ -84,6 +87,25 @@ ways out, in order of least collateral damage:
   (plugins reference, "plugin disable").
 - `"disableAllHooks": true` in a settings file turns off every hook from every
   source for that scope (hooks reference, "Disable or remove hooks").
+
+## Tests
+
+```
+bash hooks/tests/run-tests.sh
+```
+
+Runs from any working directory and needs nothing but `bash` and `python3`:
+`uv`, `pnpm` and `task` are stubbed under `hooks/tests/fixtures/stubs/` and are
+installed onto `PATH` inside the sandbox, so the suite never touches the real
+tools or the network. It copies `hooks/tests/fixtures/` into a `mktemp`
+directory, writes only there, removes it on the way out, and exits non-zero when
+any case fails.
+
+The fixtures are one mini project per convention (`py/` for `uv`, `node/` for
+the package manager, `taskfile/` for `task`), one with no scripts at all
+(`bare/`), and two whose scripts must never run: `outside/`, which stands for a
+clone of somebody else's repo outside the project directory, and `py-evil/`,
+which sits next to `py/` and shares its name prefix.
 
 ## Registration
 
