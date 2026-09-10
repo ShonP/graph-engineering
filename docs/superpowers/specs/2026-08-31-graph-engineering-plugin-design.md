@@ -578,3 +578,43 @@ VoltAgent's competitive-analyst subagent (rejected - marketing SWOT, minimal
 source skepticism); the plugin's own `researcher` agent (reused - the skill is
 a protocol over it, not a second researcher). Rejected: a hard turn budget in
 the skill; budgets stay in the dispatch, scaled to the ask.
+
+### 2026-09-10 - Vendoring bare and untagged upstreams
+
+Spec 4.2 says adopted skills are depended on, not vendored; that sentence
+covers plugin upstreams only. The forge #41 amendment review (2026-09-10)
+ruled the rule for everything else: a bare skill tree (no
+`.claude-plugin/plugin.json`) is vendored under `skills/<group>/<name>/`,
+pinned by commit SHA, byte-identical, with the upstream license file
+alongside and a `SOURCE.md` (URL, SHA, date, license, refresh recipe). A
+plugin upstream with no tagged release is vendored the same way until a
+`{plugin-name}--v{version}` tag exists, then it flips to a `dependencies`
+entry with a semver constraint and, for another marketplace, an
+`allowCrossMarketplaceDependenciesOn` entry.
+
+House adaptations never edit the vendored tree; they live in a sibling skill
+(spec 4.5 precedence).
+
+The reasoning follows the plugin-dependencies reference's own distinction
+between source kinds ("Tag plugin releases for version resolution"): for
+`github`, `url` and `git-subdir` sources, a version constraint with no
+matching tag fails the install outright. For a relative-path plugin with no
+matching tag, Claude Code installs the marketplace's current copy and only
+checks the constraint at load, so the constraint checks but does not pin, and
+an untagged upstream floats. Spec 4.2 rule 4 exists so an upstream change
+cannot land unreviewed; a floating dependency defeats that purpose, therefore
+vendoring by SHA is the rule until tags exist.
+
+Worked example: `pydantic/skills` (three `plugin.json`, a marketplace.json
+with relative-path sources and `version: 0.1.0`, zero git tags on
+2026-09-10) is vendored at `9e9390ee24d44b32cf5379c58acaebd7563f5f86`. The
+day `pydantic--v0.1.0` exists it becomes
+`{ "name": "pydantic", "version": "~0.1.0", "marketplace": "pydantic-skills" }`
+with `pydantic-skills` allow-listed in this plugin's marketplace.json.
+
+Rejected: a bare-name dependency entry for an untagged upstream, forbidden by
+spec 4.2 rule 4 regardless of source kind; editing a vendored file in place,
+because it breaks the byte-identical refresh the recipe depends on.
+
+See plan `docs/superpowers/plans/2026-09-10-stack-skills.md` and sourcing
+report `docs/research/2026-09-10-stack-skills-sourcing.md`.
