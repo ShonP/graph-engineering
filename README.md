@@ -94,6 +94,34 @@ Then restart the session to apply.
 `/graph-ship --resume <run-id>` picks a run back up from its ledger.
 `/graph-ship --auto-merge` relaxes only the merge gate, only for that run.
 
+## Hooks
+
+Installing this plugin turns on three hooks, and they run your repository's own
+scripts. Read this before enabling it on a repo you did not write.
+
+| When | What runs | If it is unhappy |
+|---|---|---|
+| after every `Edit` or `Write` | your `lint`, then your `typecheck`, on the file just touched | nothing is blocked. The output comes back to Claude as context beside the tool result |
+| before Claude stops | your whole `test` script | the turn is blocked with exit 2 and Claude keeps working until the suite is green, or until Claude Code ends the turn after 8 consecutive blocks (hooks reference, "Stop input") |
+| at session start | the first 40 lines of `docs/HANDOFF.md`, when that file exists | nothing |
+
+The edit hook acts only on a real file strictly inside `$CLAUDE_PROJECT_DIR`, so
+an edit inside a scratch clone of somebody else's repo never runs that repo's
+scripts. The stop hook looks in the project root and nowhere else. Neither runs
+anything unless your repo declares the script under one of three conventions
+(`pyproject.toml`, `package.json`, `Taskfile.yml`), so a repo with none of them
+sees no change at all.
+
+Two costs to know before you install. A suite that is red for reasons unrelated
+to the current task blocks up to 8 turns, running your full test command each
+time; and a slow suite is paid on every stop. To turn them off, disable the
+plugin with `claude plugin disable graph-engineering`, or every hook in a scope
+with `"disableAllHooks": true` in that scope's settings file (hooks reference,
+"Disable or remove hooks").
+
+Detection order, the project-directory bound, the dependency list and the test
+command: [`hooks/README.md`](hooks/README.md).
+
 ## Roster
 
 The full organization - nine agents:
@@ -131,7 +159,7 @@ with it.
 | `android` | compose-state, compose-ui, compose-performance, compose-build-and-test, kotlin-concurrency, kotlin-control-flow, kotlin-functions, kotlin-types-value-class | `**/*.{kt,kts}` |
 | `react` | react-rules, tanstack-query-rules, tanstack-router | `**/*.{ts,tsx}` |
 | `supabase` | supabase, supabase-postgres-best-practices | `**/*.sql` |
-| `python` | uv, pydantic, pydantic-house-rules, fastapi, building-pydantic-ai-agents, pydantic-ai-harness | `**/*.py`, `**/{pyproject.toml,uv.lock,.python-version}` |
+| `python` | uv, pydantic, pydantic-house-rules, fastapi, building-pydantic-ai-agents, pydantic-ai-harness | `**/*.py`, `**/{pyproject.toml,uv.lock,.python-version}`; building-pydantic-ai-agents on `**/agents/**/*.py`; pydantic-ai-harness by the agent catalogs only, no routing row |
 | `agents` | microsoft-agent-framework | `**/agents/**/*.py` |
 | `k8s-gitops` | argocd, helm, kubectl, kustomize, cloudnativepg, envoy-gateway, agent-router, sops-age | `argocd/**`, `manifests/**`, `**/Chart.yaml`, `**/kustomization.{yaml,yml}`, `**/*.enc.yaml` |
 | `temporal` | temporal-developer | `**/{workflows,activities}/**/*.py` |
@@ -141,7 +169,7 @@ with it.
 | `privacy` | privacy-review, gdpr-consent, gdpr-erasure-retention | `always.review`, `**/{migrations,schemas}/**` |
 | `ux` | ux-journey, ui-ux-pro-max | `always.design` |
 | `content` | short-form-posts, short-attention-media | the content playbook |
-| `process` | prior-art, review-protocol, ux-evidence, product-spec, qa-verification | `always` |
+| `process` | prior-art, review-protocol, ux-evidence, product-spec, qa-verification | prior-art on `always.impl`, review-protocol on `always.review`, ux-evidence on every UI-bearing row; product-spec preloaded by `planner`, qa-verification preloaded by `qa` |
 | `rules` | backend-rules, frontend-rules, architecture-resilience-rules, agent-workflow-rules, review-testing-rules | ride along on their stack's rows; `review-testing-rules` is on `always.impl` |
 
 **Provenance.** Some of these are written here from the vendor's own docs; some
@@ -161,8 +189,9 @@ permissions](https://code.claude.com/docs/en/permissions) "workspace trust never
 gates a skill's allowed-tools in any session". A sibling house-rules skill cannot
 narrow it either, because `allowed-tools` only applies while its own skill is
 active. The control that binds is a permission rule in the consuming repo's
-`.claude/settings.json`, since a matching `ask` rule prompts regardless of what a
-skill granted:
+`.claude/settings.json`: per [Extend Claude with
+skills](https://code.claude.com/docs/en/skills), "a matching ask or deny rule
+still aborts the invocation regardless of `allowed-tools`":
 
 ```json
 { "permissions": { "ask": ["Bash(npx:*)", "Bash(npm:*)"] } }

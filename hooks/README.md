@@ -40,14 +40,20 @@ manager, `task`) is not installed, the hook exits 0 and prints nothing.
 
 ## Scope and least privilege
 
-- `PostToolUse` acts only when `tool_input.file_path` resolves to a path inside
-  `$CLAUDE_PROJECT_DIR`. Both paths are canonicalised first, and containment
-  requires a path separator, so a sibling directory that merely shares the
-  project's name prefix is out. A file outside the project exits 0 with no
-  command run, which is what keeps an edit inside a scratch clone of somebody
-  else's repo from running that repo's scripts.
+- `PostToolUse` acts only when `tool_input.file_path` canonicalises to a real
+  file strictly inside `$CLAUDE_PROJECT_DIR`. Strictly: the project root itself,
+  a directory, and a path that no longer exists are all rejected, and
+  containment requires a path separator, so a sibling that merely shares the
+  project's name prefix is out. Anything rejected exits 0 with no command run,
+  which is what keeps an edit inside a scratch clone of somebody else's repo
+  from running that repo's scripts.
 - Inside the project it walks up from the edited file to the nearest project
-  file and no further than `$CLAUDE_PROJECT_DIR`.
+  file and no further than `$CLAUDE_PROJECT_DIR`. The walk re-checks the bound
+  before it inspects any directory, so it cannot leave the project whatever
+  start point it is handed.
+- That bound lives in `scripts/resolve_touched_project.py` rather than inline,
+  so each of its three guards can be tested on its own. `hooks/tests/cases-resolver.sh`
+  calls them directly, because end to end only one of the three is reachable.
 - `Stop` looks in `$CLAUDE_PROJECT_DIR` only and does not walk.
 - The only commands these hooks run are the project's own named scripts. Nothing
   is taken from the contents of the edited file, there is no `eval`, no shell
@@ -74,7 +80,10 @@ as the reason to keep going ("Stop decision control"). It keeps no counter of it
 own, because the platform owns the cap: "Claude Code overrides the hook and ends
 the turn after 8 consecutive blocks" ("Stop input"). The `stop_hook_active` flag
 from the input is echoed into the reason line so the loop state is visible in the
-transcript.
+transcript. It is read and deliberately not acted on: standing down on the second
+attempt would let a suite that a fix has genuinely turned green go unverified,
+and the price of not standing down is bounded by the platform cap, so the gate is
+kept honest and the cost is disclosed in the plugin README instead.
 
 ## Turning them off
 
@@ -101,11 +110,18 @@ tools or the network. It copies `hooks/tests/fixtures/` into a `mktemp`
 directory, writes only there, removes it on the way out, and exits non-zero when
 any case fails.
 
+`cases-resolver.sh` unit-tests the project-directory bound directly;
+`cases-posttooluse.sh`, `cases-stop.sh` and `cases-sessionstart.sh` drive the
+three hooks end to end.
+
 The fixtures are one mini project per convention (`py/` for `uv`, `node/` for
 the package manager, `taskfile/` for `task`), one with no scripts at all
-(`bare/`), and two whose scripts must never run: `outside/`, which stands for a
-clone of somebody else's repo outside the project directory, and `py-evil/`,
-which sits next to `py/` and shares its name prefix.
+(`bare/`), and three that exist to be refused: `outside/`, which stands for a
+clone of somebody else's repo outside the project directory, `py-evil/`, which
+sits next to `py/` and shares its name prefix, and `escape/`, an ancestor project
+sitting one level above a session project that has no project file of its own.
+Each of them leaves a marker file if its scripts are ever executed, and the suite
+asserts the markers are absent.
 
 ## Registration
 
