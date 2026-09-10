@@ -6,8 +6,8 @@ license: MIT
 
 # Envoy Gateway
 
-Targets Envoy Gateway **v1.9.x** (forge pins chart `gateway-helm` v1.9.1). Every rule cites the
-`/v1.9/` page it comes from; on a version bump, re-read those pages under the new prefix first.
+Targets Envoy Gateway **v1.9.x** (chart `gateway-helm` v1.9.1). Every rule cites the `/v1.9/` page
+it comes from; on a version bump, re-read those pages under the new prefix first.
 
 Sources (fetched 2026-09-10 with `curl -sSL`, all HTTP 200):
 - https://gateway.envoyproxy.io/v1.9/tasks/security/oidc/ - "OIDC Authentication"
@@ -214,11 +214,11 @@ policy so the translator has a root:
 { cat <<'EOF'
 apiVersion: gateway.networking.k8s.io/v1
 kind: GatewayClass
-metadata: { name: forge }
+metadata: { name: <gatewayclass> }
 spec: { controllerName: gateway.envoyproxy.io/gatewayclass-controller }
 ---
 EOF
-cat manifests/gateway-auth/securitypolicy-<app>.yaml; } \
+cat <path>/securitypolicy-<app>.yaml; } \
   | egctl x translate --from gateway-api --to gateway-api --add-missing-resources -f -
 ```
 

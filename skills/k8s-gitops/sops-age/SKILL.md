@@ -6,8 +6,9 @@ license: MIT
 
 # SOPS + age
 
-Targets **sops 3.13.3** and **age 1.3.2** (what forge pins in `mise.toml`). Both were run at
-authoring time; the Verify recipes below are transcripts, not guesses.
+Targets **sops 3.13.3** and **age 1.3.2**. Both were run at authoring time, so the Verify recipes
+below are transcripts rather than guesses. Check what your repository pins before relying on a
+version-specific rule.
 
 Sources (fetched 2026-09-10 with `curl -sSL`, all HTTP 200):
 - https://getsops.io/docs/ - "SOPS: Secrets OPerationS"
@@ -87,10 +88,12 @@ example), is reproduced below; where a key would go, the shape is described inst
   `SOPS_AGE_RECIPIENT` to choose one). Without an override sops reads
   `$XDG_CONFIG_HOME/sops/age/keys.txt`, falling back to `~/.config/sops/age/keys.txt` on Linux
   and `~/Library/Application Support/sops/age/keys.txt` on macOS. (usage/identities/age)
-- Prefer `SOPS_AGE_KEY_FILE` (a path) over `SOPS_AGE_KEY` (the key itself in the environment): a
-  path does not land in `ps`, in a shell history, or in a CI job log that dumps `env`. In
-  Kubernetes that path is a mounted Secret volume, and any container reading it takes the value
-  from a `secretKeyRef` or the mount, **never** from a command-line argument.
+- **House security rule, docs silent.** Prefer `SOPS_AGE_KEY_FILE` (a path) over `SOPS_AGE_KEY`
+  (the key itself in the environment): a path does not land in a shell history or in a CI job log
+  that dumps `env`. In Kubernetes that path is a mounted Secret volume, and any container reading
+  it takes the value from a `secretKeyRef` or the mount. The SOPS docs list `SOPS_AGE_KEY_FILE`,
+  `SOPS_AGE_KEY` and `SOPS_AGE_KEY_CMD` as three equal overrides and state no preference between
+  them (usage/identities/age); the preference here is this plugin's, not the vendor's.
 - The key file is a list of age X25519 identities, one per line, `#` comments ignored, each tried
   in sequence until one decrypts. So a single file can hold an operator key and a break-glass
   key. (usage/identities/age)
@@ -132,13 +135,18 @@ example), is reproduced below; where a key would go, the shape is described inst
   creation rule) or an explicit `--input-type` / `--output-type`. (usage/advanced; reference)
 - `sops decrypt --extract '["data"]["key"]'` pulls a single value without materialising the whole
   plaintext document. (usage/common-operations)
-- A secret value belongs in an environment variable via `secretKeyRef`, or on stdin. Never as a
-  command-line argument: `argv` is world-readable in `/proc` on Linux, and it lands in shell
-  history, in CI logs and in `ps` output.
-- A canary encrypted file that CI decrypts on every run is the assertion that catches a decrypt
-  pipeline that has quietly stopped producing Secrets. A pruned Secret can leave an Argo CD
-  Application both Synced and Healthy, so a green sync is not evidence that decryption still
-  works.
+- **Measured, not cited: no SOPS or age page discusses `argv`.** A secret value belongs in an
+  environment variable via `secretKeyRef`, or on stdin, never as a command-line argument. Proved
+  on macOS 25.5 at authoring time: `exec -a "tool --token=<value>" sleep 4 &` followed by
+  `ps -o args= -p $!` from an unrelated shell printed `tool --token=<value>` verbatim. The same
+  value piped on stdin never entered the receiving process's `argv`. On Linux the same exposure is
+  `/proc/<pid>/cmdline`, which is world-readable by default. `argv` also lands in shell history
+  and in CI logs.
+- **House rule, docs silent.** Keep one canary encrypted file that CI decrypts on every run: it
+  is the assertion that catches a decrypt pipeline which has quietly stopped producing Secrets. A
+  pruned Secret can leave a GitOps Application both Synced and Healthy, so a green sync is not
+  evidence that decryption still works. Neither the SOPS nor the age docs discuss pipeline
+  liveness; this comes from operating the pattern.
 
 ## Anti-patterns
 
@@ -171,7 +179,7 @@ Run from the repo root with the key file exported by path:
 
 ```bash
 export SOPS_AGE_KEY_FILE=/path/outside/the/repo/age.key   # never a path inside the worktree
-F=manifests/forge-secrets/secrets/sops-canary.enc.yaml
+F=<path>/<name>.enc.yaml                                  # the canary, or any encrypted file
 ```
 
 1. **The ciphertext is still navigable** (no decryption, so safe anywhere):
@@ -194,7 +202,7 @@ Prints `ENC[AES256_GCM,data:`. Anything else is a plaintext secret in git.
 3. **Decryption works, without printing any value:**
 
 ```bash
-sops decrypt "$F" | yq '.kind + "/" + .metadata.name'      # -> Secret/sops-canary
+sops decrypt "$F" | yq '.kind + "/" + .metadata.name'      # -> Secret/<name>
 sops decrypt --extract '["stringData"]["canary"]' "$F" >/dev/null && echo ok
 ```
 
