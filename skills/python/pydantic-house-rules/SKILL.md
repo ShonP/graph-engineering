@@ -1,6 +1,6 @@
 ---
 name: pydantic-house-rules
-description: Use when writing or reviewing any Python data shape (model, DTO, settings, workflow payload, internal state or value object), alongside the vendored pydantic skill. House precedence: Pydantic v2 models everywhere, no dataclasses, UUIDv7 ids, Temporal payloads through the Pydantic data converter.
+description: "Use when writing or reviewing any Python data shape (model, DTO, settings, workflow payload, internal state or value object), alongside the vendored pydantic skill. House precedence: Pydantic v2 models everywhere, no dataclasses, UUIDv7 ids, Temporal payloads through the Pydantic data converter."
 license: MIT
 ---
 
