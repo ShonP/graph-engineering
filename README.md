@@ -151,7 +151,8 @@ Skills live under `skills/<group>/<name>/SKILL.md`. The group is filing only; wh
 routes a skill to a task is the profile's routing table, matched against the
 task's files. The directory name is the routing name, and
 `scripts/check-skill-frontmatter.sh` enforces that the frontmatter `name` agrees
-with it.
+with it, and `scripts/check-routing-resolves.sh` checks that every name the
+routing table and the roster reference actually resolves to one skill.
 
 | Group | Skills | Routed by |
 |---|---|---|
@@ -199,6 +200,12 @@ still aborts the invocation regardless of `allowed-tools`":
 
 `ask` rules only restrict, so unlike `allow` rules they take effect without the
 workspace trust dialog. `/graph-init` prints this whenever it routes the QA row.
+
+Plan for the consequence: with that rule in place the two Playwright skills
+prompt on first use in an interactive session, and in a non-interactive run
+(`claude -p`, CI) the invocation aborts with `Execute skill: <name>` and no
+body. Pre-allow `Bash(npx:*)` and `Bash(npm:*)` on the runner, or pass
+`--allowedTools`, wherever a headless run needs those two skills.
 
 How each skill was sourced, and what was rejected:
 `docs/superpowers/plans/2026-09-10-stack-skills.md` and
