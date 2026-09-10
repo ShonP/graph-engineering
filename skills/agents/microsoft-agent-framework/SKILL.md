@@ -23,12 +23,11 @@ named beside it:
 - https://learn.microsoft.com/en-us/agent-framework/workflows/observability - "Microsoft Agent Framework Workflows - Observability | Microsoft Learn"
 - https://github.com/microsoft/agent-framework/blob/main/docs/decisions/0037-agent-skills-design.md - "agent-framework/docs/decisions/0037-agent-skills-design.md at main - microsoft/agent-framework - GitHub"
 
-Versions: the Learn pages above were last updated 2026-08-25. Python package
-`agent-framework`, 1.18.0 on PyPI and installed for the Verify run below,
-requires Python >= 3.10. Install with `uv add agent-framework` (the docs say
-`pip install agent-framework`; uv is the house package manager). Python is the
-house language, so the rules below quote the Python tabs; the .NET and Go
-shapes differ and the pages carry all three.
+Versions: Learn pages last updated 2026-08-25; `agent-framework` 1.18.0 on
+PyPI, requires Python >= 3.10, installed for the Verify run below. Install with
+`uv add agent-framework` (the docs say `pip install`; uv is the house package
+manager). The rules quote the Python tabs; each page also carries .NET and Go,
+whose shapes differ.
 
 ## When to apply
 
@@ -104,10 +103,17 @@ shapes differ and the pages carry all three.
   (https://learn.microsoft.com/en-us/agent-framework/agents/tools/function-tools)
 - Bound the tool loop:
   `client.function_invocation_configuration.update({"max_iterations": ...,
-  "max_function_calls": ..., "max_duration_seconds": ...})`. All default to
-  unlimited. The docs call the limits best effort, checked after each batch of
-  parallel calls, and approval wait time counts toward the duration, so treat
-  them as a backstop rather than an exact budget.
+  "max_function_calls": ..., "max_duration_seconds": ...})`. Know which are
+  unbounded: the page says "max_function_calls and max_duration_seconds default
+  to None, which means unlimited" and says nothing about `max_iterations`,
+  which defaults to 40 model round trips (`DEFAULT_MAX_ITERATIONS: Final[int] =
+  40` in `agent_framework/_tools.py`, confirmed on the installed 1.18.0). So the
+  loop always stops eventually, but the call count and the wall clock do not.
+  (https://learn.microsoft.com/en-us/agent-framework/agents/tools/function-tools)
+- The limits are best effort: the docs say they are checked after each batch of
+  parallel tool calls, so a batch can overshoot, and time spent waiting for tool
+  approval counts toward `max_duration_seconds`. Treat them as a backstop, not
+  an exact budget.
   (https://learn.microsoft.com/en-us/agent-framework/agents/tools/function-tools)
 - `approval_mode` on `@tool` is a security control. Anything that writes,
   spends, or leaves the process keeps approval on; `never_require` is for
@@ -116,37 +122,12 @@ shapes differ and the pages carry all three.
 
 **Workflows**
 
-- Graph workflows are `WorkflowBuilder` plus typed executors, edges, events and
-  state; Python also has an experimental functional `@workflow` API. Both
-  produce the same observable results, so pick by execution model: fixed graphs
-  and fan-out or fan-in favour the graph API, sequential pipelines with native
-  control flow favour the functional one.
-  (https://learn.microsoft.com/en-us/agent-framework/concepts/workflows/)
-- Workflows execute in supersteps. That is the unit of progress, of
-  checkpointing, and of reasoning about parallelism.
-  (https://learn.microsoft.com/en-us/agent-framework/workflows/checkpoints)
-- Long-running work gets a `checkpoint_storage` on the builder. A checkpoint
-  captures executor state, pending messages for the next superstep, pending
-  requests and responses, and shared state, at every superstep boundary.
-  (https://learn.microsoft.com/en-us/agent-framework/workflows/checkpoints)
-- Pick storage by durability, not by convenience: `InMemoryCheckpointStorage`
-  for tests, `FileCheckpointStorage` for one machine,
-  `CosmosCheckpointStorage` (`agent-framework-azure-cosmos`) for production and
-  cross-process. All three implement the same protocol, so the swap costs
-  nothing later if you never depended on the in-memory one.
-  (https://learn.microsoft.com/en-us/agent-framework/workflows/checkpoints)
-- A custom executor with its own state must implement both
-  `on_checkpoint_save` (return the state dict) and `on_checkpoint_restore`
-  (put it back). One without the other is a workflow that resumes wrong.
-  (https://learn.microsoft.com/en-us/agent-framework/workflows/checkpoints)
-- Human input is a `RequestPort`: the executor sends a request, a
-  `RequestInfoEvent` is emitted, an external system answers, and the framework
-  routes the response back. Do not block a thread waiting for a person.
-  (https://learn.microsoft.com/en-us/agent-framework/workflows/human-in-the-loop)
-- Reach for the capability the docs already ship (agents in workflows,
-  workflows as agents, declarative workflows, orchestration patterns) before
-  writing your own coordinator.
-  (https://learn.microsoft.com/en-us/agent-framework/workflows/)
+- Multi-step work, checkpointing, resume and human-in-the-loop have their own
+  page: read `rules/workflows.md` in this skill before building or reviewing a
+  workflow. It covers the graph and functional APIs, supersteps, checkpoint
+  storage choices, executor save and restore, and `RequestPort`.
+  (https://learn.microsoft.com/en-us/agent-framework/concepts/workflows/,
+  https://learn.microsoft.com/en-us/agent-framework/workflows/)
 
 **Observability and safety**
 
@@ -168,11 +149,19 @@ shapes differ and the pages carry all three.
   `executor.process {executor_id}`, `edge_group.process`, `message.send`);
   build dashboards and alerts on those names rather than on log text.
   (https://learn.microsoft.com/en-us/agent-framework/workflows/observability)
-- Credentials come from a specific credential in production. The docs warn that
-  `DefaultAzureCredential` is a development convenience whose fallback probing
-  is a latency and security risk; use something like `ManagedIdentityCredential`
-  instead. Keys stay in the environment or a secret store, never in the prompt
-  or the repo.
+- Azure access is keyless Entra, always. House rule, and it is also what the
+  vendor's own Python samples do: both cited pages construct the client with
+  `credential=AzureCliCredential(),` beside `azure_endpoint=` and no key
+  argument. Locally that is `AzureCliCredential()` after `az login`; in a
+  workload it is `ManagedIdentityCredential()` or workload identity. An account
+  key is not a fallback.
+  (https://learn.microsoft.com/en-us/agent-framework/agents/structured-outputs,
+  https://learn.microsoft.com/en-us/agent-framework/agents/tools/function-tools)
+- Name the credential you mean. The docs warn that `DefaultAzureCredential` is a
+  development convenience whose fallback probing brings "latency issues,
+  unintended credential probing, and potential security risks", and tell you to
+  use a specific credential such as `ManagedIdentityCredential` in production.
+  That is an argument for a named keyless credential, never for a key.
   (https://learn.microsoft.com/en-us/agent-framework/agents/structured-outputs,
   https://learn.microsoft.com/en-us/agent-framework/agents/observability)
 - The framework does not load `.env` files for you, and third-party systems
@@ -197,8 +186,10 @@ both, plus making replay and resume testable.
   failure looks like a model problem rather than a schema one.
 - `approval_mode="never_require"` on a tool that writes or spends. Failure: an
   agent takes an irreversible action nobody approved.
-- No `max_iterations` or `max_function_calls`. Failure: a tool loop that only
-  stops when the bill or the timeout does.
+- No `max_function_calls` and no `max_duration_seconds`. Failure: those two are
+  the genuinely unbounded pair, so a stuck tool loop stops only at the bill.
+  (`max_iterations` already caps model round trips at 40, so setting only that
+  one and calling the loop bounded is the mistake.)
 - One giant prompt that "does all the steps". Failure: nothing is resumable,
   nothing is inspectable, and one bad step poisons the whole output.
 - A module-level agent or mutable global state shared across requests. Failure:
@@ -211,29 +202,41 @@ both, plus making replay and resume testable.
   responses and tool arguments (which is to say user data) land in traces.
 - An LLM judge that returns "pass" or "fail". Failure: the gate drifts with the
   model. The model scores; Python decides.
+- An Azure Foundry or Azure OpenAI account key in an environment variable, a
+  secret store or a values file. Failure: a long-lived shared key is the shape
+  this house forbids: it is not per-identity, it does not rotate on its own and
+  it cannot be revoked for one principal. Use `AzureCliCredential()` locally and
+  `ManagedIdentityCredential()` or workload identity in cluster.
 - Secrets interpolated into instructions or a prompt template. Failure: the
   secret is now in every trace, log and provider-side transcript.
 
 ## Verify
 
+Keyless, after `az login`. The script is `verify_maf.py` beside this file: no
+key argument anywhere, the credential is the vendor's own sample line.
+
 ```bash
-uv add agent-framework
+uv add agent-framework azure-identity
 uv run python -c "import importlib.metadata as m; print(m.version('agent-framework'))"
-uv run python verify_maf.py     # structured output through a real chat client
+export AZURE_OPENAI_ENDPOINT="https://<resource>.cognitiveservices.azure.com/"
+export AZURE_OPENAI_CHAT_COMPLETION_MODEL="<deployment>"
+export AZURE_OPENAI_API_VERSION="2024-10-21"
+uv run python verify_maf.py
 ```
 
-Run 2026-09-10 with `agent-framework 1.18.0` against an Azure Foundry
-deployment (`gpt-5.4-mini`), endpoint and key from the environment:
+Run 2026-09-10, `agent-framework 1.18.0`, an Azure Foundry `gpt-5.4-mini`
+deployment, `AzureCliCredential()` only:
 
 ```
 $ uv run python -c "import importlib.metadata as m; print(m.version('agent-framework'))"
 1.18.0
 
-# response_format=PersonInfo (a pydantic BaseModel)
+$ uv run python verify_maf.py
 type: PersonInfo
 value: name='John Smith' age=35 occupation='software engineer'
 
-# @tool with Annotated[str, Field(description=...)] plus response_format=Forecast
+# same client and credential, plus a @tool with Annotated[str, Field(description=...)]
+# and options={"response_format": Forecast}
 tool calls: ['Amsterdam']
 type: Forecast value: city='Amsterdam' summary='Cloudy with a high of 15C.'
 ```
@@ -241,4 +244,6 @@ type: Forecast value: city='Amsterdam' summary='Cloudy with a high of 15C.'
 Expected: `response.value` is an instance of your model, not a `dict` and not a
 string, and the tool actually ran (assert on your own recorded call list, not on
 the prose in `response.text`). If `response.value` is falsy, the run produced no
-structured data and the caller must handle that path.
+structured data and the caller must handle that path. A run that only works once
+you add an API key is a misconfigured role assignment, not a reason to add the
+key.

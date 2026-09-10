@@ -13,6 +13,7 @@ Sources (fetched 2026-09-10 with curl, all HTTP 200):
 - https://kubernetes.io/docs/reference/kubectl/generated/kubectl_diff/ - "kubectl diff | Kubernetes"
 - https://kubernetes.io/docs/reference/kubectl/generated/kubectl_delete/ - "kubectl delete | Kubernetes"
 - https://kubernetes.io/docs/reference/kubectl/generated/kubectl_kustomize/ - "kubectl kustomize | Kubernetes"
+- https://kubernetes.io/docs/reference/kubectl/generated/kubectl_wait/ - "kubectl wait | Kubernetes"
 - https://kubernetes.io/blog/2025/11/25/configuration-good-practices/ - "Kubernetes Configuration Good Practices | Kubernetes"
 - https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/ - "Resource Management for Pods and Containers | Kubernetes"
 - https://kubernetes.io/docs/concepts/containers/images/ - "Images | Kubernetes"
@@ -101,9 +102,15 @@ with client v1.36.4, embedded Kustomize v5.8.1.
   by grepping human-readable output; the plain-text format is explicitly the
   human format and is free to change.
   (https://kubernetes.io/docs/reference/kubectl/)
-- `kubectl wait --for=condition=<c>` is the documented way to block on a
-  condition; a `sleep` is not.
-  (https://kubernetes.io/docs/reference/kubectl/)
+- `kubectl wait` is the documented way to block, and a `sleep` is not. `--for`
+  takes `create`, `delete`, `condition=<name>[=<value>]` or
+  `jsonpath='{path}'[=value]`, so a non-condition field has a sanctioned form
+  too: `kubectl wait --for=jsonpath='{.status.phase}'=Running pod/x`, or
+  `--for=jsonpath='{.status.loadBalancer.ingress}' service/lb`. Repeat `--for`
+  to require several at once (the reference's own example waits for
+  `--for=condition=Ready --for=create`), and set `--timeout`.
+  (https://kubernetes.io/docs/reference/kubectl/,
+  https://kubernetes.io/docs/reference/kubectl/generated/kubectl_wait/)
 - Build a kustomize directory with `kubectl kustomize DIR`, which needs no
   second binary, and pipe it into a dry-run apply for validation.
   (https://kubernetes.io/docs/reference/kubectl/generated/kubectl_kustomize/)

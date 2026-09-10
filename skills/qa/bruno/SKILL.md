@@ -12,6 +12,8 @@ Sources (fetched 2026-09-10 with curl, all HTTP 200):
 - https://docs.usebruno.com/bru-cli/runCollection - "Command Examples - Bruno Docs"
 - https://docs.usebruno.com/bru-cli/commandOptions - "Command Options - Bruno Docs"
 - https://docs.usebruno.com/secrets-management/overview - "Secret Management - Bruno Docs"
+- https://docs.usebruno.com/secrets-management/secret-variables - "Secret Variables - Bruno Docs"
+- https://docs.usebruno.com/secrets-management/secret-masking - "Secret Masking in Reports - Bruno Docs"
 - https://docs.usebruno.com/secrets-management/dotenv-file - "DotEnv File - Bruno Docs"
 - https://docs.usebruno.com/testing/tests/introduction - "Testing - Bruno Docs"
 - https://docs.usebruno.com/testing/tests/assertions - "Assertions - Bruno Docs"
@@ -61,11 +63,19 @@ matters to anything parsing older reports.
   secret in the app are not persisted to disk for the CLI, and are passed at
   runtime with `--env-var NAME=value` (or `--global-env-var`, which requires
   `--global-env`). (https://docs.usebruno.com/bru-cli/runCollection)
-- Declare secret-bearing variables under `vars:secret` in the environment file.
-  Verified 2026-09-10 with bru 4.1.0: a header built from a `vars:secret`
-  variable is written to the JSON report as `********`, while the same header
-  built from an ordinary var is written verbatim. Declaring it secret is what
-  masks it. (https://docs.usebruno.com/secrets-management/overview)
+- Declare secret-bearing variables under `vars:secret` in the environment file
+  (`vars:secret [ TOKEN ]`); those values are not saved to the environment file,
+  so the collection stays safe to check in.
+  (https://docs.usebruno.com/secrets-management/secret-variables)
+- Two masking mechanisms exist and only one of them is yours. Bruno always masks
+  a fixed list of sensitive header names (`authorization`, `x-api-key`,
+  `cookie`, `client-secret` and others) whatever the value, and separately masks
+  every value of a variable marked secret. Verified 2026-09-10 with bru 4.1.0,
+  with the two effects separated: the same secret variable rendered into
+  `X-Trace-Id`, a header on nobody's list, still came out `********`, while an
+  ordinary variable in `X-Plain-Key` came out verbatim. So a credential in a
+  custom header is protected only if you declared the variable secret.
+  (https://docs.usebruno.com/secrets-management/secret-masking)
 - The other supported local shape is a `.env` file at the collection root,
   referenced as `{{process.env.NAME}}` from the environment file. If you use it:
   `.env` goes in `.gitignore`, and a `.env.sample` without values documents the
@@ -136,9 +146,10 @@ matters to anything parsing older reports.
 - A token, cookie or API key written into a `.bru` file or a committed
   environment file. Failure: a live credential in git history. Pass it with
   `--env-var` at runtime.
-- Using an ordinary variable for a credential because "it is only staging".
-  Failure: verified above, ordinary vars are written to the JSON and HTML
-  reports verbatim, so the run's own artifact leaks it.
+- Using an ordinary variable for a credential because "it is only staging", or
+  assuming the header name saves you. Failure: verified above, an ordinary var
+  in a non-listed header is written to the JSON, HTML and JUnit reports
+  verbatim, so the run's own artifact leaks it.
 - A screenshot of the GUI runner as QA evidence. Failure: nothing is machine
   checkable, nothing gates the merge. Attach the JUnit or JSON report.
 - A request with no `assert` and no `tests` block. Failure: the collection
@@ -186,9 +197,11 @@ exit=0
 # same collection, one assertion flipped to an expectation the server fails
 exit=1            (identical with and without --bail)
 
-# JSON report headers, secret var versus ordinary var
+# JSON report headers: secret var in a listed and an unlisted header,
+# ordinary var in an unlisted header
 "Authorization": "Bearer ********"
-"X-Plain-Key": "plain-visible-value"
+"X-Trace-Id":    "********"
+"X-Plain-Key":   "plain-visible-value"
 ```
 
 Expected: exit 0 with every assertion listed, a non-empty report file, and no
