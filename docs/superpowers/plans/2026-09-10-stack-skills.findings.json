@@ -1,0 +1,98 @@
+[
+  {
+    "severity": "blocking",
+    "file": "docs/superpowers/plans/2026-09-10-stack-skills.md",
+    "line": 129,
+    "title": "Vendoring recipe copies .git for whole-repo vendors; Task 6 commits a gitlink and no files",
+    "evidence": "Recipe step 2 is `rsync -a --delete $S/vendor-<repo>/<subtree>/ $P/skills/<group>/<name>/` and is declared 'used verbatim by Tasks 6, 8, 10, 14, 16'. Task 6 (line 334) sets subtree = repo root with only `--exclude .github`, so the clone's `.git/` is copied into `skills/temporal/temporal-developer/`. Reproduced on a scratch repo: after the rsync the vendored dir contains `.git`; the plan's step-5 acceptance diff printed exactly one line (`../upstream/.github/w.yml => /dev/null | 1 -`), which matches Task 6's stated expectation ('expected deletions .github/** only'), so the acceptance PASSES; `git add skills` then warned 'adding embedded git repository' and the commit recorded `160000 <sha> 0 skills/temporal/temporal-developer` - a gitlink, with zero vendored files committed. The task reports success while the plugin ships an empty submodule pointer.",
+    "fix": "Add `--exclude .git` to recipe step 2 (and keep `--exclude .github` for Task 6), and make step-5 acceptance assert the vendored directory contains no `.git` entry plus `git ls-files -s skills/<group>/<name> | grep -v '^160000'`."
+  },
+  {
+    "severity": "blocking",
+    "file": "docs/superpowers/plans/2026-09-10-stack-skills.md",
+    "line": 85,
+    "title": "Assumption A1 and the Task 21 spec amendment rest on a dependency-resolution claim the cited doc refutes",
+    "evidence": "A1 states the dependency route 'would still fail today with \"no git tag satisfying ~0.1.0\"'. code.claude.com/docs/en/plugin-dependencies (fetched 2026-09-10, section 'Tag plugin releases for version resolution') says the tag rule applies to git-backed sources, then: 'For a relative-path plugin with no matching tag, Claude Code installs the marketplace's current copy instead and checks the constraint when the plugin loads.' pydantic/skills' marketplace.json at the pinned SHA declares every plugin with a relative path (`\"source\": \"./plugins/pydantic\"`, `./plugins/ai`, `./plugins/pydantic-ai-harness`) and `\"version\": \"0.1.0\"`, so `~0.1.0` is satisfied at load and the install does not fail. Task 21 (line 626) writes that refuted reasoning into the spec as a standing rule ('a plugin upstream with no tagged release is vendored the same way until a `{plugin-name}--v{version}` tag exists'), and the owner is asked to rule on A1 with wrong evidence. The `{plugin-name}--v{version}` tag convention itself is confirmed correct; only the 'install fails' consequence is wrong for relative-path sources.",
+    "fix": "Restate A1 and the Task 21 amendment on the reasons that survive: cross-marketplace dependencies need `allowCrossMarketplaceDependenciesOn` in graph-engineering's marketplace.json (which it lacks today), an untagged relative-path dependency floats with the upstream's current copy rather than being pinned, and vendoring is what lets the house override sit adjacent per spec 4.5. Drop the 'install would fail' sentence, and distinguish relative-path sources from `github`/`url`/`git-subdir` sources in the amendment."
+  },
+  {
+    "severity": "blocking",
+    "file": "docs/superpowers/plans/2026-09-10-stack-skills.md",
+    "line": 594,
+    "title": "Task 19's grep predicate misses agents/reviewer.md, so the reviewer fallback never learns the new stack rows",
+    "evidence": "Task 19 targets 'every file under `agents/` whose body contains the heading `Competency catalog and routing fallback`'. `grep -rn` over agents/ returns that exact heading only in qa.md:14, implementer-simple.md:25 and implementer.md:23. reviewer.md:14 reads `## Lens catalog and routing fallback`, and content-writer.md:21, media-producer.md:22, ux-designer.md:16, researcher.md:17 read `## Skill routing fallback`. Task 18 adds a `review:` list to every new routing row, but the reviewer is the one agent the grep excludes, so a reviewer dispatched with no lenses named on a forge `argocd/**` or `manifests/**` diff has no fallback route to argocd, helm, kubectl or cloudnativepg - the exact 'never review a stack diff with no stack lens loaded' rule the fallback exists to enforce. Task 19's acceptance ('diff of the table block between the agent files is empty') compares only the files grep found, so it cannot catch the omission.",
+    "fix": "Name the files explicitly (implementer.md, implementer-simple.md, qa.md, reviewer.md) or grep on `routing fallback`, decide what the four `Skill routing fallback` agents get, and change the acceptance to assert the row set is present in every agent file that has any fallback section."
+  },
+  {
+    "severity": "important",
+    "file": "docs/superpowers/plans/2026-09-10-stack-skills.md",
+    "line": 642,
+    "title": "Hooks detect Node package scripts only; no pyproject.toml/uv detection, so they are no-ops on the named first consumer",
+    "evidence": "Task 22 keys lint-on-edit and test-before-stop on `package.json` `scripts.lint|typecheck|test` (`jq -e '.scripts.lint'`). Open question 11 (line 666) concedes 'on forge today all three hooks are silent no-ops except the handoff print' - `find` over ~/projects/forge-platform returns zero package.json and zero pyproject.toml. Yet Task 22's ordering is justified as '**After:** Tasks 7 to 10 (forge plan 6 is the first consumer)', i.e. the plan serializes the hook behind the Python skills for a consumer the hook cannot detect. The house Python convention this plan itself teaches in Task 7 is `uv run` against `pyproject.toml`, which the hook ignores.",
+    "fix": "Add a pyproject.toml branch to both scripts: when the nearest project file is pyproject.toml, run `uv run lint`/`uv run typecheck`/`uv run test` (or the `[tool.*]` script names the repo defines), and record in the README which project files each hook recognizes. Then either keep the Task 7-10 dependency or drop it as unrelated."
+  },
+  {
+    "severity": "important",
+    "file": "docs/superpowers/plans/2026-09-10-stack-skills.md",
+    "line": 642,
+    "title": "PostToolUse hook walks up to any package.json and executes its scripts, unscoped to the project directory",
+    "evidence": "The Stop hook is scoped ('finds `package.json` in the project root (`CLAUDE_PROJECT_DIR`)', line 643) but the PostToolUse hook 'finds the nearest `package.json` above it' where `it` is `tool_input.file_path`, which the plan itself notes is an absolute path anywhere on disk. Any Edit or Write inside a third-party checkout therefore auto-runs that checkout's `lint`/`typecheck` script with the user's privileges and no confirmation. This plan's own workflow puts third-party clones on disk: the vendoring recipe clones pydantic/skills, fastapi/fastapi, temporalio/skill-temporal-developer, grafana/skills and microsoft/playwright into the scratchpad, and microsoft/playwright ships a package.json with scripts. The security-review bullet in the same task covers `eval`, quoting and network but not the script-discovery boundary.",
+    "fix": "Bound the upward search at `CLAUDE_PROJECT_DIR` and exit 0 silently when `file_path` resolves outside it, matching the Stop hook. State that bound in the README `## Hooks` paragraph."
+  },
+  {
+    "severity": "important",
+    "file": "docs/superpowers/plans/2026-09-10-stack-skills.md",
+    "line": 453,
+    "title": "Apache-2.0 NOTICE not carried for the Playwright vendor, and the acceptance criterion forbids adding it",
+    "evidence": "microsoft/playwright is Apache-2.0 and ships a NOTICE file at the repo root (confirmed via the contents API at SHA af74c938...: 'Playwright / Copyright (c) Microsoft Corporation / This software contains code derived from the Puppeteer project...'). Apache-2.0 section 4(d) requires redistributions to carry the attribution notices from NOTICE. Task 14 step 3 copies the repo-root LICENSE only, and the recipe's step-5 acceptance (line 138) says the `--stat` output must name 'only SOURCE.md and, where step 3 ran, LICENSE as new files... any third line fails the task' - so an implementer who copies NOTICE fails their own acceptance. grafana/skills, the other Apache-2.0 vendor, has no NOTICE file, so this is specific to Task 14.",
+    "fix": "Add a recipe step: copy NOTICE alongside LICENSE where the upstream root has one, allow it as a third expected addition in the step-5 acceptance, and record it in SOURCE.md's License line."
+  },
+  {
+    "severity": "important",
+    "file": "docs/superpowers/plans/2026-09-10-stack-skills.md",
+    "line": 493,
+    "title": "Harvested rule packs collide by name with the owner's global skills; bare-name routing resolves to the global copy",
+    "evidence": "Task 17 copies backend-rules, architecture-resilience-rules, agent-workflow-rules and review-testing-rules into skills/rules with `name` deliberately unchanged, while Task 18 (line 583) and Task 19 write those bare names into templates/graph-profile.yaml and the agent fallback tables. Reproduced in this session: invoking `review-testing-rules` returned 'Base directory for this skill: /Users/shonpazarker/.claude/skills/review-testing-rules' (the global copy), while `graph-engineering:prior-art` returned the plugin cache path - plugin skills are addressable only via the `graph-engineering:` prefix, bare names resolve to the user's global skills. So on the owner's machine the four harvested copies are unreachable by the names the plan routes, and the portability claim ('the plugin copy is the portable one', line 494) is untested. The plan defers the question to Task 20 (line 495), which runs after all 22 other tasks and is the plan's only gate, so there is no earlier signal.",
+    "fix": "Resolve the name question before Task 17 lands, not after: either verify and record the invocation form the engine uses for plugin skills (prefixed vs bare) and write that form into the template rows and fallback tables, or move the resolution check out of Task 20 into an early task that a single `claude --plugin-dir` session can answer."
+  },
+  {
+    "severity": "important",
+    "file": "docs/superpowers/plans/2026-09-10-stack-skills.md",
+    "line": 68,
+    "title": "The Stop-cap spike verdict and open question 12 are refuted by the hooks reference they cite",
+    "evidence": "The prior-art note records \"'Claude Code overrides a Stop hook after eight consecutive blocks' -> PARTIAL: the hooks reference names `stop_hook_active` loop protection but the word 'consecutive' only appears for `modelsUsed`\", and open question 12 (line 667) says the figure 'was not found in the hooks reference on 2026-09-10... the exact count is unknown'. code.claude.com/docs/en/hooks, section 'Stop input', states verbatim: 'Claude Code overrides the hook and ends the turn after 8 consecutive blocks.' The 'Stop decision control' subsection repeats it as 'the 8-consecutive-continuation cap'. Task 22 line 643 instructs the implementer not to carry the figure 'unless that page states it' - the page does state it - so implementation lands right, but the plan ships a wrong spike verdict and an open question that is already answered.",
+    "fix": "Change the spike verdict to VALIDATED with the quoted sentence and the section name, close open question 12, and let Task 22's README paragraph cite 'Stop input' as the source of the cap."
+  },
+  {
+    "severity": "nit",
+    "file": "docs/superpowers/plans/2026-09-10-stack-skills.md",
+    "line": 609,
+    "title": "The plan's gate is a hand-built glob-match table rather than an executable resolver",
+    "evidence": "Task 20 is described as 'the gate for the whole plan' and asks for a hand-assembled table matching 22 sample paths against ~20 routing rows. The only executable check is Task 18's acceptance loop `test -f skills/*/$n/SKILL.md`, which proves names exist but not which rows a path matches. Hand glob matching over 22 x 20 is where an error hides silently, and brace-alternation rows are matcher-dependent (`git ls-files -- ':(glob)**/{gateway,gateway-*}/**'` matches 0 files in forge while `**/gateway-*/**` matches 17, because git pathspec has no brace expansion).",
+    "fix": "Run a ~20-line matcher in the scratchpad (fnmatch/wcmatch over the sample list and the parsed routing keys) and paste its output into the run doc, and state which glob dialect the engine uses so brace rows are known-good."
+  },
+  {
+    "severity": "nit",
+    "file": "docs/superpowers/plans/2026-09-10-stack-skills.md",
+    "line": 319,
+    "title": "Task 5 calls the agent-router doc tree unconfirmed; the docs path resolves",
+    "evidence": "Task 5 is the only written-skill task with no citable page list, on the grounds that 'https://theagentrouter.ai/ returned 200 with no <title> ... so the doc tree location is unconfirmed'. `https://theagentrouter.ai/docs` and `https://theagentrouter.ai/docs/` both return 200 (checked 2026-09-10). The other ten written-skill tasks each name 4-7 pages, so Task 5's rules cannot be pre-scoped or reviewed against a page list.",
+    "fix": "Fetch https://theagentrouter.ai/docs, list the 4-6 pages the rules will cite (install, EG version compatibility, route/backend CRDs, credentials, token metrics) with the CRD kinds confirmed at v1.1.0, and keep the GitHub-at-tag path as the fallback."
+  },
+  {
+    "severity": "nit",
+    "file": "docs/superpowers/plans/2026-09-10-stack-skills.md",
+    "line": 135,
+    "title": "Step 5 diffs against the same clone the copy came from, so it verifies the rsync rather than the pin",
+    "evidence": "The recipe's verification is `git diff --no-index --stat $S/vendor-<repo>/<subtree> skills/<group>/<name>` against the working clone created in step 1. That proves the copy is faithful to whatever is in the scratchpad, not that the tree matches the upstream at the recorded SHA. Any accidental edit made in the clone during the task (for example while inspecting an upstream file) propagates and verifies clean.",
+    "fix": "Re-clone into a second directory at the same SHA for step 5, or add `git -C $S/vendor-<repo> status --porcelain` returning empty plus `git -C $S/vendor-<repo> rev-parse HEAD` matching the SOURCE.md SHA, pasted in the report."
+  },
+  {
+    "severity": "nit",
+    "file": "docs/superpowers/plans/2026-09-10-stack-skills.md",
+    "line": 344,
+    "title": "Parallel tasks in the same group each delete the same .gitkeep",
+    "evidence": "Tasks 7, 8 and 10 all run in parallel in the python group and each lists `delete skills/python/.gitkeep` (Task 7 hedges 'if still present', Task 8 does not). Tasks 1-5, 11 and 12 have the same overlap on skills/k8s-gitops/.gitkeep. Whichever lands second gets a no-op deletion or a conflict on the same path.",
+    "fix": "Assign the .gitkeep deletion to one named task per group (the lowest-numbered one) and drop the bullet from the others."
+  }
+]
