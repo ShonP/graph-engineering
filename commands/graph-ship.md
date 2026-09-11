@@ -20,6 +20,7 @@ Execute a playbook. **The engine is playbook-agnostic:** it reads `graphs/<name>
 4. **Dispatch discipline.** For each node:
    - Resolve the agent through `localAgents` first, then the plugin roster.
    - For implementation and fix nodes, pick the implementer by task size from the plan: `small` -> `implementer-simple` (sonnet), otherwise `implementer` (opus). An `ESCALATE` from `implementer-simple` re-dispatches the same task to `implementer` once, without counting as a fix round.
+   - **Never override an agent's model.** Each roster agent declares its model in its frontmatter (`reviewer` and `implementer` on opus, `implementer-simple` on sonnet) and the dispatch takes it as is: no `model:` argument on the Task call, whatever the size of the diff. That covers scoped re-checks in the fix loop, pre-gate plan reviews and post-merge follow-ups. A "small diff, cheap reviewer" saving is the house anti-pattern here: the review is the gate, and a cheaper reviewer is how a defect the owner never sees gets through. The only model choice the engine makes is implementer versus implementer-simple, by task size, above.
    - Derive the REQUIRED skill list from the profile's `routing`, matched against that task's files, plus the `always` entries.
    - Name those skills in the dispatch prompt as non-optional.
    - Pass the run directory, the profile path, the node's `in` artifacts, the node's `mode` if it declares one (the researcher runs one mode per dispatch), and the task's acceptance criteria.
