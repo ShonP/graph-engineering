@@ -18,7 +18,7 @@ resolver_says() {
   local actual
   actual="$(
     RESOLVER_EXPR="$expression" PROJECT="$FIX/escape/proj" \
-      OUTSIDE="$FIX/escape" python3 -c '
+      OUTSIDE="$FIX/escape" WS="$FIX/workspace" PY="$FIX/py" python3 -c '
 import os
 import sys
 
@@ -27,6 +27,8 @@ import resolve_touched_project as bound
 
 PROJECT = os.environ["PROJECT"]
 OUTSIDE = os.environ["OUTSIDE"]
+WS = os.environ["WS"]
+PY = os.environ["PY"]
 print(eval(os.environ["RESOLVER_EXPR"]))
 ' 2>&1
   )"
@@ -70,3 +72,31 @@ resolver_says "resolve rejects the project root" None \
 resolver_says "resolve accepts a real file in a nested project" \
   "('$FIX/escape/proj/tool', 'package')" \
   'bound.resolve({"tool_input": {"file_path": PROJECT + "/tool/real.ts"}}, PROJECT)'
+
+# A project file that declares neither `lint` nor `typecheck` is not the project
+# that owns the file (ADR 0014 D2). The uv workspace shape puts the three script
+# names on the ROOT and ships the member with no entry point at all, so stopping
+# at the nearest pyproject.toml means every edit under packages/*/src/ silently
+# stops being linted. The walk keeps going until a project file declares one of
+# the two, or the project directory is reached.
+resolver_says "a project file declaring lint or typecheck is the owner" True \
+  'bound.declares_scripts(WS, "pyproject")'
+resolver_says "a project file declaring neither is not" False \
+  'bound.declares_scripts(WS + "/packages/x", "pyproject")'
+resolver_says "the walk passes a scriptless workspace member and lands on the root" \
+  "('$FIX/workspace', 'pyproject')" \
+  'bound.find_project_file(WS + "/packages/x/src", WS)'
+resolver_says "a member's file resolves to the workspace root" \
+  "('$FIX/workspace', 'pyproject')" \
+  'bound.resolve({"tool_input": {"file_path": WS + "/packages/x/src/touched.py"}}, WS)'
+# The other half: walking past the scriptless member must not reach past the
+# project bound either. With the member itself as the project, there is no
+# scripted ancestor inside the bound, so the answer is nothing at all - NOT the
+# workspace root above it.
+resolver_says "the walk stops at the bound rather than finding a scripted ancestor" None \
+  'bound.find_project_file(WS + "/packages/x/src", WS + "/packages/x")'
+# And a project that DOES declare the scripts still resolves to itself: the
+# patch must not turn every repo into a walk to its outermost project file.
+resolver_says "a project that declares the scripts still resolves to itself" \
+  "('$FIX/py', 'pyproject')" \
+  'bound.resolve({"tool_input": {"file_path": PY + "/src/touched.py"}}, PY)'

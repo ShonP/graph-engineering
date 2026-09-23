@@ -1,0 +1,12 @@
+# Fixture: a uv workspace MEMBER. It is a real project file - the nearest one
+# to src/touched.py - and it declares NO [project.scripts] at all. That is the
+# point: the member ships the library and no entry point, so the resolver has
+# to keep walking to the root that owns `lint` and `typecheck`.
+#
+# Do not add [project.scripts] here. The case
+# "the walk passes a scriptless workspace member and lands on the root"
+# is what this file exists to make fail.
+[project]
+name = "fixture-workspace-member"
+version = "0.1.0"
+requires-python = ">=3.11"

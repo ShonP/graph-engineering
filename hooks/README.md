@@ -13,7 +13,8 @@ on `docs/HANDOFF.md`. Nothing in them is specific to one repo.
 ## Detection order
 
 Both working hooks find the project's script the same way, and stop at the first
-convention that matches.
+convention that matches. For `PostToolUse`, a project file that declares neither
+`lint` nor `typecheck` does not match, and the walk continues upward.
 
 | Order | Project file | Condition | Command |
 | --- | --- | --- | --- |
@@ -48,9 +49,16 @@ manager, `task`) is not installed, the hook exits 0 and prints nothing.
   which is what keeps an edit inside a scratch clone of somebody else's repo
   from running that repo's scripts.
 - Inside the project it walks up from the edited file to the nearest project
-  file and no further than `$CLAUDE_PROJECT_DIR`. The walk re-checks the bound
-  before it inspects any directory, so it cannot leave the project whatever
-  start point it is handed.
+  file **that declares `lint` or `typecheck`**, and no further than
+  `$CLAUDE_PROJECT_DIR`. The walk re-checks the bound before it inspects any
+  directory, so it cannot leave the project whatever start point it is handed.
+- A project file declaring neither script is walked past rather than returned.
+  That matters in a uv workspace, where the root owns the script names and the
+  member ships no entry point: stopping at the member's `pyproject.toml` would
+  resolve every file under `packages/*/src/` to a project with no scripts, and
+  the hook would exit 0 in silence — the whole library silently unlinted. A
+  project file the resolver cannot read or parse stops the walk where it is,
+  rather than letting an ancestor's scripts run against a file it does not own.
 - That bound lives in `scripts/resolve_touched_project.py` rather than inline,
   so each of its three guards can be tested on its own. `hooks/tests/cases-resolver.sh`
   calls them directly, because end to end only one of the three is reachable.

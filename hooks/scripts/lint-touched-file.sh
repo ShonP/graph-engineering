@@ -21,8 +21,10 @@
 #     - Taskfile projects are handled by the Stop hook only; a Taskfile has no
 #       single-file lint shape.
 #
-# Detection order, nearest project file first, walking up from the edited file
-# and stopping at $CLAUDE_PROJECT_DIR:
+# Detection order, nearest project file that DECLARES one of the two scripts
+# first, walking up from the edited file and stopping at $CLAUDE_PROJECT_DIR. A
+# project file declaring neither is walked past (a uv workspace member ships no
+# entry point; stopping there silently unlints the whole library):
 #   1. pyproject.toml with lint / typecheck under [project.scripts]
 #        -> `uv run lint <file>` then `uv run typecheck <file>`
 #   2. package.json with scripts.lint / scripts.typecheck

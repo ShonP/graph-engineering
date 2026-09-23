@@ -13,6 +13,14 @@ where each of its three guards can be tested directly:
   find_project_file  the upward walk never inspects a directory outside the
                      project, whatever start point it is handed
 
+The walk also skips a project file that declares neither `lint` nor `typecheck`
+and keeps going. That is not a security guard, it is a correctness one, and it
+was measured: in a uv workspace the root owns the three script names and the
+member ships no entry point at all, so stopping at the NEAREST pyproject.toml
+resolves every file under packages/*/src/ to a project with no scripts, and the
+hook then exits 0 in silence. Every edit to the library stops being linted and
+nothing says so. See docs/adr/0014-forge-libs-distribution.md D2.
+
 The guards are layered on purpose. Given the caller's own check that
 CLAUDE_PROJECT_DIR is a directory, the isfile guard already rejects everything
 the other two would catch, so an end-to-end test cannot reach them. That is what
@@ -26,7 +34,52 @@ import json
 import os
 import sys
 
+try:
+    import tomllib
+except ImportError:  # Python < 3.11
+    tomllib = None
+
 PROJECT_FILES = (("pyproject.toml", "pyproject"), ("package.json", "package"))
+
+# The two scripts lint-touched-file.sh actually runs on a touched file. A project
+# file declaring neither is not the project that owns it, so the walk continues.
+# These names and that script's two `has_script` calls move together: stopping the
+# walk somewhere the hook then declines to act on is the bug this tuple prevents.
+SCRIPT_NAMES = ("lint", "typecheck")
+
+
+def declares_scripts(directory, kind):
+    """Does the project file in `directory` declare `lint` or `typecheck`?
+
+    Returns True when the file cannot be read or parsed, and when tomllib is
+    absent (Python < 3.11). An unreadable project file stops the walk where it
+    is: the alternative is walking up to an ancestor and running THAT project's
+    scripts against a file it does not own, which is worse than doing nothing.
+    """
+    if kind == "pyproject":
+        if tomllib is None:
+            return True
+        try:
+            with open(os.path.join(directory, "pyproject.toml"), "rb") as handle:
+                data = tomllib.load(handle)
+        except Exception:
+            return True
+        project = data.get("project") if isinstance(data, dict) else None
+        scripts = project.get("scripts") if isinstance(project, dict) else None
+    else:
+        try:
+            with open(os.path.join(directory, "package.json"), "rb") as handle:
+                data = json.load(handle)
+        except Exception:
+            return True
+        scripts = data.get("scripts") if isinstance(data, dict) else None
+
+    if not isinstance(scripts, dict):
+        return False
+    return any(
+        isinstance(scripts.get(name), str) and scripts[name].strip()
+        for name in SCRIPT_NAMES
+    )
 
 
 def is_inside(touched, project):
@@ -40,14 +93,20 @@ def is_inside(touched, project):
 
 
 def find_project_file(directory, project):
-    """Walk up from `directory` to the nearest project file, never leaving
-    `project`. Returns (directory, kind), or None.
+    """Walk up from `directory` to the nearest project file that declares one of
+    SCRIPT_NAMES, never leaving `project`. Returns (directory, kind), or None.
+
+    A project file declaring neither script is walked past, not returned: see the
+    module docstring for the uv workspace shape that makes this the difference
+    between linting the library and silently not linting it.
     """
     while True:
         if directory != project and not is_inside(directory, project):
             return None
         for filename, kind in PROJECT_FILES:
-            if os.path.isfile(os.path.join(directory, filename)):
+            if os.path.isfile(os.path.join(directory, filename)) and declares_scripts(
+                directory, kind
+            ):
                 return directory, kind
         parent = os.path.dirname(directory)
         if directory == project or parent == directory:
