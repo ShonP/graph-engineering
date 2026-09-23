@@ -22,7 +22,10 @@
 #       single-file lint shape.
 #
 # Detection order, nearest project file first, walking up from the edited file
-# and stopping at $CLAUDE_PROJECT_DIR:
+# and stopping at $CLAUDE_PROJECT_DIR. A project file declaring neither script is
+# passed on the way to a same-kind ancestor that declares one (a uv workspace
+# member ships no entry point; stopping there silently unlints the library), and
+# never to a project file of another kind:
 #   1. pyproject.toml with lint / typecheck under [project.scripts]
 #        -> `uv run lint <file>` then `uv run typecheck <file>`
 #   2. package.json with scripts.lint / scripts.typecheck

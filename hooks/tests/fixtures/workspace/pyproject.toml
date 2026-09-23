@@ -1,0 +1,18 @@
+# Fixture: the ROOT of a uv workspace. It owns the three script names; the
+# member under packages/ deliberately declares none (ADR 0014 D2 - the shape
+# that stops a consumer's bin/ from collecting our entry points).
+#
+# The resolver must walk PAST the member's scriptless pyproject.toml and land
+# here, or every edit under packages/*/src/ stops being linted, silently.
+[project]
+name = "fixture-uv-workspace-root"
+version = "0.1.0"
+requires-python = ">=3.11"
+
+[project.scripts]
+test = "fixture_workspace:run_test"
+lint = "fixture_workspace:run_lint"
+typecheck = "fixture_workspace:run_typecheck"
+
+[tool.uv.workspace]
+members = ["packages/*"]

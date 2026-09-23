@@ -211,7 +211,8 @@ body. Pre-allow `Bash(npx:*)` and `Bash(npm:*)` on the runner, or pass
 
 How each skill was sourced, and what was rejected:
 `docs/superpowers/plans/2026-09-10-stack-skills.md` and
-`docs/research/2026-09-10-stack-skills-sourcing.md`.
+`docs/research/2026-09-10-stack-skills-sourcing.md`; for `ruff`, `sqlalchemy`,
+`loguru` and `nats`, `docs/research/2026-09-23-python-skills-sourcing.md`.
 
 ## House rules
 
