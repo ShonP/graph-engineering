@@ -13,8 +13,15 @@ commits.
 ### Added
 
 - **Four Python and messaging competencies**, written from what plan 6 measured
-  on a live cluster rather than from vendor-docs digests. Each claim carries the
-  ADR section that measured it and a vendor URL with a version and a date.
+  on a live cluster rather than from vendor-docs digests. Each skill's header
+  lists its sources, pinned to the version it was written against: a versioned
+  docs path such as `docs.sqlalchemy.org/en/20/` or `loguru.readthedocs.io/en/0.7.3/`,
+  the source at the release tag, or, for docs.nats.io, which has no versions,
+  the `nats.docs` commit. Measured claims cite the ADR section by its
+  location, `Equival-io/forge-platform` `docs/adr/`, a private repo, and the
+  header says so. Every Verify recipe was run against forge-libs `552a9b9`,
+  and each check shown to fail on a real violation. Sourcing pass:
+  `docs/research/2026-09-23-python-skills-sourcing.md`.
   - `skills/python/ruff` — rule selection that survives a codebase, banning
     **symbols rather than modules** (a module ban also flags
     `from dataclasses import replace`, so it gets silenced on day one), the
@@ -36,19 +43,27 @@ commits.
     timeout.
 - **Routing rows** for all four: `ruff` joins `**/*.py`; `sqlalchemy` on
   `**/{models,db,migrations}/**/*.py` and `**/alembic/**`; `nats` on
-  `**/{bus,events,messaging}/**`; `loguru` on `**/logging*.py`.
-- **A uv-workspace fixture** under `hooks/tests/fixtures/workspace` — a root
-  owning the three script names and a member declaring none.
+  `**/{bus,events,messaging}/**`, `**/nats*/**` and `**/nats*.{yaml,yml}` (the
+  server config and the Stream/Consumer CRs); `loguru` on `**/logging*.py`.
+- **Resolver fixtures** under `hooks/tests/fixtures`: `workspace/`, a uv
+  workspace whose root owns the three script names, with one member that
+  declares none and one whose `pyproject.toml` does not parse; and `mixed/`,
+  a Python root that declares `lint`, with a `web/package.json` that declares
+  only `build` and `test`.
 
 ### Changed
 
 - **`hooks/scripts/resolve_touched_project.py` walks past a project file that
-  declares neither `lint` nor `typecheck`**, continuing until one does or the
-  project directory is reached. Previously it stopped at the nearest project
-  file; in a uv workspace that is the member's scriptless `pyproject.toml`, so
-  every edit under `packages/*/src/` resolved to a project with no scripts and
-  the PostToolUse hook exited 0 **in silence** — the whole library quietly
-  unlinted. A project file that cannot be read or parsed still stops the walk
+  declares neither `lint` nor `typecheck`, to the nearest ancestor of the SAME
+  kind that declares one.** A directory holding a project file of another kind,
+  or the project bound, ends the search, and the answer is the nearest project
+  file, the same answer as before. Previously the walk always stopped at the
+  nearest project file. In a uv workspace that is the member's scriptless
+  `pyproject.toml`, so every edit under `packages/*/src/` resolved to a project
+  with no scripts, and the PostToolUse hook exited 0 **in silence**: the whole
+  library went unlinted. The same-kind limit keeps a scriptless
+  `web/package.json` under a Python root from resolving to the root and
+  running `uv run lint` on a `.tsx` file. A project file that cannot be read or parsed still stops the walk
   where it is, rather than letting an ancestor's scripts run against a file that
   ancestor does not own. `hooks/README.md` and `lint-touched-file.sh`'s header
   both stated the old rule and were corrected with it.
@@ -58,6 +73,11 @@ commits.
   enforced; it is replaced by the ruff `banned-api` ban, a fixture proving the
   rule fires (exit 1, `TID251`), and an explicit statement of the four spellings
   that reach a real dataclass past it. The framework-adapter section gains the
-  `# noqa: TID251  # framework adapter exception: <call>` spelling.
+  `# noqa: TID251  # framework adapter exception: <call>` spelling, and
+  `ruff --select PGH004` rejects a bare `# noqa`. Check 6 (every Temporal
+  client passes the converter) now matches any call whose target **ends with**
+  `Client.connect`, rather than only the exact text `Client.connect`. The exact
+  match missed `temporalio.client.Client.connect(...)` and an aliased
+  `client.Client.connect(...)`, so a bare client written that way passed.
 - **`.claude-plugin/plugin.json`** lists `./skills/messaging` so the new group
   loads. `version` is deliberately unchanged.
