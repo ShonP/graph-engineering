@@ -10,6 +10,41 @@ commits.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-09-23
+
+### Added
+
+- **`post-deploy` and `retro` nodes at the end of every playbook** (feature,
+  bug, infra), after the merge gate.
+- **`skills/process/post-deploy-verification`** — wait for the merged commit
+  to serve (`deploy.wait`, e.g. `argocd app wait --sync --health`), run the
+  `smoke`-tagged Bruno requests and PromQL checks shaped like an Argo Rollouts
+  AnalysisTemplate (`interval`, `count`, `successCondition`) against the
+  deployed environment, and report PASS / FAIL / BLOCKED / SKIPPED. The
+  environment is shared, so everything is read-only: `vet_smoke.py` refuses
+  any smoke write not scoped to `{{testTenant}}` in its URL path (or with no
+  test tenant configured) before anything runs, and metrics compare against a
+  baseline taken when the deploy lands, after an `initialDelay`; a FAIL produces a
+  filled-in rollback recommendation for the owner and never an automatic
+  rollback, and it is never a fix-loop input.
+- **`skills/process/retro`** — a blameless leak table from the run (each
+  finding or FAILED row, the node that caught it and the earliest node that
+  should have), grouped by class, with one proposed rule change per class as
+  an exact diff against a named file. Proposes only; the engine lists the diffs
+  in its final report and applies none. Grounded in the Google SRE book's
+  postmortem culture chapter.
+- **Profile `deploy` block** (`wait`, `bruEnv`, `env`, `testTenant`,
+  `checks`, `rollback`), empty by default; an empty `wait` makes post-deploy
+  `SKIPPED`.
+- **`api-contract`: the `smoke` tag is for requests safe in a shared
+  environment** - GETs, or writes into `deploy.testTenant` only.
+- **`docs/img/playbook.png` regenerated** for the full feature flow: four
+  research nodes, plan gate, build, review ∥ qa, fix, merge gate, deploy
+  check, retro.
+- **Engine step 9**: post-deploy waits for the owner's merge (`waiting:
+  merge`, resumed with `--resume`); step 10 reports the post-deploy verdict and
+  the retro diffs.
+
 ## [0.11.0] - 2026-09-23
 
 ### Added

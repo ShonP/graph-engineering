@@ -38,14 +38,15 @@ flowchart LR
     qa -->|FAILED rows| fix
     fix -.->|"max 3 rounds"| review & qa
     review & qa -->|PASS| merge{{"merge (gate)"}}
+    merge --> post([post-deploy]) --> retro([retro])
 
     subgraph agents [" "]
         direction LR
-        a1["planner: goal, plan, merge"]
+        a1["planner: goal, plan, merge, retro"]
         a0["researcher: research-ux / tech / competitor / impact (parallel)"]
         a2["implementer / implementer-simple: implement, fix"]
         a3["reviewer: review"]
-        a4["qa: qa (runs the change on the profile's runtime)"]
+        a4["qa: qa (runs the change on the profile's runtime), post-deploy (read-only, on the deployed env)"]
     end
 ```
 
@@ -104,9 +105,9 @@ the owner sees it at the first gate.
 
 | Playbook | Shape | For |
 |---|---|---|
-| `feature` | goal -> research ux / tech / competitor / impact -> **plan gate** -> implement -> review ∥ qa -> fix (≤3) -> **merge gate** | new behaviour, chores, mixed app + infra |
-| `bug` | report -> reproduce (a **failing test**, by qa) -> diagnose (`systematic-debugging`) -> sibling search (same bug shape elsewhere, Semgrep) -> **plan gate** -> implement -> review ∥ qa -> fix -> **merge gate** | existing behaviour that is wrong |
-| `infra` | goal -> research tech / impact -> **plan gate** -> implement -> review ∥ verify (render, validate CRDs too, rendered diff, apply to a throwaway cluster) -> fix -> **merge gate** | Helm, kustomize, Argo CD, manifests, gateway and policy config |
+| `feature` | goal -> research ux / tech / competitor / impact -> **plan gate** -> implement -> review ∥ qa -> fix (≤3) -> **merge gate** -> post-deploy -> retro | new behaviour, chores, mixed app + infra |
+| `bug` | report -> reproduce (a **failing test**, by qa) -> diagnose (`systematic-debugging`) -> sibling search (same bug shape elsewhere, Semgrep) -> **plan gate** -> implement -> review ∥ qa -> fix -> **merge gate** -> post-deploy -> retro | existing behaviour that is wrong |
+| `infra` | goal -> research tech / impact -> **plan gate** -> implement -> review ∥ verify (render, validate CRDs too, rendered diff, apply to a throwaway cluster) -> fix -> **merge gate** -> post-deploy -> retro | Helm, kustomize, Argo CD, manifests, gateway and policy config |
 
 `/graph-ship --resume <run-id>` picks a run back up from its ledger.
 `/graph-ship --auto-merge` relaxes only the merge gate, only for that run.
@@ -159,8 +160,7 @@ The engine picks the implementer by the task's `size` in the plan: `small` goes
 to `implementer-simple`, everything else to `implementer`. Every agent below its
 skill floor returns `NEEDS_SETUP` instead of improvising.
 
-Still planned: post-deploy smoke and a retro node, board sync, and
-`/graph-doctor`.
+Still planned: board sync and `/graph-doctor`.
 
 ## Competencies
 
@@ -261,6 +261,13 @@ standing rules and every agent carries them:
   at 3 or 20% of the plan), follow-up (listed in the PR, not fixed). That is how
   related bugs get fixed without a two-hour fix becoming a two-day refactor.
   `skills/process/impact-map`.
+- **After merge.** Every playbook ends with `post-deploy` - qa waits for the
+  merged commit to serve, then runs the `smoke`-tagged Bruno requests and
+  AnalysisTemplate-shaped PromQL checks against the deployed environment,
+  read-only, and on FAIL hands the owner a filled-in rollback, never running it
+  (`post-deploy-verification`) - and `retro`, a blameless leak table (what each
+  gate caught, what got past the gate that should have) turned into proposed
+  rule diffs the owner applies or declines (`retro`).
 - **Prior art.** No ask starts from priors. At the start of every task, and
   again at every mid-task fork, look at what others do - reuse candidates
   first (an existing skill, plugin or library), then competitors, open source,

@@ -9,7 +9,9 @@ fix loop fed by both. The research MAP is here because `prior-art` is a house
 rule: no run plans from priors; `research-impact` is in it because a plan written
 from the goal alone fixes the named thing and breaks its neighbours
 (`impact-map`). The qa leg is here because review reads code
-and qa runs it; a change nobody ran is not verified.
+and qa runs it; a change nobody ran is not verified. After the merge gate,
+`post-deploy` checks the change where it was deployed and `retro` turns what
+leaked past each gate into proposed rules.
 
 Later phases add the missing nodes. Nothing here changes when they do, because
 the engine reads whatever playbook it is given.
@@ -93,4 +95,20 @@ agent: planner
 in: the reviewed diff, the gate verdict, .graph/<run>/followups.md
 out: .graph/<run>/ledger.md
 gate: yes
+next: post-deploy
+
+## node: post-deploy
+agent: qa
+skills: [post-deploy-verification]
+in: the merged change, the profile's `deploy` block
+out: .graph/<run>/post-deploy.md (PASS / FAIL with a rollback recommendation / BLOCKED / SKIPPED), .graph/<run>/post-deploy/
+gate: no
+next: retro
+
+## node: retro
+agent: planner
+skills: [retro]
+in: the whole run directory
+out: .graph/<run>/retro.md (leaks, classes, proposed rule changes as diffs - never applied)
+gate: no
 next: END
