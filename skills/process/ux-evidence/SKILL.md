@@ -50,12 +50,12 @@ the point; crop or highlight so the difference reads at thumbnail size.
    - iOS: `xcrun simctl io booted screenshot <file>.png`,
      `xcrun simctl io booted recordVideo <file>.mp4`.
    - Android: `adb exec-out screencap -p > <file>.png`, `adb shell screenrecord`.
-   - If the repo already has a media pipeline (profile `rules`, media-producer
-     assets), extend it; never build a parallel one.
+   - If the repo already has a capture pipeline (profile `rules`), extend it;
+     never build a parallel one.
 3. **Re-run the same script on the changed code** for "after". Same data,
    same viewport, same steps - the only variable is the change.
-4. **Recordings** follow `short-attention-media`: cut every wait, ≤ 30s,
-   mp4 (h264, faststart) or GIF for short loops. Extract frames and look at
+4. **Recordings**: cut every wait (loading, transitions, human-speed typing),
+   ≤ 30s, one flow per clip, mp4 (h264, faststart) or GIF for short loops. Extract frames and look at
    them before calling the capture done - exit 0 is not a picture.
 
 ## Where it lives
@@ -86,4 +86,3 @@ The profile's `uxEvidence.path` (default `docs/ux/changes`):
 | qa | uses the after capture as the row evidence for UI criteria; re-captures if it no longer matches the running system, and files a `FAILED` row if before and after are indistinguishable when the criteria say they should differ |
 | reviewer | UI diff with no evidence folder or PR section = **Blocking** (stated house rule); evidence that contradicts the experience spec = Important |
 | planner (merge node) | presents the pairs beside the diff; the owner approves what they can see |
-| media-producer | builds launch demos from the same capture scripts; never re-records by hand |

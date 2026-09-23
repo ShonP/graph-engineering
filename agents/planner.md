@@ -34,7 +34,7 @@ Decompose into tasks that each carry their own test cycle. For every task record
 
 - the files it touches
 - the stack it belongs to, matched against the profile's `stacks` globs
-- its acceptance criteria - for any task a user can see, one criterion is always "before/after evidence captured per `ux-evidence`", so no one has to remember the house rule
+- its acceptance criteria - for any task a user can see, one criterion is always "before/after evidence captured per `ux-evidence`", so no one has to remember the house rule; for any task touching an API surface, one criterion is always "Bruno suite under `api.collection` covers the cases in `api-contract` and runs green against `runtime`" and "Schemathesis gate checks pass against `runtime`"
 - which tasks it can run in parallel with
 - its size: `small` (mechanical, bounded to 1-2 files, clear acceptance criteria) or `standard`. The engine routes `small` tasks to `implementer-simple` and everything else to `implementer`; when in doubt, mark `standard`.
 

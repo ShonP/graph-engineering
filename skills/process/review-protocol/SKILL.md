@@ -64,6 +64,12 @@ skill load, on every diff they touch:
   Blocking - it is a stated house rule. Evidence that contradicts the
   experience spec or the acceptance criteria is Important. Look at the images;
   a folder that exists is not evidence that it shows the change.
+- **API contract** (any API-surface diff): the collection under the profile's
+  `api.collection` changes with the endpoint, and the PR body carries the
+  `## API contract` section with the `bru run` command and pass line, per
+  `api-contract`. Missing with no stated reason is Blocking - a stated house
+  rule. A touched endpoint whose requests assert only status, or skip the auth
+  case, is Important.
 
 ## Format
 

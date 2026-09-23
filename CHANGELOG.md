@@ -10,6 +10,8 @@ commits.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-23
+
 ### Added
 
 - **Four Python and messaging competencies**, written from what plan 6 measured
@@ -51,6 +53,88 @@ commits.
   a Python root that declares `lint`, with a `web/package.json` that declares
   only `build` and `test`.
 
+- **`skills/process/api-contract`** — a house rule beside `ux-evidence`: every
+  change to an API surface ships its Bruno requests in the same PR (happy path
+  asserting values, auth, validation, edge, non-leak), qa runs them and then the
+  whole collection, and the reviewer treats a missing suite as Blocking. Bruno
+  documents no convention for where a collection lives in a repo, so the house
+  one is the profile's `api.collection` (default `bruno/`). Routed by the new
+  server-side API-surface rows described below. Sourcing: prior-art run 2026-09-23 (docs.usebruno.com,
+  docs.docker.com compose `up`, devcontainers spec).
+- **Profile `runtime` block** (`up`, `seed`, `port`, `health` {`url` |
+  `command`, `expect`, `timeout`}, `baseUrl`, `down`, `env`, `none`) so qa
+  stands any repo up itself. `none: "<reason>"` is for a repo with nothing to
+  stand up (a library, a CLI, a plugin): qa verifies through its public surface
+  instead, so a mandatory qa node does not trap those repos at `BLOCKED`.
+  `up` mirrors `docker compose up --wait --wait-timeout`; `health.url` is polled
+  with `curl --retry-connrefused --retry-all-errors`; `seed` has no analog in
+  compose or devcontainer, so it is ours. devcontainer's lifecycle shape was
+  rejected wholesale: it assumes every repo runs in a devcontainer and has no
+  seed or health concept. Spiked 2026-09-23: curl 8.7.1 retries a refused
+  connection and exits 7; Compose v2.40.3 has `--wait` and `--wait-timeout`.
+  `/graph-init` now proposes the block and the API rows from what the repo holds.
+- **`skills/qa/schemathesis`** — property-based and stateful API tests
+  generated from the served OpenAPI/GraphQL schema, the second layer of
+  `api-contract` beside Bruno. Only `not_a_server_error` and
+  `response_schema_conformance` gate; the rest of the default set runs
+  report-only as spec drift (Important), because an out-of-the-box FastAPI app
+  fails it on day one and a gate that is always red gets turned off. Spiked
+  2026-09-23 with schemathesis 4.28.0 on a FastAPI app with a planted
+  `100 // qty` bug: gate checks found it unaided (exit 1, reproduction curl
+  printed), exited 0 once fixed (716/716), while the full set still reported
+  drift (exit 1). Hurl was weighed as a Bruno replacement and rejected (no GUI,
+  no native JSON Schema assertion, and the tested `bruno` skill already exists);
+  Postman was rejected for cloud-workspace collections that cannot ship in a PR.
+- **`api-contract` requires a served schema.** Every HTTP API serves OpenAPI
+  (GraphQL: SDL), current in the same PR, with error statuses documented;
+  profile `api.schema` names where.
+- **API-surface rows are server-side only.** `routes/` and `handlers/` route
+  `api-contract` only for server languages (py, go, java, kt, rb);
+  `routers/`, `controllers/`, `endpoints/` for those plus ts/js (no PHP or
+  .NET rows: not in the house stack); NestJS
+  `*.controller.ts`, Next.js `app/api/**/route.ts` and `pages/api/**`, and the
+  spec files. A bare `**/routes/**` matched TanStack Router, Remix and
+  SvelteKit `src/routes/`, Angular `app.routes.ts` and MSW `mocks/handlers/`,
+  which would have made a route-component task demand a Bruno suite and a
+  schema the SPA cannot serve. Checked with wcmatch on 25 paths, 12 of them
+  frontend or unrelated negatives. `/graph-init` adds a row for TS server routes
+  it finds by content.
+- **qa gets its own compose project.** `runtime.up`/`down` use
+  `docker compose -p ge-${GRAPH_RUN_ID}`, and the engine exports
+  `GRAPH_RUN_ID` to qa. Spiked: `-p` overrides a top-level `name:` and
+  namespaces project-scoped volumes (`ge-<id>_pgdata`), but it does NOT rename
+  a volume or network with its own `name:`, a `container_name:`, or anything
+  `external: true` - the review reproduced qa's app resolving `db` to the
+  developer's database over a shared named network. So a repo using them
+  commits a block-style `compose.qa.yaml` that renames each with
+  `${GRAPH_RUN_ID}` and drops the externals (`!override`, `!reset null`),
+  `/graph-init` proposes it, and qa runs a `compose config | jq` isolation
+  check and refuses to start while it prints anything. Spiked: five leaks
+  printed on the base file, none with the override, none on a plain file; the
+  first draft's flow-style `{name: ge-${GRAPH_RUN_ID}_x}` example was itself a
+  YAML parse error and is gone.
+- **`.graph/<run>/qa-findings.json`.** Schemathesis drift, and anything else qa
+  finds beside the criteria, is written there in the review-protocol format and
+  read by the fix node beside `findings.json`; `--auto-merge` checks both.
+- **The runtime template ships empty.** `/graph-init` fills what it detects;
+  an empty required field is qa `BLOCKED` naming it. The health poll adds
+  `--max-time 5 --retry-max-time <timeout>` (spiked: a listener that accepts
+  and never answers now stops the poll at the budget instead of hanging), and
+  `expect` is a raw substring, so the docs warn off JSON-spaced tokens.
+- **qa's Bruno command passes tokens and hides headers.** One `--env-var` per
+  name in `runtime.env` (an unbound `{{TOKEN}}` is sent literally),
+  `--reporter-skip-all-headers`, and an absolute report path.
+- **`runtime.port` and `runtime.health.expect`.** qa checks the port is free
+  before `up` and the health body contains `expect`. The spike hit it: an
+  unrelated process already on the port answered the health poll with 401 until
+  the real server bound, and a status-only check would have gone green against
+  the wrong service.
+- **A `qa` node in the feature playbook**, parallel with review (both share
+  `next: fix`). Its `FAILED` rows feed the fix loop beside review findings and
+  are re-run each round; `BLOCKED` is a setup stop, not a fix-loop input, and
+  the merge gate does not open on a run whose qa leg never ran. `--auto-merge`
+  now also requires qa `PASS`.
+
 ### Changed
 
 - **`hooks/scripts/resolve_touched_project.py` walks past a project file that
@@ -81,3 +165,14 @@ commits.
   `client.Client.connect(...)`, so a bare client written that way passed.
 - **`.claude-plugin/plugin.json`** lists `./skills/messaging` so the new group
   loads. `version` is deliberately unchanged.
+
+### Removed
+
+- **Content and social media leave the plugin; it is engineering only.** The
+  `content-writer` and `media-producer` agents, the `content` skill group
+  (`short-form-posts`, `short-attention-media`), the profile template's
+  `content:` block and `publication` gate, and the `launch` / `content`
+  playbooks from the plan. The roster is seven agents. `ux-evidence` keeps the
+  two recording rules it borrowed from `short-attention-media` (cut every wait,
+  ≤ 30s per flow) inline. Dated specs and plans under `docs/` still describe the
+  old roster and are left as the record of what was decided then.
