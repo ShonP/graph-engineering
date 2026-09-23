@@ -10,6 +10,35 @@ commits.
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-09-23
+
+### Added
+
+- **The designer picks how to show the design.** `ux-journey`
+  `references/render-media.md` lists six media - live-app injection
+  (Playwright into the running app), Storybook, a standalone HTML mock, a
+  Claude artifact, Claude Design, a generated sketch - with what each shows,
+  when it fits and when it does not. The designer first checks which are
+  available here, lists that in the spec, and picks the best-suited
+  available one per decision. A committed PNG of each changed screen stays
+  the floor: it is what the plan gate embeds and qa compares against;
+  interactive media are linked in addition.
+
+### Changed
+
+- `ux-designer` keeps a least-privilege `tools:` allowlist and gains
+  `Artifact` by name. It reads untrusted text (web research, app data), so it
+  never inherits the owner's signed-in connectors. Claude Design tools cannot
+  be granted by server name and their names are not fixed, so the designer
+  writes `design/claude-design-brief.md` and the engine - which holds the
+  connector - runs it at the plan gate when one is connected.
+- Storybook is implementer work: the designer drafts stories in
+  `design/stories/`, the UI task moves them next to their component, and the
+  states are shown meanwhile as live-app captures or HTML.
+- `design/` has one folder per role (`as-is/`, `to-be/`, `stories/`,
+  `artifact/`, `explore/`) and the planner commits only the spec, `as-is/`
+  and `to-be/` under `docsPath`.
+
 ## [0.13.0] - 2026-09-23
 
 Agents building frontend features put new elements wherever the diff was
