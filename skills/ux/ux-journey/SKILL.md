@@ -39,7 +39,8 @@ feature.
      sheet, an empty state, a toast). Reuse is the default; a net-new
      component needs a reason.
    - **Prior decisions:** grep earlier experience specs under
-     `<docsPath>/ux/` for this area. A decision already made for a similar
+     `<docsPath>/ux/` (`*/experience.md`, and older `*-experience.md` files)
+     for this area. A decision already made for a similar
      action is the consistency baseline.
    - **Walk the journey:** entry points → steps → exit, taps/inputs to goal,
      friction (dead ends, double entry, waits without feedback, decisions the
@@ -89,8 +90,13 @@ feature.
      `.graph/<run>/design/to-be/`. The owner approves what they can see, not
      a paragraph describing it. Never merged.
 
-6. **Write the experience spec** to `<docsPath>/ux/<date>-<feature>-experience.md`
-   (persistent, so the next feature's step 2 can find it), with:
+6. **Write the experience spec** as `experience.md` in one self-contained
+   folder - in a run, `.graph/<run>/design/`, with the captures and renders it
+   shows under `as-is/` and `to-be/` beside it, linked by relative paths. The
+   first UI task of the plan commits that folder to
+   `<docsPath>/ux/<date>-<feature>/`, so the spec and its images reach the PR
+   together and the next feature's step 2 finds them. (Outside a run, write it
+   there directly.) It holds:
    goal + emotional job; as-is captures and the inventory; the placement
    decision per element with its consistency citation and rejected
    alternatives; to-be renders; storyboard with tap counts; state table;
@@ -116,10 +122,15 @@ feature.
   never pixels.
 - If research contradicts the requested mechanism, say so and propose the
   better journey. Don't silently comply, don't silently override.
-- Scale it: a copy change needs one acceptance row; a moved or added button
-  needs steps 2 and 4 (capture, placement with its consistency citation and
-  one rejected alternative) and its rows; a new flow, screen or feature gets
-  everything.
+- **Scale it** - this rule overrides the step list, and a design node's
+  definition of done follows it:
+  - **copy or message change** (text only, no layout): one acceptance row
+    naming the exact string and where it shows. No stand-up, no renders.
+  - **moved or added element** on an existing screen: steps 2 and 4 -
+    capture that screen, placement with its consistency citation and one
+    rejected alternative - one to-be render, and its rows.
+  - **new flow, screen or feature**: everything above.
+  Say which size you chose, and why, in the spec's first line.
 
 ## Anti-patterns
 

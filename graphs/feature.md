@@ -61,7 +61,7 @@ next: plan
 agent: ux-designer
 when: ui
 in: .graph/<run>/goal.md, .graph/<run>/research/ux.md, .graph/<run>/research/competitor.md, the running app (the profile's `runtime`)
-out: <docsPath>/ux/<date>-<feature>-experience.md (as-is captures and inventory, placement decisions with rejected alternatives, state table, to-be renders, UI acceptance rows - per `ux-journey`), .graph/<run>/design/ (captures and renders)
+out: .graph/<run>/design/experience.md with its as-is/ and to-be/ images, at the size `ux-journey`'s scale rule picks (copy change: acceptance rows only; new element: capture, placement, render, rows; new flow: everything), ending in UI acceptance rows
 gate: no
 next: plan
 

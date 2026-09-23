@@ -30,9 +30,22 @@ a decision. The spec's design branch was never built; this builds it.
 - **`when: <flag>`** node field in the engine, read from `goal.md`
   (`ui: yes|no - <reason>`, written by the planner, `yes` when unsure). A
   missing flag runs the node.
+- **Sized, not all-or-nothing:** `ux-journey`'s scale rule is the design
+  node's definition of done - a copy change is one acceptance row with no
+  stand-up; a new element on an existing screen is capture, placement, one
+  render and rows; a new flow gets everything.
+- **The spec persists with its images:** the design node writes one folder
+  (`.graph/<run>/design/`: `experience.md` + `as-is/` + `to-be/`, relative
+  links); the plan's first UI task commits it to `<docsPath>/ux/<date>-<feature>/`,
+  so it reaches the PR and the next feature's consistency check.
 
 ### Changed
 
+- **Engine dispatches a ready set**: every node whose predecessors are all
+  `done` or `skipped` goes out together, so tech and impact research never
+  wait on `design`. A `design` `BLOCKED` (a configured runtime that would not
+  come up) stops the run and `--resume` re-runs `blocked` nodes; a plan-gate
+  rejection of `ui: no` re-queues `design` in the same run.
 - **The plan gate is the design gate.** `plan.md` embeds an `## Experience`
   section (placement, alternatives, renders inline, state table) and the gate
   exhibit shows the `ui:` line and the images. UI tasks carry the spec's

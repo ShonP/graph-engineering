@@ -412,8 +412,7 @@ routing:
 localAgents: {}
 
 gates:
-  plan: owner
-  design: owner
+  plan: owner   # also the design gate: the plan embeds the `design` node's spec
   merge: owner
 
 board:
