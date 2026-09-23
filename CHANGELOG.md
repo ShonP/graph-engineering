@@ -26,14 +26,18 @@ commits.
 
 ### Changed
 
-- `ux-designer` drops its `tools:` allowlist for `disallowedTools: [Edit,
-  NotebookEdit]`. MCP tools cannot be granted by server name in `tools:`
-  (sub-agents docs), so an allowlist could never reach Claude Design;
-  inheriting the session's tools lets the designer use Artifact and Claude
-  Design where they exist, and it still only creates files. Storybook stories
-  are drafted under `.graph/<run>/design/stories/` and moved in by the UI task.
-- The plan gate shows any interactive render the plan names, and publishes
-  (private) an artifact the designer could not.
+- `ux-designer` keeps a least-privilege `tools:` allowlist and gains
+  `Artifact` by name. It reads untrusted text (web research, app data), so it
+  never inherits the owner's signed-in connectors. Claude Design tools cannot
+  be granted by server name and their names are not fixed, so the designer
+  writes `design/claude-design-brief.md` and the engine - which holds the
+  connector - runs it at the plan gate when one is connected.
+- Storybook is implementer work: the designer drafts stories in
+  `design/stories/`, the UI task moves them next to their component, and the
+  states are shown meanwhile as live-app captures or HTML.
+- `design/` has one folder per role (`as-is/`, `to-be/`, `stories/`,
+  `artifact/`, `explore/`) and the planner commits only the spec, `as-is/`
+  and `to-be/` under `docsPath`.
 
 ## [0.13.0] - 2026-09-23
 
