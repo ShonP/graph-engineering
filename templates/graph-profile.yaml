@@ -71,9 +71,13 @@ routing:
   # disagree - spec 4.5 precedence is house > vault-generated > community, so the
   # house "v2 models everywhere, no dataclasses" overrides the vendored dataclass
   # advice. The vendored file is never edited to say that.
+  # `ruff` is on this row and not on the pyproject.toml row below: the lint is
+  # configured in pyproject.toml but it is ENFORCED per file, and the PostToolUse
+  # hook runs `uv run lint <file>` after every edit, so the competency is needed
+  # wherever Python is written rather than only where the config is edited.
   "**/*.py":
-    impl: [uv, pydantic, pydantic-house-rules, fastapi, backend-rules, architecture-resilience-rules]
-    review: [pydantic, pydantic-house-rules, fastapi, backend-rules, architecture-resilience-rules]
+    impl: [uv, ruff, pydantic, pydantic-house-rules, fastapi, backend-rules, architecture-resilience-rules]
+    review: [ruff, pydantic, pydantic-house-rules, fastapi, backend-rules, architecture-resilience-rules]
     qa: []
   # Project and lock files: environment and dependency work is uv's, not the
   # framework's.
