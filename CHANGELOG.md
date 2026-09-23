@@ -10,6 +10,31 @@ commits.
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-09-23
+
+### Added
+
+- **The designer picks how to show the design.** `ux-journey`
+  `references/render-media.md` lists six media - live-app injection
+  (Playwright into the running app), Storybook, a standalone HTML mock, a
+  Claude artifact, Claude Design, a generated sketch - with what each shows,
+  when it fits and when it does not. The designer first checks which are
+  available here, lists that in the spec, and picks the best-suited
+  available one per decision. A committed PNG of each changed screen stays
+  the floor: it is what the plan gate embeds and qa compares against;
+  interactive media are linked in addition.
+
+### Changed
+
+- `ux-designer` drops its `tools:` allowlist for `disallowedTools: [Edit,
+  NotebookEdit]`. MCP tools cannot be granted by server name in `tools:`
+  (sub-agents docs), so an allowlist could never reach Claude Design;
+  inheriting the session's tools lets the designer use Artifact and Claude
+  Design where they exist, and it still only creates files. Storybook stories
+  are drafted under `.graph/<run>/design/stories/` and moved in by the UI task.
+- The plan gate shows any interactive render the plan names, and publishes
+  (private) an artifact the designer could not.
+
 ## [0.13.0] - 2026-09-23
 
 Agents building frontend features put new elements wherever the diff was

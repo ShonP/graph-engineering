@@ -156,7 +156,7 @@ The full organization - seven agents, engineering only:
 |---|---|---|---|
 | `planner` | fable | spec, then task-decomposed plan with per-task sizing | specs only |
 | `researcher` | sonnet | one bounded question, five modes: ux / tech / competitor / impact (blast radius + adjacent-issue triage) / spike (strict turn budget) | reports only |
-| `ux-designer` | opus | the `design` node: captures the running UI, decides placement, writes the experience spec with UI acceptance rows; variant exploration scored against the house rubric | mockups only |
+| `ux-designer` | opus | the `design` node: captures the running UI, decides placement, shows it in the best-suited available medium (live-app capture, Storybook, HTML, Claude artifact, Claude Design), writes the experience spec with UI acceptance rows; variant exploration scored against the house rubric | mockups only |
 | `implementer` | opus | one non-trivial task, test-first, with spine-named skills | yes |
 | `implementer-simple` | sonnet | one SMALL task (mechanical, 1-2 files); escalates instead of pushing through | yes |
 | `reviewer` | opus | reads the diff once through every lens it needs | no (read-only) |
