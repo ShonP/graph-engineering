@@ -22,7 +22,7 @@ Execute a playbook. **The engine is playbook-agnostic:** it reads `graphs/<name>
 
 2. **Open the run.** Create `.graph/<run-id>/` with a UUIDv7 id. Copy the playbook into it, so the run records which version of the graph it executed. Start `ledger.md` with the `playbook:` line first - `playbook: <name> - <reason>` from triage, or `playbook: <name> - --graph` when the owner named it - then every node marked `pending`.
 
-   On `--resume <run-id>`, read that ledger instead, skip nodes marked `done`, and resume at the first `pending`.
+   On `--resume <run-id>`, read that ledger instead, skip nodes marked `done` or `skipped`, and resume at the first node marked `waiting: <what>` or `pending`, in that order.
 
    **Worktree.** Before the first node whose agent writes to the repo (an implementer, or qa writing a reproduction test), create the run's worktree with `superpowers:using-git-worktrees` on a branch named for the run, and pass its path to every later dispatch. Every agent that writes, writes there.
 
@@ -46,10 +46,16 @@ Execute a playbook. **The engine is playbook-agnostic:** it reads `graphs/<name>
 
 6. **Handle NEEDS_SETUP.** If an agent reports it, stop that leg and tell the owner which skill or dependency is missing. Do not re-dispatch without it, and do not let the agent improvise the competency. A result produced without the house patterns looks the same as one produced with them, which is precisely the danger.
 
-7. **Fix loop.** The fix node takes every input the two legs produce: each blocking and important finding in the reviewer's `findings.json` and in qa's `qa-findings.json` (for example Schemathesis spec drift), and each `FAILED` qa row (its reproduction steps are the bug report). Re-dispatch the implementer for them, then re-run every node that feeds `fix` - the reviewer's node scoped to the same diff, and the qa-agent node (`qa`, or `verify` in the infra playbook) for the rows that failed plus any row whose files the fix touched. At most 3 rounds. Surface anything that survives as a labelled list for the owner. Nits never block.
+7. **Fix loop.** The fix node takes every input the two legs produce: each blocking and important finding in the reviewer's `findings.json` and in qa's `qa-findings.json` (for example Schemathesis spec drift), and each `FAILED` qa row (its reproduction steps are the bug report). Before each re-run, keep the round: rename `findings.json`, `qa-findings.json` and `qa.md` to `*.r<N>.*` (round 1 = the first review), so the next round writes fresh files and `retro` can see what every round caught, not only what survived. Re-dispatch the implementer for them, then re-run every node that feeds `fix` - the reviewer's node scoped to the same diff, and the qa-agent node (`qa`, or `verify` in the infra playbook) for the rows that failed plus any row whose files the fix touched. At most 3 rounds. Surface anything that survives as a labelled list for the owner. Nits never block.
 
    A repo whose profile sets `runtime.none` still runs the qa node; qa verifies through the public surface instead of a stood-up stack, so this rule does not trap libraries and CLIs. A qa `BLOCKED` is not a fix-loop input: the system could not be stood up, which is a missing `runtime` block, seed or env, not a code defect. Treat it like `NEEDS_SETUP` (step 6) and name what is missing. The merge gate does not open on a run whose qa leg never ran.
 
 8. **Update the ledger after every node:** status, artifact path, timestamp. Follow-ups live beside it in `.graph/<run>/followups.md` (written by the plan node, appended by implementers); the engine never rewrites that file, and the merge node reads it. This is what lets a run survive compaction and what `--resume` reads. Trust it over your own recollection of what you did.
 
-9. **Report** the run id, each node's status, and the gate verdict.
+9. **After the merge gate.** Approval and merging are two ledger states:
+   - **`approved`** - the owner approved the merge gate. The engine pushes the run branch and opens the PR with `gh pr create` if none exists (body: the merge exhibit - diff summary, evidence, `## Follow-ups`), and records its number. With `--auto-merge` and the conditions in step 5 met, the engine is the one that merges: `gh pr merge <n> --merge`.
+   - **`merged: <sha>`** - the PR is merged. The engine checks with `gh pr view <n> --json state,mergeCommit` (or, off GitHub, `git merge-base --is-ancestor <run branch head> origin/<default>` after a fetch) and records the merge commit SHA, which `post-deploy` waits to see serving.
+
+   The `post-deploy` node needs `merged:`. If the owner has not merged yet, mark it `waiting: merge` and stop; `--resume <run-id>` checks again. An empty `deploy.wait` makes it `SKIPPED` and the run goes on to `retro`. A post-deploy `FAIL` is never a fix-loop input and never triggers an automatic rollback: its rollback recommendation goes to the owner at once.
+
+10. **Report** the run id, each node's status, the gate verdicts, the post-deploy verdict, and the retro's proposed rule changes as diffs for the owner to apply or decline. The engine applies none of them.

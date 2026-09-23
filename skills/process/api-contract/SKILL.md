@@ -54,7 +54,7 @@ Per endpoint touched, in its own folder so it runs alone (`bru run <folder>`):
 | Edge | the case the criteria name: empty list, pagination end, idempotent retry, conflict |
 | Non-leak | a field that must NOT appear (internal ids, debug info, PII) is absent |
 
-Tag the happy path `smoke` so post-deploy runs `bru run --tags smoke`. A request
+Tag the happy path `smoke` so post-deploy can run it against the deployed environment - but only a request that is safe there: a GET/HEAD, or a write whose URL **path** has `{{testTenant}}` as a whole segment (e.g. `/tenants/{{testTenant}}/orders`) - a mention in the body, query string or headers does not scope the write. Post-deploy vets every `smoke` request before running any (`post-deploy-verification`, `vet_smoke.py`) and refuses the rest, so an unscoped write tagged `smoke` is a finding against the collection. A request
 with no `assert` or `tests` block does not count.
 
 ## Where it lives
@@ -80,7 +80,7 @@ sets no convention, so this is the house one:
 ## How it runs
 
 Against the stack the profile's `runtime` block stands up (see
-`qa-verification`), never against a shared or production environment:
+`qa-verification`), never against a shared or production environment - the only exception is the vetted, read-only `smoke` subset `post-deploy-verification` runs after deploy:
 
 ```bash
 REPO_ROOT=$(git rev-parse --show-toplevel)

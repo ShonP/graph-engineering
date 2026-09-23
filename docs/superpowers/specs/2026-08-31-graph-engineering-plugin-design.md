@@ -648,3 +648,9 @@ drew, with `infra-verification` as its verify recipe. The engine now triages
 the goal to a playbook when `--graph` is omitted, which realises §2's "many
 workflows, one roster" without the owner choosing a graph per ask.
 
+0.12.0 closes the loop §5.3's launch tail used to hold, engineering-only:
+every playbook ends with `post-deploy` (read-only verification on the deployed
+environment, rollback recommended to the owner, never executed) and `retro`
+(blameless leak analysis turned into proposed house rules, never applied by an
+agent). The 2026-09-23 re-scoped P5 is complete with this release.
+

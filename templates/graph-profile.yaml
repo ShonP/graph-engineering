@@ -97,6 +97,36 @@ runtime:
   env: []
   none: ""
 
+# Where a merged change is checked after it deploys (`post-deploy-verification`).
+# This is a SHARED environment: everything qa runs here is read-only - Bruno
+# requests tagged `smoke` (GETs, or writes into `testTenant` only) and PromQL.
+# qa never rolls back; `rollback` is the text it fills in for the owner. Leave
+# `wait` empty and the post-deploy node reports SKIPPED; retro still runs.
+#   wait        blocks until the merged commit serves, e.g.
+#               argocd app wait <app> --sync --health --timeout 600
+#   bruEnv      the Bruno environment for the deployed target
+#   env         NAMES of credential variables (never values)
+#   testTenant  the tenant smoke writes may touch - a write runs only if
+#               `{{testTenant}}` is a segment of its URL path; "" = reads only
+#   checks      AnalysisTemplate-shaped PromQL checks, compared with the
+#               window before the deploy (an absolute threshold alone lets a
+#               0.1% -> 0.9% error ratio pass):
+#               - name: error-ratio
+#                 query: '<ratio over [10m]>'
+#                 initialDelay: 10m     # >= the query window
+#                 interval: 60s
+#                 count: 5
+#                 failureLimit: 0
+#                 successCondition: 'result[0] <= baseline[0] * 1.5 + 0.001'
+#   rollback    the command the owner would run, filled in on FAIL
+deploy:
+  wait: ""
+  bruEnv: ""
+  env: []
+  testTenant: ""
+  checks: []
+  rollback: ""
+
 # How qa proves an infra change (`infra-verification`). `cluster` is a
 # THROWAWAY cluster the run creates and deletes, with its own kubeconfig file -
 # never an existing cluster, never ~/.kube/config. Leave `cluster` empty for

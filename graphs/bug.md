@@ -83,4 +83,20 @@ agent: planner
 in: the reviewed diff, the gate verdict, .graph/<run>/plan.md, .graph/<run>/root-cause.md, .graph/<run>/followups.md
 out: .graph/<run>/ledger.md
 gate: yes
+next: post-deploy
+
+## node: post-deploy
+agent: qa
+skills: [post-deploy-verification]
+in: the merged change, the profile's `deploy` block
+out: .graph/<run>/post-deploy.md (PASS / FAIL with a rollback recommendation / BLOCKED / SKIPPED), .graph/<run>/post-deploy/
+gate: no
+next: retro
+
+## node: retro
+agent: planner
+skills: [retro]
+in: the whole run directory
+out: .graph/<run>/retro.md (leaks, classes, proposed rule changes as diffs - never applied)
+gate: no
 next: END
