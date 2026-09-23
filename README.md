@@ -170,6 +170,10 @@ task's files. The directory name is the routing name, and
 `scripts/check-skill-frontmatter.sh` enforces that the frontmatter `name` agrees
 with it, and `scripts/check-routing-resolves.sh` checks that every name the
 routing table and the roster reference actually resolves to one skill.
+`scripts/check-skill-scripts.sh` runs the regression tests that ship beside
+skill scripts (`skills/**/tests/`): `vet_smoke.py`, which guards writes to a
+shared environment, and `compose_isolation.sh`, which keeps qa's stack off the
+developer's.
 
 | Group | Skills | Routed by |
 |---|---|---|
@@ -186,7 +190,7 @@ routing table and the roster reference actually resolves to one skill.
 | `security` | security-review | `always.review` |
 | `privacy` | privacy-review, gdpr-consent, gdpr-erasure-retention | `always.review`, `**/{migrations,schemas}/**` |
 | `ux` | ux-journey, ui-ux-pro-max | `always.design` |
-| `process` | prior-art, review-protocol, ux-evidence, api-contract, definition-of-done, impact-map, product-spec, qa-verification | prior-art on `always.impl`, review-protocol on `always.review`, definition-of-done and impact-map preloaded in agent frontmatter (planner and both implementers; reviewer: definition-of-done) and deliberately not in `always`, ux-evidence on every UI-bearing row, api-contract on every API-surface row (`routers/`, `controllers/`, `handlers/`, OpenAPI specs, `*.bru`); product-spec preloaded by `planner`, qa-verification preloaded by `qa` |
+| `process` | prior-art, review-protocol, ux-evidence, api-contract, definition-of-done, impact-map, product-spec, qa-verification, infra-verification, post-deploy-verification, retro | prior-art on `always.impl`, review-protocol on `always.review`, definition-of-done and impact-map preloaded in agent frontmatter (planner and both implementers; reviewer: definition-of-done) and deliberately not in `always`, ux-evidence on every UI-bearing row, api-contract on every API-surface row (`routers/`, `controllers/`, `handlers/`, OpenAPI specs, `*.bru`); product-spec preloaded by `planner`, qa-verification preloaded by `qa`; infra-verification on the GitOps rows; post-deploy-verification and retro named by the playbooks' `post-deploy` and `retro` nodes |
 | `rules` | backend-rules, frontend-rules, architecture-resilience-rules, agent-workflow-rules, review-testing-rules | ride along on their stack's rows; `review-testing-rules` is on `always.impl` |
 
 **Provenance.** Some of these are written here from the vendor's own docs; some

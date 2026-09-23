@@ -47,27 +47,41 @@ verified what did not run - still holds.
    and stop. That is a result, not a failure.
 1. **Wait for the deploy to land** with `deploy.wait` (e.g. `argocd app wait
    <app> --sync --health --timeout 600`, or a loop on a version endpoint until
-   it reports the merge SHA the ledger recorded). Record the time it landed as
-   `deployedAt`. Timeout = `BLOCKED`, naming what never converged. Checking
-   before the new version serves proves the old version works.
+   it reports the merge SHA the ledger recorded). Timeout = `BLOCKED`, naming
+   what never converged. Checking before the new version serves proves the old
+   version works. Then record `deployedAt`: when the merged revision **started**
+   rolling out, never the time `wait` returned - that is too late on a resumed
+   run (the deploy landed yesterday, `wait` returns at once) and on any rolling
+   update (new pods served traffic while `wait` blocked), and a late baseline
+   already contains the regression it is meant to expose. Use `deploy.startedAt`
+   with `${SHA}` set to the merge SHA - for Argo CD, `kubectl get application
+   <app> -n argocd -o json | jq -r --arg s "$SHA" '.status.history[] |
+   select(.revision == $s) | .deployStartedAt'` (Argo appends `revision` and
+   `deployStartedAt` to `status.history` on every successful sync). Empty or
+   unset: the merge commit's time, `git show -s --format=%cI <sha>`, which is
+   never after the rollout began.
 2. **Vet, then smoke.**
 
    ```bash
+   mkdir -p "$REPO_ROOT/.graph/<run>/post-deploy"
    python3 "<this skill's dir>/vet_smoke.py" "$REPO_ROOT/<api.collection>" \
-     --test-tenant "<deploy.testTenant>" > .graph/<run>/post-deploy/vetted.txt
+     --test-tenant "<deploy.testTenant>" > "$REPO_ROOT/.graph/<run>/post-deploy/vetted.txt"
    ```
 
    Exit 1 means at least one `REFUSE` line: those requests are listed as
-   findings and do not run. Then run each `RUN` file on its own, from the
+   findings and do not run. Exit 2 means nothing was vetted - the collection
+   path does not exist (an unset `$REPO_ROOT` makes it `/bruno`) or it holds no
+   `smoke`-tagged request - and is `BLOCKED`: an empty smoke list must never let
+   step 4 call "every smoke request passed" true. Then run each `RUN` file on its own, from the
    collection directory:
 
    ```bash
    bru run <file> --env <deploy.bruEnv> --env-var testTenant="<deploy.testTenant>" \
-     --env-var TOKEN="$TOKEN" --reporter-skip-all-headers \
+     --env-var <NAME>="$<NAME>" ... --reporter-skip-all-headers \
      --reporter-junit "$REPO_ROOT/.graph/<run>/post-deploy/bru-<name>.xml"
    ```
 
-   Spiked 2026-09-23 on nine `.bru` files: `RUN` for a smoke GET and a smoke
+   One `--env-var NAME="$NAME"` per name in `deploy.env`. Spiked 2026-09-23 on nine `.bru` files: `RUN` for a smoke GET and a smoke
    POST to `/tenants/{{testTenant}}/users`; `REFUSE` (exit 1) for an unscoped
    POST, a POST naming `{{testTenant}}` only in `docs`, a PUT naming it only in
    the body, a DELETE naming it only in the query string, and a GraphQL
@@ -75,19 +89,25 @@ verified what did not run - still holds.
    `--test-tenant` empty, the tenant-scoped POST is refused too. The review's
    18 adversarial files added: a GET block followed by a DELETE block (Bruno
    merges them and sends the DELETE) - refused; `..` path segments - refused;
-   Python 3.9 (macOS `/usr/bin/python3`) - runs.
+   Python 3.9 (macOS `/usr/bin/python3`) - runs. The final review's bypasses
+   are now refused too - a script that changes the method or URL, one that runs
+   or sends another request (in the file, a `folder.bru` or `collection.bru`),
+   a `vars` block or `setVar` rebinding `testTenant`, an indented second method
+   block - and a missing collection or zero smoke requests exits 2. All of it
+   is pinned by `tests/test_vet_smoke.py` (15 cases; 8 fail against the
+   previous version).
 3. **Metrics against a baseline.** Each `deploy.checks` entry has `query` (a
    rate or ratio over a window, e.g. `[10m]`), `initialDelay`, `interval`,
    `count`, `failureLimit` (default 0, as in Argo) and `successCondition` over
    `result[0]` and `baseline[0]`, e.g. `result[0] <= baseline[0] * 1.5 + 0.001`.
    - **Baseline once, at `deployedAt`:** an instant query evaluated AT the
-     moment the deploy landed - `/api/v1/query?query=<query>&time=<deployedAt
+     moment the rollout started - `/api/v1/query?query=<query>&time=<deployedAt
      as unix seconds or RFC3339>` - so its window ends at the deploy and covers
      only the old version. Without `time=` Prometheus evaluates at "now", after
      the smoke run, and the baseline already contains new-version traffic. That value is `baseline[0]`
      for every measurement; no offset arithmetic, nothing in the profile to
      rewrite.
-   - **Then wait `initialDelay`**, at least the query's window (Argo has the
+   - **Then wait `initialDelay`**, counted from when `wait` returned, at least the query's window (Argo has the
      same field for the same reason): measured earlier, the window still
      averages in old-version traffic and dilutes a regression below the
      threshold.

@@ -22,7 +22,7 @@ and kube-linter v0.8.3 are current upstream but were not installed or run here.
   `--kubeconfig "$REPO_ROOT/.graph/<run>/kubeconfig"` as a flag - an absolute
   path, because step 7 works from a scratch worktree and tool shells drop
   exported variables between calls - kind: `kind create cluster --name
-  ge-${GRAPH_RUN_ID} --kubeconfig "$REPO_ROOT/.graph/<run>/kubeconfig" --wait 120s`; k3d:
+  ge-${GRAPH_RUN_ID:?} --kubeconfig "$REPO_ROOT/.graph/<run>/kubeconfig" --wait 120s`; k3d:
   `--kubeconfig-update-default=false`, then `k3d kubeconfig get` into that
   file. The developer's `~/.kube/config` and current-context are never read or
   changed, so their shell keeps pointing at their own cluster and two runs
