@@ -196,26 +196,25 @@ uv run python -c 'from pydantic import BaseModel; print(BaseModel.model_validate
 uv run python -c 'from pydantic import UUID7; print(UUID7)'
 # typing.Annotated[uuid.UUID, UuidVersion(uuid_version=7)]
 
-# 3. no domain TypedDicts. Expect no output.
-grep -rn 'TypedDict' src/
+# 3. no domain TypedDicts: a class or functional DEFINITION, not a mention. Expect no output.
+grep -rnE --include='*.py' '^\s*class \w+\([^)]*TypedDict|= *TypedDict\(' src/
 
 # 4. ruff enforces the ban: `[tool.ruff.lint.flake8-tidy-imports.banned-api]` keyed on the
 #    three SYMBOLS -- `dataclasses.dataclass`, `dataclasses.make_dataclass`,
 #    `pydantic.dataclasses.dataclass` -- never the module. Mechanics: `skills/python/ruff`.
 uv run lint; echo "exit=$?"          # the default sweep: expect exit=0
 
-# 4b. PROVE it fires. Keep a fixture that deliberately violates it, excluded by FILE so the
-#     sweep stays green; `force-exclude` defaults to false, so naming it directly still
-#     checks it. Measured on ruff 0.16.8 -- expect exit=1, and:
-#       TID251 `dataclasses.dataclass` is banned: Pydantic v2 for every data shape ...
-#         --> tests/fixtures/has_dataclass.py:14:25
+# 4b. PROVE it fires: a fixture that violates it, excluded by FILE (the sweep stays green;
+#     force-exclude=false, so naming it still checks it). ruff 0.16.8: exit=1 and
+#       TID251 `dataclasses.dataclass` is banned: ...  --> tests/fixtures/has_dataclass.py:14:25
 uv run lint tests/fixtures/has_dataclass.py; echo "exit=$?"
-# A green means the fixture stopped violating, the exclude widened to its directory, or
-# force-exclude was turned on -- all bugs in the guard, not passes.
+# Green = the fixture stopped violating, the exclude widened, or force-exclude went on.
 
 # 4c. Four spellings still reach a real dataclass (both dynamic imports, a cross-module
 #     re-export, `class X(SomeDataclass)`), and a star import escapes: ast-walk the static
-#     two, treat the rest as guard rail. No bare noqa -- every one names its rule and why.
+#     two, treat the rest as guard rail. No bare `# noqa` (it silences TID251 unnamed):
+#     PGH004 reads comment tokens, so exit=0, or `PGH004 Use specific rule codes` + exit=1.
+uv run ruff check --select PGH004 src tools tests; echo "exit=$?"
 grep -rn '# noqa: TID251' src/ tools/ | grep -v 'framework adapter exception:' || echo "all named"
 ```
 
