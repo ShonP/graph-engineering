@@ -113,8 +113,8 @@ runtime:
 #   startedAt   prints (RFC3339) when the merged revision ${SHA} started rolling
 #               out - the baseline ends there. Argo CD:
 #               kubectl get application <app> -n argocd -o json | jq -r
-#                 --arg s "$SHA" '.status.history[] | select(.revision == $s)
-#                 | .deployStartedAt'
+#                 --arg s "$SHA" '[.status.history[] | select(.revision == $s)
+#                 | .deployStartedAt] | min // empty'
 #               Empty: the merge commit's time, which is never after the rollout.
 #   bruEnv      the Bruno environment for the deployed target
 #   env         NAMES of credential variables (never values)

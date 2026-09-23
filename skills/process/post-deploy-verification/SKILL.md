@@ -31,7 +31,9 @@ verified what did not run - still holds.
   runs only if `{{testTenant}}` is a whole segment of its URL **path** and
   `deploy.testTenant` is non-empty (qa passes `--env-var
   testTenant=<deploy.testTenant>`). A mention in docs, body, query string or
-  headers does not count: it does not decide whose rows the write touches. Anything else is refused and named - it is a
+  headers does not count: it does not decide whose rows the write touches. A
+  smoke request, its folder and collection carry no scripts - only declarative
+  `assert` and `auth:*` blocks - since a script can send anything. Anything else is refused and named - it is a
   finding against the collection, not something to run. `vet_smoke.py` beside
   this file does the vetting (below).
 - **Never roll back, never re-sync, never scale.** A FAIL produces a rollback
@@ -55,8 +57,9 @@ verified what did not run - still holds.
    update (new pods served traffic while `wait` blocked), and a late baseline
    already contains the regression it is meant to expose. Use `deploy.startedAt`
    with `${SHA}` set to the merge SHA - for Argo CD, `kubectl get application
-   <app> -n argocd -o json | jq -r --arg s "$SHA" '.status.history[] |
-   select(.revision == $s) | .deployStartedAt'` (Argo appends `revision` and
+   <app> -n argocd -o json | jq -r --arg s "$SHA" '[.status.history[] |
+   select(.revision == $s) | .deployStartedAt] | min // empty'` (the earliest:
+   a manual re-sync of the same revision adds a later entry) (Argo appends `revision` and
    `deployStartedAt` to `status.history` on every successful sync). Empty or
    unset: the merge commit's time, `git show -s --format=%cI <sha>`, which is
    never after the rollout began.
@@ -89,13 +92,15 @@ verified what did not run - still holds.
    `--test-tenant` empty, the tenant-scoped POST is refused too. The review's
    18 adversarial files added: a GET block followed by a DELETE block (Bruno
    merges them and sends the DELETE) - refused; `..` path segments - refused;
-   Python 3.9 (macOS `/usr/bin/python3`) - runs. The final review's bypasses
-   are now refused too - a script that changes the method or URL, one that runs
-   or sends another request (in the file, a `folder.bru` or `collection.bru`),
-   a `vars` block or `setVar` rebinding `testTenant`, an indented second method
-   block - and a missing collection or zero smoke requests exits 2. All of it
-   is pinned by `tests/test_vet_smoke.py` (15 cases; 8 fail against the
-   previous version).
+   Python 3.9 (macOS `/usr/bin/python3`) - runs. Scripts are refused outright:
+   any non-empty `script:*` or `tests` block in the request, or in a
+   `folder.bru` / `collection.bru` above it, because Bruno scripts run
+   arbitrary JavaScript with axios and fetch, and a denylist of calls was
+   bypassed four ways in review. A `vars` block rebinding `testTenant` and an
+   indented second method block are refused; a missing collection or zero
+   smoke requests exits 2. All of it is pinned by `tests/test_vet_smoke.py`.
+   Keep smoke requests declarative: `assert` blocks for checks, an `auth:*`
+   block reading a `--env-var` for credentials.
 3. **Metrics against a baseline.** Each `deploy.checks` entry has `query` (a
    rate or ratio over a window, e.g. `[10m]`), `initialDelay`, `interval`,
    `count`, `failureLimit` (default 0, as in Argo) and `successCondition` over

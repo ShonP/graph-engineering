@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Regression cases for compose_isolation.sh. Needs docker compose v2 and jq;
-# exits 0 with SKIP when either is missing. Writes only inside a mktemp dir.
+# exits 77 (skipped, the automake convention) when either is missing. Writes only inside a mktemp dir.
 set -uo pipefail
 
 CHECK="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)/compose_isolation.sh"
-docker compose version >/dev/null 2>&1 && command -v jq >/dev/null || { echo "SKIP: docker compose or jq missing"; exit 0; }
+docker compose version >/dev/null 2>&1 && command -v jq >/dev/null || { echo "SKIP: docker compose or jq missing"; exit 77; }
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/ge-iso.XXXXXX")" && WORK="$(cd "$WORK" && pwd -P)" || exit 1
 trap 'rm -rf "$WORK"' EXIT

@@ -86,6 +86,31 @@ class VetSmoke(unittest.TestCase):
         extra = '\nscript:pre-request {\n  bru.setVar("testTenant", "acme-prod");\n}\n'
         self.assert_refused({"a.bru": req("post", "{{baseUrl}}/tenants/{{testTenant}}/u", extra)})
 
+    def test_vars_rebind_after_template_value_refused(self):
+        extra = "\nvars:pre-request {\n  host: {{baseUrl}}\n  testTenant: acme\n}\n"
+        self.assert_refused({"a.bru": req("post", "{{baseUrl}}/tenants/{{testTenant}}/u", extra)})
+
+    def test_folder_vars_rebind_refused(self):
+        folder = "meta {\n  name: f\n}\n\nvars:pre-request {\n  a: {{x}}\n  testTenant: acme\n}\n"
+        self.assert_refused({"sub/folder.bru": folder, "sub/a.bru": req("post", "{{baseUrl}}/tenants/{{testTenant}}/u")})
+
+    def test_any_script_refused(self):
+        for js in ('await require("axios").delete("https://prod/x");',
+                   'await fetch("https://prod/x", {method: "DELETE"});',
+                   'const k = "testTenant"; bru.setVar(k, "acme");',
+                   'bru["setVar"]("testTenant", "acme");'):
+            with self.subTest(js=js):
+                self.assert_refused({"a.bru": req("get", "{{baseUrl}}/x", f"\nscript:pre-request {{\n  {js}\n}}\n")})
+
+    def test_tests_block_refused(self):
+        extra = '\ntests {\n  await bru.sendRequest({method: "DELETE"});\n}\n'
+        self.assert_refused({"a.bru": req("get", "{{baseUrl}}/x", extra)})
+
+    def test_empty_script_and_assert_allowed(self):
+        extra = "\nscript:pre-request {\n}\n\nassert {\n  res.status: eq 200\n}\n"
+        code, out = self.run_vet({"a.bru": req("get", "{{baseUrl}}/x", extra)})
+        self.assertEqual(code, 0, out)
+
     def test_untagged_write_ignored(self):
         files = {"a.bru": req("get", "{{baseUrl}}/x"), "b.bru": req("delete", "{{baseUrl}}/x", tags="smoke-extended")}
         self.assertEqual(self.run_vet(files)[0], 0)

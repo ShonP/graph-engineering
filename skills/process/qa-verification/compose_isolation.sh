@@ -20,14 +20,17 @@ set -uo pipefail
 
 [ $# -ge 1 ] && [ -n "$1" ] || { echo "usage: $0 <project> [compose args]" >&2; exit 2; }
 project="$1"; shift
-root="$(pwd -P)"
+# Compose renders a relative bind from the logical cwd; accept either spelling
+# of the worktree so a symlinked path (macOS /tmp -> /private/tmp) is not a leak.
+root_l="$(pwd -L)"; root_p="$(pwd -P)"
 
 json="$(docker compose -p "$project" --profile '*' "$@" config --format json)" || {
   echo "compose config failed (see stderr above)" >&2; exit 2; }
 [ -n "$json" ] || { echo "compose config printed nothing" >&2; exit 2; }
 
-leaks="$(printf '%s' "$json" | jq -r --arg p "$project" --arg root "$root" '
-  def outside: (. == $root or startswith($root + "/")) | not;
+leaks="$(printf '%s' "$json" | jq -r --arg p "$project" --arg rl "$root_l" --arg rp "$root_p" '
+  def under($r): . == $r or startswith($r + "/");
+  def outside: (under($rl) or under($rp)) | not;
   [ (.volumes  // {} | .[] | select(.external == true) | "external volume: \(.name)"),
     (.networks // {} | .[] | select(.external == true) | "external network: \(.name)"),
     (.volumes  // {} | .[] | select(.external != true) | .name | select(startswith($p) | not) | "shared volume name: \(.)"),

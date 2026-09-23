@@ -13,14 +13,15 @@ because it does not decide which tenant's rows the write touches. A file with
 more than one method block is refused (Bruno sends the last one; an indented
 block counts), and so is a path with `.` or `..` segments.
 
-A request's file is not all Bruno sends: scripts can rewrite it or send
-others. So a smoke request is also refused when its own file, or a
-`folder.bru` / `collection.bru` between it and the collection root, has a
-script that changes the method or URL (`req.setMethod`, `req.setUrl`), sends
-another request (`bru.runRequest`, `bru.sendRequest`), or rebinds
-`testTenant` (`bru.setVar` / `setEnvVar`, or a `vars` block defining it).
-Request and runtime variables beat `--env-var`, so a rebound tenant is a real
-tenant.
+A request's file is not all Bruno sends: scripts run arbitrary JavaScript
+(with axios and fetch available), so they can rewrite the request or send any
+other. No denylist of calls can be complete, so this is an allowlist: a smoke
+request is refused when its own file, or a `folder.bru` / `collection.bru`
+between it and the collection root, has any non-empty `script:*` or `tests`
+block, or a `vars` block that defines `testTenant` (request and runtime
+variables beat `--env-var`, so a rebound tenant is a real tenant). Declarative
+`assert` blocks are fine. Auth belongs in an `auth:*` block reading a variable
+passed with `--env-var`, not in a script.
 
 Exit 0: every smoke request is RUN. Exit 1: at least one REFUSE. Exit 2: the
 collection directory is missing or has no smoke-tagged request - nothing was
@@ -38,11 +39,10 @@ METHOD_BLOCK = re.compile(
     r"^[ \t]*(get|head|options|post|put|patch|delete|graphql)\s*\{(.*?)^[ \t]*\}",
     re.S | re.M,
 )
-RISKY_CALLS = re.compile(
-    r"req\.set(Method|Url)\b|bru\.(runRequest|sendRequest)\b"
-    r"|\.set(Env)?Var\(\s*[\"'`]testTenant[\"'`]"
-)
-TENANT_VAR = re.compile(r"^vars(:[\w-]+)?\s*\{[^}]*^\s*~?testTenant\s*:", re.S | re.M)
+SCRIPT_HEADER = re.compile(r"^[ \t]*(script:[\w-]+|tests)\s*\{", re.M)
+SCRIPT_BLOCK = re.compile(r"^[ \t]*(script:[\w-]+|tests)\s*\{(.*?)^\}", re.S | re.M)
+VARS_BLOCK = re.compile(r"^[ \t]*vars(?::[\w-]+)?\s*\{(.*?)^[ \t]*\}", re.S | re.M)
+TENANT_KEY = re.compile(r"^\s*~?testTenant\s*:", re.M)
 
 
 def smoke_tagged(text: str) -> bool:
@@ -61,10 +61,14 @@ def url_path(block: str) -> str:
 
 
 def script_risk(text: str) -> str | None:
-    call = RISKY_CALLS.search(text)
-    if call:
-        return f"script calls {call.group(0).rstrip('(')}"
-    if TENANT_VAR.search(text):
+    closed = {m.start(): m.group(2) for m in SCRIPT_BLOCK.finditer(text)}
+    for header in SCRIPT_HEADER.finditer(text):
+        body = closed.get(header.start())
+        # An unclosed or oddly closed block is refused too: better a false
+        # refusal than a script nobody read.
+        if body is None or body.strip():
+            return f"non-empty {header.group(1)} block"
+    if any(TENANT_KEY.search(body) for body in VARS_BLOCK.findall(text)):
         return "a vars block rebinds testTenant"
     return None
 

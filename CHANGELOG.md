@@ -33,13 +33,14 @@ shape; each fix closes a way a check could pass without checking.
   printing nothing.
 - **Template `down` uses the same `-f` files as `up`**, so the renamed
   volumes are removed and `-v` never targets the original names.
-- **`vet_smoke.py` refuses script-based bypasses**: `req.setMethod`/`setUrl`,
-  `bru.runRequest`/`sendRequest` (in the request, a `folder.bru` or
-  `collection.bru`), a `vars` block or `setVar` rebinding `testTenant`, and an
-  indented second method block. A missing collection or zero smoke requests
+- **`vet_smoke.py` is an allowlist now**: a smoke request is refused when it,
+  or a `folder.bru` / `collection.bru` above it, has any non-empty `script:*`
+  or `tests` block (Bruno scripts run arbitrary JavaScript with axios and
+  fetch, so no list of forbidden calls is complete), a `vars` block rebinding
+  `testTenant`, or an indented second method block. A missing collection or zero smoke requests
   exits 2 (`BLOCKED`) instead of a silent pass.
 - **Post-deploy baseline ends when the rollout started** (`deploy.startedAt`,
-  Argo's `status.history[].deployStartedAt` for the merge SHA; fallback the
+  the earliest Argo `status.history[].deployStartedAt` for the merge SHA; fallback the
   merge commit's time), not when `wait` returned - which let a regression
   into its own baseline on resumed runs and rolling updates.
 - **Fix loop re-runs every check that produced a qa finding** (Schemathesis
@@ -54,7 +55,7 @@ shape; each fix closes a way a check could pass without checking.
 ### Added
 
 - `scripts/check-skill-scripts.sh` and the tests it runs:
-  `post-deploy-verification/tests/test_vet_smoke.py` (15 cases, 8 of which
+  `post-deploy-verification/tests/test_vet_smoke.py` (20 tests; 15 checks, subtests included,
   fail on 0.12.0) and `qa-verification/tests/test_compose_isolation.sh` (11).
 
 ## [0.12.0] - 2026-09-23
