@@ -24,10 +24,9 @@ Sources (fetched 2026-09-10, curl, all HTTP 200):
 - https://github.com/aminalaee/uuid-utils - "GitHub - aminalaee/uuid-utils: Fast, drop-in replacement for Python's uuid module, powered by Rust."
 - https://github.com/oittaa/uuid6-python - "GitHub - oittaa/uuid6-python: New time-based UUID formats which are suited for use as a database key"
 
-The Python title is recorded with hyphens where the page uses em dashes, which this repo's files
-do not carry. The two packages are cited by repository because `pypi.org/project/<name>/` served a
-bot challenge that day; PyPI JSON read `uuid-utils` 1.0.0 and `uuid6` 2025.0.1 (Python >=3.10 and
->=3.9).
+The Python title is recorded with hyphens where the page uses em dashes. The two packages are
+cited by repository because `pypi.org/project/<name>/` served a bot challenge that day; PyPI JSON
+read `uuid-utils` 1.0.0 and `uuid6` 2025.0.1 (Python >=3.10 and >=3.9).
 
 In-repo sources: `skills/python/pydantic/SKILL.md` (the vendored skill, pin `9e9390ee`) and
 `skills/temporal/temporal-developer/references/python/data-handling.md`, "Pydantic Integration".
@@ -160,6 +159,11 @@ class RequestCounter(AbstractCapability[Any]): ...
 
 A `@dataclass` with no such comment is a finding, whatever its author intended.
 
+Where ruff enforces the ban (`Verify` check 4), the exemption carries the same phrase on a
+**narrow** suppression, so one grep still finds every exempt site:
+`# noqa: TID251  # framework adapter exception: <the library call>`. A bare `# noqa` silences
+every rule on that line, present and future, and is never the exemption.
+
 ## Anti-patterns
 
 - `@dataclass` or `from dataclasses import dataclass` on a domain, contract, settings or
@@ -168,8 +172,8 @@ A `@dataclass` with no such comment is a finding, whatever its author intended.
 - `TypedDict` for domain state. It is erased at runtime, so a wrong shape reaching it is a
   `KeyError` deep in business logic instead of a `ValidationError` at the boundary.
 - A `dict` payload across a workflow, queue or HTTP boundary. Nothing pins the keys, so a
-  producer-side rename ships and the consumer fails on replay, which is when the history is
-  already written and the fix is a new workflow version.
+  producer-side rename ships and the consumer fails on replay — when the history is already
+  written and the fix is a new workflow version.
 - Reaching for `pydantic.dataclasses` to satisfy both this skill and the vendored one. It
   satisfies neither: the model methods are gone and every call site grows a `TypeAdapter`.
 - `id: str` on a model. Any string validates, so a truncated or v4 id gets stored and the
@@ -195,22 +199,24 @@ uv run python -c 'from pydantic import UUID7; print(UUID7)'
 # 3. no domain TypedDicts. Expect no output.
 grep -rn 'TypedDict' src/
 
-# 4. no stdlib dataclasses outside the framework adapter exception. Expect no output;
-#    a @dataclass whose preceding line carries the comment is skipped, one without is printed.
-python3 - src <<'PY'
-import pathlib, sys
-bad = []
-for f in pathlib.Path(sys.argv[1]).rglob('*.py'):
-    lines = f.read_text().splitlines()
-    for i, line in enumerate(lines):
-        if not line.lstrip().startswith('@dataclass'):
-            continue
-        if 'framework adapter exception:' not in (lines[i - 1] if i else ''):
-            bad.append(f'{f}:{i + 1}')
-if bad:
-    print('@dataclass without the framework adapter exception comment:', *bad, sep='\n  ')
-    sys.exit(1)
-PY
+# 4. ruff enforces the ban: `[tool.ruff.lint.flake8-tidy-imports.banned-api]` keyed on the
+#    three SYMBOLS -- `dataclasses.dataclass`, `dataclasses.make_dataclass`,
+#    `pydantic.dataclasses.dataclass` -- never the module. Mechanics: `skills/python/ruff`.
+uv run lint; echo "exit=$?"          # the default sweep: expect exit=0
+
+# 4b. PROVE it fires. Keep a fixture that deliberately violates it, excluded by FILE so the
+#     sweep stays green; `force-exclude` defaults to false, so naming it directly still
+#     checks it. Measured on ruff 0.16.8 -- expect exit=1, and:
+#       TID251 `dataclasses.dataclass` is banned: Pydantic v2 for every data shape ...
+#         --> tests/fixtures/has_dataclass.py:14:25
+uv run lint tests/fixtures/has_dataclass.py; echo "exit=$?"
+# A green means the fixture stopped violating, the exclude widened to its directory, or
+# force-exclude was turned on -- all bugs in the guard, not passes.
+
+# 4c. Four spellings still reach a real dataclass (both dynamic imports, a cross-module
+#     re-export, `class X(SomeDataclass)`), and a star import escapes: ast-walk the static
+#     two, treat the rest as guard rail. No bare noqa -- every one names its rule and why.
+grep -rn '# noqa: TID251' src/ tools/ | grep -v 'framework adapter exception:' || echo "all named"
 ```
 
 5. Every id default really produces a v7. One assertion per model with an id, in the test
@@ -223,27 +229,22 @@ def test_id_default_is_v7() -> None:
 
 6. Every Temporal client passes the converter. Counting symbols does not work: a wired file
    mentions `pydantic_data_converter` twice (import plus keyword) against one `Client.connect`,
-   so a count comparison false-alarms on correct code and passes when one of two clients omits
-   the keyword. Check the call site instead:
+   so a count false-alarms on correct code and passes when one of two clients omits it. Check
+   the call site instead:
 
 ```bash
 python3 - src <<'PY'
 import ast, pathlib, sys
 bad = []
 for f in pathlib.Path(sys.argv[1]).rglob('*.py'):
-    for node in ast.walk(ast.parse(f.read_text())):
-        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
+    for n in ast.walk(ast.parse(f.read_text())):
+        if not (isinstance(n, ast.Call) and ast.unparse(n.func).endswith('Client.connect')):
             continue
-        if ast.unparse(node.func) != 'Client.connect':
-            continue
-        kw = next((k.value for k in node.keywords if k.arg == 'data_converter'), None)
+        kw = next((k.value for k in n.keywords if k.arg == 'data_converter'), None)
         if kw is None or not ast.unparse(kw).endswith('pydantic_data_converter'):
-            bad.append(f'{f}:{node.lineno}')
-if bad:
-    print('Client.connect without data_converter=pydantic_data_converter:', *bad, sep='\n  ')
-    sys.exit(1)
-print('all Temporal clients pass pydantic_data_converter')
+            bad.append(f'{f}:{n.lineno}')
+print(*bad, sep='\n') if bad else print('all clients pass the converter')
+sys.exit(1 if bad else 0)
 PY
-# correct wiring  -> "all Temporal clients pass pydantic_data_converter", exit 0
-# one bare client -> "Client.connect without data_converter=...: src/bad/client.py:8", exit 1
+# correct wiring -> "all clients pass the converter", exit 0; a bare client -> path:line, exit 1
 ```
