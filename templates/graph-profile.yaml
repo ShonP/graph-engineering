@@ -97,6 +97,13 @@ routing:
   "**/alembic/**":
     impl: [sqlalchemy]
     review: [sqlalchemy]
+  # NATS / JetStream: the directories that hold the bus client, the event
+  # contracts and the relay. Not restricted to *.py - a stream or consumer CR,
+  # a subject allow-list and the code that publishes are one change, and the
+  # authorization half is where this goes wrong silently.
+  "**/{bus,events,messaging}/**":
+    impl: [nats, architecture-resilience-rules]
+    review: [nats, architecture-resilience-rules, security-review]
   # loguru: the module that configures logging for the process. Narrow on
   # purpose - the sink, the level, the stdlib bridge and the per-record context
   # are decided in one file, and that file is where getting it wrong is silent.
