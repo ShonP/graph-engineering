@@ -24,7 +24,7 @@ The engine does not know what a feature is. It reads a playbook and runs the
 nodes it finds, which is why a bug workflow and an infra workflow are new
 markdown files rather than new branches in the engine.
 
-The feature playbook, the only one shipped so far:
+Three playbooks ship: `feature`, `bug` and `infra`. The feature playbook:
 
 ![feature playbook](docs/img/playbook.png)
 
@@ -95,8 +95,18 @@ Then restart the session to apply.
 
 ```
 /graph-init            # once per repo: writes .claude/graph-profile.yaml
-/graph-ship "<goal>"   # run the feature playbook
+/graph-ship "<goal>"   # triage picks feature, bug or infra, then runs it
+/graph-ship "<goal>" --graph bug   # or name the playbook yourself
 ```
+
+Triage writes its pick and the reason as the first line of the run's ledger;
+the owner sees it at the first gate.
+
+| Playbook | Shape | For |
+|---|---|---|
+| `feature` | goal -> research ux / tech / competitor / impact -> **plan gate** -> implement -> review ∥ qa -> fix (≤3) -> **merge gate** | new behaviour, chores, mixed app + infra |
+| `bug` | report -> reproduce (a **failing test**, by qa) -> diagnose (`systematic-debugging`) -> sibling search (same bug shape elsewhere, Semgrep) -> **plan gate** -> implement -> review ∥ qa -> fix -> **merge gate** | existing behaviour that is wrong |
+| `infra` | goal -> research tech / impact -> **plan gate** -> implement -> review ∥ verify (render, validate CRDs too, rendered diff, apply to a throwaway cluster) -> fix -> **merge gate** | Helm, kustomize, Argo CD, manifests, gateway and policy config |
 
 `/graph-ship --resume <run-id>` picks a run back up from its ledger.
 `/graph-ship --auto-merge` relaxes only the merge gate, only for that run.
@@ -149,8 +159,8 @@ The engine picks the implementer by the task's `size` in the plan: `small` goes
 to `implementer-simple`, everything else to `implementer`. Every agent below its
 skill floor returns `NEEDS_SETUP` instead of improvising.
 
-Still planned: the `bug` and `infra` playbooks, post-deploy smoke and a retro
-node, board sync, and `/graph-doctor`.
+Still planned: post-deploy smoke and a retro node, board sync, and
+`/graph-doctor`.
 
 ## Competencies
 

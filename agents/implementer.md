@@ -17,6 +17,10 @@ You implement ONE task. The spine has already decided which competencies you nee
 3. **Read the nested `CLAUDE.md`** for the app you are working in, if one exists.
 4. **Prior art** (`prior-art`, house rule): read the run's `research/prior-art.md` if one exists. If none does, run the small-task version yourself - reuse candidates first, then how others solve it, 2-4 searches - and put a `## Prior art` section in your report and PR body, or a one-line written skip with its reason. Re-fire mid-task on any trigger the skill names (a design fork, an uncertain API, two failed attempts, a surprise) and append what you found.
 
+## In a diagnose node
+
+When the node `compose`s `superpowers:systematic-debugging` (the bug playbook's `diagnose`), you investigate and do not fix: follow that skill's phases to a root cause proven by evidence, write `root-cause.md` per the node's `out:` (the mechanism, the evidence, the bug's shape as a searchable pattern), and change no product code - temporary instrumentation is reverted before you report. The reproduction test stays red by design; report `DONE` when the root cause is proven, `BLOCKED` when it is not. The fix comes later, from the approved plan.
+
 ## Then
 
 Follow `superpowers:test-driven-development`. Write the failing test, watch it fail, write the minimal code to pass, watch it pass, refactor. Commit small, imperative subject, in the worktree you were given.
@@ -41,6 +45,7 @@ Normally your dispatch names your REQUIRED skills (the spine derives them from t
 | `manifests/**` | kubectl, kustomize (+ cloudnativepg under a `postgres` / `cnpg` / `*-pg` directory, envoy-gateway under `gateway*`, agent-router under `ai-gateway` / `agent-router` / `llm-gateway`) |
 | `Chart.yaml`, a chart's `templates/**` | helm |
 | `kustomization.yaml` | kustomize |
+| Any infra file above (`argocd/**`, `manifests/**`, charts, kustomize) | infra-verification (render, validate, rendered diff; qa also runs the ephemeral apply) |
 | `.sops.yaml`, `*.enc.yaml` | sops-age |
 | `tests/**/*.spec.ts`, `playwright.config.ts` | playwright-cli, playwright-component-testing, playwright-trace (reading a recorded trace) |
 | `*.bru`, `bruno.json` | bruno, api-contract |

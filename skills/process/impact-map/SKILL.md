@@ -52,6 +52,30 @@ implementers.
 Each triaged item: `class | file:line | what is wrong | why this class | the
 test that would prove the fix`.
 
+## Sibling search (bug playbook)
+
+When the dispatch hands you a `root-cause.md`, the radius is wider: the same bug
+shape anywhere in the repo. Turn the root cause's shape into a structural
+pattern and search for it - Semgrep needs no database build (CodeQL variant
+analysis does, which is why it is not the default):
+
+```bash
+semgrep --metrics=off --config sibling.yaml <paths> --json \
+  | jq -r '.results[] | "\(.path):\(.start.line)"'
+```
+
+`sibling.yaml` is one rule: a `pattern-either` for the buggy shape and
+`pattern-not-inside` for the guard the fix adds, so already-safe sites drop
+out. Read each hit's line from the file itself - without a login, Semgrep's
+JSON prints `requires login` in place of the source line. No Semgrep, or a
+language it lacks: `rg` with the tightest regex you can write, and say so.
+Every hit gets a triage row; a true sibling on a user-reachable path is a
+must-fix.
+
+Spiked 2026-09-23, semgrep 1.174.0: a rule for `$X / $Y` and `$X // $Y`
+not inside `if $Y == 0:` found the seeded `100 // item.qty` and the one
+unguarded sibling, and skipped the guarded division.
+
 ## For implementers mid-task
 
 Something wrong next to your change is triaged with the same table, but you

@@ -43,6 +43,7 @@ Normally your dispatch names your REQUIRED skills (the spine derives them from t
 | `manifests/**` | kubectl, kustomize (+ cloudnativepg under a `postgres` / `cnpg` / `*-pg` directory, envoy-gateway under `gateway*`, agent-router under `ai-gateway` / `agent-router` / `llm-gateway`) |
 | `Chart.yaml`, a chart's `templates/**` | helm |
 | `kustomization.yaml` | kustomize |
+| Any infra file above (`argocd/**`, `manifests/**`, charts, kustomize) | infra-verification (render, validate, rendered diff; qa also runs the ephemeral apply) |
 | `.sops.yaml`, `*.enc.yaml` | sops-age |
 | `tests/**/*.spec.ts`, `playwright.config.ts` | playwright-cli, playwright-component-testing, playwright-trace (reading a recorded trace) |
 | `*.bru`, `bruno.json` | bruno, api-contract |

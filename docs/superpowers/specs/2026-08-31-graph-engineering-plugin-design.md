@@ -641,3 +641,10 @@ neighbours; and `definition-of-done` stamps per-change-type artifacts
 task's acceptance criteria, because review of code alone does not make a
 change operable.
 
+0.11.0 builds §5.2 `bug` with three additions the spec did not have - a
+failing-test reproduction before any code moves, a sibling search for the same
+bug shape, and qa beside review - and adds an `infra` playbook the spec never
+drew, with `infra-verification` as its verify recipe. The engine now triages
+the goal to a playbook when `--graph` is omitted, which realises §2's "many
+workflows, one roster" without the owner choosing a graph per ask.
+
