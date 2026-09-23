@@ -97,6 +97,14 @@ routing:
   "**/alembic/**":
     impl: [sqlalchemy]
     review: [sqlalchemy]
+  # loguru: the module that configures logging for the process. Narrow on
+  # purpose - the sink, the level, the stdlib bridge and the per-record context
+  # are decided in one file, and that file is where getting it wrong is silent.
+  # A repo whose bridge lives beside it under another name (an _intercept.py,
+  # say) adds that path here; the row cannot guess it.
+  "**/logging*.py":
+    impl: [loguru]
+    review: [loguru]
   # Agents: Microsoft Agent Framework by house default, Pydantic AI when the repo
   # uses it. Both ride on top of the **/*.py row above.
   "**/agents/**/*.py":
