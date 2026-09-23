@@ -298,11 +298,11 @@ routing:
   # SPA cannot serve, so qa blocks forever. An Express/Hono/Fastify repo whose
   # TS routes are server code gets its own row from /graph-init, which finds
   # them by content (`Router()`, `app.get(`), not by name.
-  "**/{routers,controllers,Controllers,endpoints}/**/*.{py,go,java,kt,rb,php,cs,ts,js}":
+  "**/{routers,controllers,endpoints}/**/*.{py,go,java,kt,rb,ts,js}":
     impl: [bruno, schemathesis, api-contract]
     review: [api-contract]
     qa: [bruno, schemathesis, api-contract]
-  "**/{routes,handlers}/**/*.{py,go,java,kt,rb,php,cs}":
+  "**/{routes,handlers}/**/*.{py,go,java,kt,rb}":
     impl: [bruno, schemathesis, api-contract]
     review: [api-contract]
     qa: [bruno, schemathesis, api-contract]

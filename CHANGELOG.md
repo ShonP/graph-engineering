@@ -89,9 +89,9 @@ commits.
   (GraphQL: SDL), current in the same PR, with error statuses documented;
   profile `api.schema` names where.
 - **API-surface rows are server-side only.** `routes/` and `handlers/` route
-  `api-contract` only for server languages (py, go, java, kt, rb, php, cs);
-  `routers/`, `controllers/` (and ASP.NET/Laravel `Controllers/`),
-  `endpoints/` for those plus ts/js; NestJS
+  `api-contract` only for server languages (py, go, java, kt, rb);
+  `routers/`, `controllers/`, `endpoints/` for those plus ts/js (no PHP or
+  .NET rows: not in the house stack); NestJS
   `*.controller.ts`, Next.js `app/api/**/route.ts` and `pages/api/**`, and the
   spec files. A bare `**/routes/**` matched TanStack Router, Remix and
   SvelteKit `src/routes/`, Angular `app.routes.ts` and MSW `mocks/handlers/`,
