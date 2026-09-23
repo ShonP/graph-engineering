@@ -5,7 +5,7 @@ argument-hint: "<goal> [--graph feature] [--auto-merge] [--resume <run-id>]"
 
 # /graph-ship - the engine
 
-Execute a playbook. **The engine is playbook-agnostic:** it reads `graphs/<name>.md` and runs whatever nodes it finds. It does not know what a feature is. That is what lets the same engine run a bug, a launch or a content workflow later without a branch being added here.
+Execute a playbook. **The engine is playbook-agnostic:** it reads `graphs/<name>.md` and runs whatever nodes it finds. It does not know what a feature is. That is what lets the same engine run a bug or an infra workflow later without a branch being added here.
 
 ## Steps
 

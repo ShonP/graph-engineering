@@ -15,13 +15,13 @@ COMPETENCIES (skills)   routed per task by the profile's routing table
         |
 ROSTER (agents)         reused by every playbook
         |
-PLAYBOOKS (graphs)      feature | bug | launch | content
+PLAYBOOKS (graphs)      feature | bug | infra
         |
 ENGINE (/graph-ship)    playbook-agnostic: run nodes, honor gates, keep a ledger
 ```
 
 The engine does not know what a feature is. It reads a playbook and runs the
-nodes it finds, which is why a bug workflow and a content workflow are new
+nodes it finds, which is why a bug workflow and an infra workflow are new
 markdown files rather than new branches in the engine.
 
 The feature playbook, the only one shipped so far:
@@ -124,7 +124,7 @@ command: [`hooks/README.md`](hooks/README.md).
 
 ## Roster
 
-The full organization - nine agents:
+The full organization - seven agents, engineering only:
 
 | Agent | Model | Job | Writes |
 |---|---|---|---|
@@ -135,17 +135,15 @@ The full organization - nine agents:
 | `implementer-simple` | sonnet | one SMALL task (mechanical, 1-2 files); escalates instead of pushing through | yes |
 | `reviewer` | opus | reads the diff once through every lens it needs | no (read-only) |
 | `qa` | sonnet | acceptance criteria verified on a RUNNING system, evidence per criterion | tests only |
-| `media-producer` | sonnet | short-attention media: 1.3s hook, ≤30-90s cuts, captions always, media built as code | assets only |
 
 The model column is the agent's frontmatter and the engine dispatches it unchanged: `/graph-ship` never passes a `model:` override, so a scoped re-check of a three-line fix runs on the same opus reviewer as the first review. Implementer versus implementer-simple, by task size, is the engine's only model choice.
-| `content-writer` | sonnet | short-attention copy grounded in the voice doc and real numbers; never publishes | copy only |
 
 The engine picks the implementer by the task's `size` in the plan: `small` goes
 to `implementer-simple`, everything else to `implementer`. Every agent below its
 skill floor returns `NEEDS_SETUP` instead of improvising.
 
-Still planned: the `bug`, `launch` and `content` playbooks that put the back
-half of the roster to work, board sync, and `/graph-doctor`.
+Still planned: the `bug` and `infra` playbooks, the `qa` leg in the feature
+playbook, board sync, and `/graph-doctor`.
 
 ## Competencies
 
@@ -171,7 +169,6 @@ routing table and the roster reference actually resolves to one skill.
 | `security` | security-review | `always.review` |
 | `privacy` | privacy-review, gdpr-consent, gdpr-erasure-retention | `always.review`, `**/{migrations,schemas}/**` |
 | `ux` | ux-journey, ui-ux-pro-max | `always.design` |
-| `content` | short-form-posts, short-attention-media | the content playbook |
 | `process` | prior-art, review-protocol, ux-evidence, product-spec, qa-verification | prior-art on `always.impl`, review-protocol on `always.review`, ux-evidence on every UI-bearing row; product-spec preloaded by `planner`, qa-verification preloaded by `qa` |
 | `rules` | backend-rules, frontend-rules, architecture-resilience-rules, agent-workflow-rules, review-testing-rules | ride along on their stack's rows; `review-testing-rules` is on `always.impl` |
 

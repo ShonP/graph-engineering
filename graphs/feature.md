@@ -1,7 +1,7 @@
 # feature - reduced walking skeleton
 
-The full feature graph in the spec adds a UX design branch, a qa leg beside
-review, and a launch tail. This reduced form is deliberately the smallest graph
+The full feature graph in the spec adds a UX design branch and a qa leg beside
+review. This reduced form is deliberately the smallest graph
 that still proves the engine works: a gate that actually stops, a parallel MAP
 (the three research nodes share `next: plan`), a dispatch that carries
 spine-named skills, a review that ranks, and a fix loop. The research MAP is

@@ -81,3 +81,14 @@ commits.
   `client.Client.connect(...)`, so a bare client written that way passed.
 - **`.claude-plugin/plugin.json`** lists `./skills/messaging` so the new group
   loads. `version` is deliberately unchanged.
+
+### Removed
+
+- **Content and social media leave the plugin; it is engineering only.** The
+  `content-writer` and `media-producer` agents, the `content` skill group
+  (`short-form-posts`, `short-attention-media`), the profile template's
+  `content:` block and `publication` gate, and the `launch` / `content`
+  playbooks from the plan. The roster is seven agents. `ux-evidence` keeps the
+  two recording rules it borrowed from `short-attention-media` (cut every wait,
+  ≤ 30s per flow) inline. Dated specs and plans under `docs/` still describe the
+  old roster and are left as the record of what was decided then.
