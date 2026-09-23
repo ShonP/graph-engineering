@@ -13,13 +13,17 @@ where each of its three guards can be tested directly:
   find_project_file  the upward walk never inspects a directory outside the
                      project, whatever start point it is handed
 
-The walk also skips a project file that declares neither `lint` nor `typecheck`
-and keeps going. That is not a security guard, it is a correctness one, and it
-was measured: in a uv workspace the root owns the three script names and the
-member ships no entry point at all, so stopping at the NEAREST pyproject.toml
-resolves every file under packages/*/src/ to a project with no scripts, and the
-hook then exits 0 in silence. Every edit to the library stops being linted and
-nothing says so. See docs/adr/0014-forge-libs-distribution.md D2.
+The walk also passes a project file that declares neither `lint` nor
+`typecheck` - but only on the way to an ancestor project file of the SAME kind.
+That is not a security guard, it is a correctness one, and it was measured: in
+a uv workspace the root owns the three script names and the member ships no
+entry point at all, so stopping at the NEAREST pyproject.toml resolves every
+file under packages/*/src/ to a project with no scripts, and the hook then exits
+0 in silence (Equival-io/forge-platform docs/adr/0014-forge-libs-distribution.md
+D2). The same-kind limit is what keeps a scriptless web/package.json under a
+Python root from resolving to the root and running `uv run lint` on a .tsx file.
+Whenever no same-kind scripted ancestor is found, the answer is the nearest
+project file, exactly as before the walk learned to pass one.
 
 The guards are layered on purpose. Given the caller's own check that
 CLAUDE_PROJECT_DIR is a directory, the isfile guard already rejects everything
@@ -93,24 +97,38 @@ def is_inside(touched, project):
 
 
 def find_project_file(directory, project):
-    """Walk up from `directory` to the nearest project file that declares one of
-    SCRIPT_NAMES, never leaving `project`. Returns (directory, kind), or None.
+    """Walk up from `directory` to the project file that owns it, never leaving
+    `project`. Returns (directory, kind), or None.
 
-    A project file declaring neither script is walked past, not returned: see the
-    module docstring for the uv workspace shape that makes this the difference
-    between linting the library and silently not linting it.
+    The nearest project file is the answer unless it declares neither of
+    SCRIPT_NAMES; then the walk continues to the nearest ANCESTOR of the same
+    kind that declares one. A directory holding a project file of another kind
+    ends that search, and so does the bound: the nearest one is returned, as it
+    was before this walk could pass one. See the module docstring.
     """
+    nearest = None
     while True:
         if directory != project and not is_inside(directory, project):
-            return None
-        for filename, kind in PROJECT_FILES:
-            if os.path.isfile(os.path.join(directory, filename)) and declares_scripts(
-                directory, kind
-            ):
-                return directory, kind
+            return nearest
+        present = [
+            kind
+            for filename, kind in PROJECT_FILES
+            if os.path.isfile(os.path.join(directory, filename))
+        ]
+        if present and nearest is None:
+            if declares_scripts(directory, present[0]):
+                return directory, present[0]
+            nearest = directory, present[0]
+            if len(present) > 1:
+                return nearest
+        elif present:
+            if present != [nearest[1]]:
+                return nearest
+            if declares_scripts(directory, nearest[1]):
+                return directory, nearest[1]
         parent = os.path.dirname(directory)
         if directory == project or parent == directory:
-            return None
+            return nearest
         directory = parent
 
 

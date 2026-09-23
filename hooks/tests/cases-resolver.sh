@@ -18,7 +18,8 @@ resolver_says() {
   local actual
   actual="$(
     RESOLVER_EXPR="$expression" PROJECT="$FIX/escape/proj" \
-      OUTSIDE="$FIX/escape" WS="$FIX/workspace" PY="$FIX/py" python3 -c '
+      OUTSIDE="$FIX/escape" WS="$FIX/workspace" PY="$FIX/py" MX="$FIX/mixed" \
+      python3 -c '
 import os
 import sys
 
@@ -29,6 +30,7 @@ PROJECT = os.environ["PROJECT"]
 OUTSIDE = os.environ["OUTSIDE"]
 WS = os.environ["WS"]
 PY = os.environ["PY"]
+MX = os.environ["MX"]
 print(eval(os.environ["RESOLVER_EXPR"]))
 ' 2>&1
   )"
@@ -91,10 +93,24 @@ resolver_says "a member's file resolves to the workspace root" \
   'bound.resolve({"tool_input": {"file_path": WS + "/packages/x/src/touched.py"}}, WS)'
 # The other half: walking past the scriptless member must not reach past the
 # project bound either. With the member itself as the project, there is no
-# scripted ancestor inside the bound, so the answer is nothing at all - NOT the
-# workspace root above it.
-resolver_says "the walk stops at the bound rather than finding a scripted ancestor" None \
+# scripted ancestor inside the bound, so the answer is the member - what the
+# walk returned before the patch, which the hook then declines to act on - and
+# NOT the workspace root above it.
+resolver_says "the walk stops at the bound rather than finding a scripted ancestor" \
+  "('$FIX/workspace/packages/x', 'pyproject')" \
   'bound.find_project_file(WS + "/packages/x/src", WS + "/packages/x")'
+# The walk only passes a scriptless project file on the way to one of the SAME
+# kind. A package.json declaring build and test (neither is lint or typecheck)
+# under a Python root that declares both must resolve to the package.json, as it
+# did before the patch; resolving to the root runs `uv run lint web/src/App.tsx`.
+resolver_says "a scriptless package.json does not walk to a pyproject.toml" \
+  "('$FIX/mixed/web', 'package')" \
+  'bound.resolve({"tool_input": {"file_path": MX + "/web/src/App.tsx"}}, MX)'
+# A member whose pyproject.toml does not parse cannot be shown to be scriptless,
+# so the walk stops at it rather than handing the file to the root's scripts.
+resolver_says "an unparseable member stops the walk at the member" \
+  "('$FIX/workspace/packages/bad', 'pyproject')" \
+  'bound.resolve({"tool_input": {"file_path": WS + "/packages/bad/src/touched.py"}}, WS)'
 # And a project that DOES declare the scripts still resolves to itself: the
 # patch must not turn every repo into a walk to its outermost project file.
 resolver_says "a project that declares the scripts still resolves to itself" \

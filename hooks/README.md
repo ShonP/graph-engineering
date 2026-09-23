@@ -14,7 +14,8 @@ on `docs/HANDOFF.md`. Nothing in them is specific to one repo.
 
 Both working hooks find the project's script the same way, and stop at the first
 convention that matches. For `PostToolUse`, a project file that declares neither
-`lint` nor `typecheck` does not match, and the walk continues upward.
+`lint` nor `typecheck` is passed on the way to an ancestor of the same kind that
+does; see the bound below.
 
 | Order | Project file | Condition | Command |
 | --- | --- | --- | --- |
@@ -49,14 +50,19 @@ manager, `task`) is not installed, the hook exits 0 and prints nothing.
   which is what keeps an edit inside a scratch clone of somebody else's repo
   from running that repo's scripts.
 - Inside the project it walks up from the edited file to the nearest project
-  file **that declares `lint` or `typecheck`**, and no further than
-  `$CLAUDE_PROJECT_DIR`. The walk re-checks the bound before it inspects any
+  file, and no further than `$CLAUDE_PROJECT_DIR`. The walk re-checks the bound before it inspects any
   directory, so it cannot leave the project whatever start point it is handed.
-- A project file declaring neither script is walked past rather than returned.
+- When that nearest project file declares neither script, the walk continues
+  to the nearest ancestor project file **of the same kind** that declares one.
   That matters in a uv workspace, where the root owns the script names and the
   member ships no entry point: stopping at the member's `pyproject.toml` would
   resolve every file under `packages/*/src/` to a project with no scripts, and
-  the hook would exit 0 in silence — the whole library silently unlinted. A
+  the hook would exit 0 in silence — the whole library silently unlinted.
+- The same-kind limit is the other half: a `web/package.json` declaring only
+  `build` and `test` under a Python root must not resolve to the root, which
+  would run `uv run lint` on a `.tsx` file. A directory holding a project file
+  of another kind, or the bound, ends the search, and the nearest project file
+  is the answer — the hook then finds no script there and stays silent. A
   project file the resolver cannot read or parse stops the walk where it is,
   rather than letting an ancestor's scripts run against a file it does not own.
 - That bound lives in `scripts/resolve_touched_project.py` rather than inline,

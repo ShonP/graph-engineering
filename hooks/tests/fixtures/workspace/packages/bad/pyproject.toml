@@ -1,0 +1,7 @@
+# Fixture: a workspace member whose pyproject.toml does not parse. The resolver
+# cannot tell whether it declares scripts, so it stops HERE rather than walking
+# up and running the root's scripts against a file it may not own. The case
+# "an unparseable member stops the walk at the member" exists to fail when that
+# fallback flips.
+[project
+name = "fixture-unparseable-member"

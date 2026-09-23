@@ -1,0 +1,14 @@
+# Fixture: a Python project at the root that declares lint and typecheck, with a
+# JavaScript app under web/ whose package.json declares neither. The resolver
+# walks past a scriptless project file only to an ancestor of the SAME kind, so
+# a file under web/ must never resolve here: that would run `uv run lint` on a
+# .tsx file. See the case "a scriptless package.json does not walk to a
+# pyproject.toml".
+[project]
+name = "fixture-mixed-root"
+version = "0.1.0"
+requires-python = ">=3.11"
+
+[project.scripts]
+lint = "fixture_mixed:run_lint"
+typecheck = "fixture_mixed:run_typecheck"
