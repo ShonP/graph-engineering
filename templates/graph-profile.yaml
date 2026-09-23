@@ -84,6 +84,19 @@ routing:
   "**/{pyproject.toml,uv.lock,.python-version}":
     impl: [uv]
     review: [uv]
+  # SQLAlchemy: the directories that hold models, the session/engine wiring and
+  # the migrations. Routed by directory because a glob cannot see an import; a
+  # repo that keeps its models elsewhere edits this row rather than the skill.
+  # Both rows ride on top of the **/*.py row above.
+  "**/{models,db,migrations}/**/*.py":
+    impl: [sqlalchemy]
+    review: [sqlalchemy]
+  # Alembic's own tree: env.py, script.py.mako and the versions/ directory. Not
+  # restricted to *.py - alembic.ini and the mako template are part of the same
+  # change, and a migration review that cannot see them is half a review.
+  "**/alembic/**":
+    impl: [sqlalchemy]
+    review: [sqlalchemy]
   # Agents: Microsoft Agent Framework by house default, Pydantic AI when the repo
   # uses it. Both ride on top of the **/*.py row above.
   "**/agents/**/*.py":
