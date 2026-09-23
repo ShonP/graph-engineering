@@ -176,7 +176,7 @@ routing table and the roster reference actually resolves to one skill.
 | `security` | security-review | `always.review` |
 | `privacy` | privacy-review, gdpr-consent, gdpr-erasure-retention | `always.review`, `**/{migrations,schemas}/**` |
 | `ux` | ux-journey, ui-ux-pro-max | `always.design` |
-| `process` | prior-art, review-protocol, ux-evidence, api-contract, definition-of-done, impact-map, product-spec, qa-verification | prior-art, definition-of-done and impact-map on `always.impl`, review-protocol and definition-of-done on `always.review`, ux-evidence on every UI-bearing row, api-contract on every API-surface row (`routers/`, `controllers/`, `handlers/`, OpenAPI specs, `*.bru`); product-spec preloaded by `planner`, qa-verification preloaded by `qa` |
+| `process` | prior-art, review-protocol, ux-evidence, api-contract, definition-of-done, impact-map, product-spec, qa-verification | prior-art on `always.impl`, review-protocol on `always.review`, definition-of-done and impact-map preloaded in agent frontmatter (planner and both implementers; reviewer: definition-of-done) and deliberately not in `always`, ux-evidence on every UI-bearing row, api-contract on every API-surface row (`routers/`, `controllers/`, `handlers/`, OpenAPI specs, `*.bru`); product-spec preloaded by `planner`, qa-verification preloaded by `qa` |
 | `rules` | backend-rules, frontend-rules, architecture-resilience-rules, agent-workflow-rules, review-testing-rules | ride along on their stack's rows; `review-testing-rules` is on `always.impl` |
 
 **Provenance.** Some of these are written here from the vendor's own docs; some
@@ -256,7 +256,7 @@ standing rules and every agent carries them:
   first (an existing skill, plugin or library), then competitors, open source,
   docs, articles - rank each source, run the skepticism checklist, spike any
   load-bearing claim, and write the prior-art note. The feature graph opens
-  with a three-way research MAP for this reason. `skills/process/prior-art`.
+  with a four-way research MAP for this reason. `skills/process/prior-art`.
 - **Security, privacy, accessibility** are implementer non-negotiables and
   always-on review lenses; see `agents/implementer.md` and
   `skills/process/review-protocol`.
