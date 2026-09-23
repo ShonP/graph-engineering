@@ -83,12 +83,12 @@ feature.
      next?).
    - **Every platform the profile names** reads the same; platform-native
      affordances are enhancements, not divergences.
-   - **To-be render:** for each changed screen, a throwaway picture of the
-     decision - the as-is capture with the new element placed in it
-     (Playwright injecting it into the running page with the house
-     components' classes, or a scratch story), saved to
-     `.graph/<run>/design/to-be/`. The owner approves what they can see, not
-     a paragraph describing it. Never merged.
+   - **To-be render:** for each changed screen, a picture of the decision -
+     the as-is capture with the new element placed in it (Playwright
+     injecting it into the running page with the house components' classes,
+     or a scratch story), saved to `to-be/` beside the spec and committed
+     with it by the first UI task. The owner approves what they can see, not
+     a paragraph describing it. Only explore-mode variants are never merged.
 
 6. **Write the experience spec** as `experience.md` in one self-contained
    folder - in a run, `.graph/<run>/design/`, with the captures and renders it
