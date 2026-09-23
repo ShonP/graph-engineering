@@ -106,9 +106,43 @@ class VetSmoke(unittest.TestCase):
         extra = '\ntests {\n  await bru.sendRequest({method: "DELETE"});\n}\n'
         self.assert_refused({"a.bru": req("get", "{{baseUrl}}/x", extra)})
 
-    def test_empty_script_and_assert_allowed(self):
-        extra = "\nscript:pre-request {\n}\n\nassert {\n  res.status: eq 200\n}\n"
+    def test_blank_script_and_assert_allowed(self):
+        extra = "\nscript:pre-request {\n  \n}\n\nassert {\n  res.status: eq 200\n}\n"
         code, out = self.run_vet({"a.bru": req("get", "{{baseUrl}}/x", extra)})
+        self.assertEqual(code, 0, out)
+
+    def test_vars_block_indented_brace_refused(self):
+        extra = "\nvars:pre-request {\n  a: x\n  }: z\n  testTenant: victim\n}\n"
+        self.assert_refused({"a.bru": req("post", "{{baseUrl}}/t/{{testTenant}}/items", extra)})
+
+    def test_vars_quoted_key_refused(self):
+        for key in ('"testTenant"', '~"testTenant"'):
+            with self.subTest(key=key):
+                extra = f"\nvars:pre-request {{\n  {key}: victim\n}}\n"
+                self.assert_refused({"a.bru": req("post", "{{baseUrl}}/t/{{testTenant}}/items", extra)})
+
+    def test_folder_quoted_key_refused(self):
+        folder = 'meta {\n  name: f\n}\n\nvars:pre-request {\n  "testTenant": victim\n}\n'
+        self.assert_refused({"sub/folder.bru": folder, "sub/a.bru": req("post", "{{baseUrl}}/t/{{testTenant}}/items")})
+
+    def test_method_block_indented_brace_refused(self):
+        text = req("post", "{{baseUrl}}/t/{{testTenant}}/items").replace(
+            "  url: {{baseUrl}}/t/{{testTenant}}/items\n}",
+            "  url: {{baseUrl}}/t/{{testTenant}}/items\n  }: z\n  url: https://api/t/victim/items\n}")
+        self.assert_refused({"a.bru": text})
+
+    def test_two_url_keys_refused(self):
+        text = req("post", "{{baseUrl}}/t/{{testTenant}}/items").replace(
+            "/items\n}", "/items\n  url: https://api/t/victim/items\n}")
+        self.assert_refused({"a.bru": text})
+
+    def test_lone_carriage_return_refused(self):
+        extra = "\nscript:pre-request {\n\r}\n  bru.sendRequest({});\n}\n"
+        self.assert_refused({"a.bru": req("get", "{{baseUrl}}/x", extra)})
+
+    def test_crlf_file_still_vetted(self):
+        text = req("get", "{{baseUrl}}/x").replace("\n", "\r\n")
+        code, out = self.run_vet({"a.bru": text})
         self.assertEqual(code, 0, out)
 
     def test_untagged_write_ignored(self):

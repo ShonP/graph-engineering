@@ -96,8 +96,10 @@ verified what did not run - still holds.
    any non-empty `script:*` or `tests` block in the request, or in a
    `folder.bru` / `collection.bru` above it, because Bruno scripts run
    arbitrary JavaScript with axios and fetch, and a denylist of calls was
-   bypassed four ways in review. A `vars` block rebinding `testTenant` and an
-   indented second method block are refused; a missing collection or zero
+   bypassed four ways in review. A `vars` block mentioning `testTenant`, a
+   second method block or `url` key, and a stray carriage return are refused
+   (blocks end only at a column-0 `}`, as Bruno parses them; checked against
+   `@usebruno/lang` 0.39.0); a missing collection or zero
    smoke requests exits 2. All of it is pinned by `tests/test_vet_smoke.py`.
    Keep smoke requests declarative: `assert` blocks for checks, an `auth:*`
    block reading a `--env-var` for credentials.

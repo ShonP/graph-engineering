@@ -11,14 +11,15 @@ has `{{testTenant}}` as a whole segment AND a non-empty --test-tenant was given.
 A mention anywhere else - docs, body, query string, headers - does not count,
 because it does not decide which tenant's rows the write touches. A file with
 more than one method block is refused (Bruno sends the last one; an indented
-block counts), and so is a path with `.` or `..` segments.
+block counts, and a block ends only at a column-0 `}`, as in Bruno's grammar),
+and so is a path with `.` or `..` segments or a method block with two `url` keys.
 
 A request's file is not all Bruno sends: scripts run arbitrary JavaScript
 (with axios and fetch available), so they can rewrite the request or send any
 other. No denylist of calls can be complete, so this is an allowlist: a smoke
 request is refused when its own file, or a `folder.bru` / `collection.bru`
 between it and the collection root, has any non-empty `script:*` or `tests`
-block, or a `vars` block that defines `testTenant` (request and runtime
+block, or a `vars` block that mentions `testTenant` at all (request and runtime
 variables beat `--env-var`, so a rebound tenant is a real tenant). Declarative
 `assert` blocks are fine. Auth belongs in an `auth:*` block reading a variable
 passed with `--env-var`, not in a script.
@@ -35,41 +36,60 @@ import re
 import sys
 
 READ_METHODS = {"get", "head", "options"}
-METHOD_BLOCK = re.compile(
-    r"^[ \t]*(get|head|options|post|put|patch|delete|graphql)\s*\{(.*?)^[ \t]*\}",
-    re.S | re.M,
-)
-SCRIPT_HEADER = re.compile(r"^[ \t]*(script:[\w-]+|tests)\s*\{", re.M)
-SCRIPT_BLOCK = re.compile(r"^[ \t]*(script:[\w-]+|tests)\s*\{(.*?)^\}", re.S | re.M)
-VARS_BLOCK = re.compile(r"^[ \t]*vars(?::[\w-]+)?\s*\{(.*?)^[ \t]*\}", re.S | re.M)
-TENANT_KEY = re.compile(r"^\s*~?testTenant\s*:", re.M)
+METHODS = {"get", "head", "options", "post", "put", "patch", "delete", "graphql"}
+# A block starts at `<name> {` and, as in Bruno's grammar, ends only at a `}`
+# in column 0 - an indented `}` is an ordinary line inside the block. A block
+# with no such closer runs to the end of the file.
+BLOCK_HEADER = re.compile(r"^[ \t]*([\w:-]+)[ \t]*\{[ \t]*$", re.M)
+BLOCK_END = re.compile(r"^\}", re.M)
+
+
+def read_bru(path: pathlib.Path) -> str:
+    # Raw line endings: Python's universal newlines would turn a lone `\r` into
+    # a line break that Bruno does not see. CRLF is normalised; a lone `\r` is
+    # left in place and refused by blocks_of().
+    return path.read_bytes().decode("utf-8", errors="replace").replace("\r\n", "\n")
+
+
+def blocks_of(text: str) -> list[tuple[str, str]]:
+    if "\r" in text:
+        return [("\r", "")]
+    out = []
+    pos = 0
+    while True:
+        header = BLOCK_HEADER.search(text, pos)
+        if not header:
+            return out
+        end = BLOCK_END.search(text, header.end())
+        stop = end.start() if end else len(text)
+        out.append((header.group(1).lower(), text[header.end():stop]))
+        pos = end.end() if end else len(text)
 
 
 def smoke_tagged(text: str) -> bool:
-    meta = re.search(r"^meta\s*\{(.*?)^\}", text, re.S | re.M)
+    meta = [body for name, body in blocks_of(text) if name == "meta"]
     if not meta:
         return False
-    tags = re.search(r"tags:\s*\[(.*?)\]", meta.group(1), re.S)
+    tags = re.search(r"tags:\s*\[(.*?)\]", meta[0], re.S)
     return bool(tags) and "smoke" in re.split(r"[\s,]+", tags.group(1))
 
 
 def url_path(block: str) -> str:
-    url = re.search(r"^\s*url:\s*(\S+)", block, re.M)
+    url = re.search(r"^\s*url\s*:\s*(\S+)", block, re.M)
     if not url:
         return ""
     return url.group(1).split("?", 1)[0].split("#", 1)[0]
 
 
 def script_risk(text: str) -> str | None:
-    closed = {m.start(): m.group(2) for m in SCRIPT_BLOCK.finditer(text)}
-    for header in SCRIPT_HEADER.finditer(text):
-        body = closed.get(header.start())
-        # An unclosed or oddly closed block is refused too: better a false
-        # refusal than a script nobody read.
-        if body is None or body.strip():
-            return f"non-empty {header.group(1)} block"
-    if any(TENANT_KEY.search(body) for body in VARS_BLOCK.findall(text)):
-        return "a vars block rebinds testTenant"
+    for name, body in blocks_of(text):
+        if name == "\r":
+            return "stray carriage return (Bruno and this parser would disagree)"
+        if (name.startswith("script:") or name == "tests") and body.strip():
+            return f"non-empty {name} block"
+        # Any mention, quoted, disabled or otherwise: a false refusal is fine.
+        if (name == "vars" or name.startswith("vars:")) and "testTenant" in body:
+            return f"{name} block mentions testTenant"
     return None
 
 
@@ -79,7 +99,7 @@ def inherited_risk(f: pathlib.Path, root: pathlib.Path) -> str | None:
         for name in ("folder.bru", "collection.bru"):
             p = d / name
             if p.is_file():
-                reason = script_risk(p.read_text())
+                reason = script_risk(read_bru(p))
                 if reason:
                     return f"{p.relative_to(root)}: {reason}"
         if d == root or root not in d.parents:
@@ -91,7 +111,7 @@ def verdict(text: str, tenant: str) -> str | None:
     risk = script_risk(text)
     if risk:
         return risk
-    blocks = METHOD_BLOCK.findall(text)
+    blocks = [(n, b) for n, b in blocks_of(text) if n in METHODS]
     if not blocks:
         return "no method block"
     if len(blocks) > 1:
@@ -99,6 +119,10 @@ def verdict(text: str, tenant: str) -> str | None:
         # first one is not what gets sent. Refuse rather than guess.
         return f"{len(blocks)} method blocks ({', '.join(b[0] for b in blocks)})"
     method, block = blocks[0]
+    urls = re.findall(r"^\s*url\s*:", block, re.M)
+    if len(urls) > 1:
+        # Bruno keeps the last url key; refuse rather than pick one.
+        return f"{method} block has {len(urls)} url keys"
     if method in READ_METHODS:
         return None
     segments = url_path(block).split("/")
@@ -129,7 +153,13 @@ def main() -> int:
     for f in sorted(root.rglob("*.bru")):
         if f.name in ("folder.bru", "collection.bru"):
             continue
-        text = f.read_text()
+        text = read_bru(f)
+        if "\r" in text:
+            # Unparseable the way Bruno parses it, so its tags cannot be trusted either.
+            print(f"REFUSE {f} stray carriage return")
+            refused += 1
+            vetted += 1
+            continue
         if not smoke_tagged(text):
             continue
         vetted += 1

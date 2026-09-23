@@ -30,6 +30,12 @@ case_ "network_mode container"        1 "network_mode container:dev"    $'servic
 case_ "volumes_from container"        1 "volumes_from container:db"     $'services:\n  app:\n    image: alpine\n    volumes_from: ["container:db"]'
 case_ "bind outside worktree"         1 "outside the worktree /var/run" $'services:\n  app:\n    image: alpine\n    volumes: [/var/run/docker.sock:/s]'
 case_ "host-backed volume"            1 "host-backed volume: pg"        $'services:\n  app:\n    image: alpine\n    volumes: [pg:/pg]\nvolumes:\n  pg:\n    driver_opts: {type: none, o: bind, device: /srv/pg}'
+# From a symlinked path: compose renders ./data under the logical path.
+ln -s "$WORK" "$WORK.link" && trap 'rm -rf "$WORK" "$WORK.link"' EXIT
+printf 'services:\n  app:\n    image: alpine\n    volumes: [./data:/d]\n' > "$WORK/compose.yaml"
+out="$(cd "$WORK.link" && bash "$CHECK" ge-t 2>&1)"; code=$?
+if [ "$code" = 0 ]; then echo "ok   relative bind from a symlinked worktree"; else echo "FAIL relative bind from a symlinked worktree (exit $code)"; printf '%s\n' "$out" | sed 's/^/     /'; fail=1; fi
+
 case_ "unparseable config is BLOCKED" 2 ""                              $'services: [oops'
 
 exit $fail

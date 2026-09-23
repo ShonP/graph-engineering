@@ -36,8 +36,9 @@ shape; each fix closes a way a check could pass without checking.
 - **`vet_smoke.py` is an allowlist now**: a smoke request is refused when it,
   or a `folder.bru` / `collection.bru` above it, has any non-empty `script:*`
   or `tests` block (Bruno scripts run arbitrary JavaScript with axios and
-  fetch, so no list of forbidden calls is complete), a `vars` block rebinding
-  `testTenant`, or an indented second method block. A missing collection or zero smoke requests
+  fetch, so no list of forbidden calls is complete), a `vars` block that
+  mentions `testTenant`, a second method block or `url` key, or a stray
+  carriage return. Blocks end only at a column-0 `}`, as in Bruno's grammar. A missing collection or zero smoke requests
   exits 2 (`BLOCKED`) instead of a silent pass.
 - **Post-deploy baseline ends when the rollout started** (`deploy.startedAt`,
   the earliest Argo `status.history[].deployStartedAt` for the merge SHA; fallback the
@@ -55,8 +56,10 @@ shape; each fix closes a way a check could pass without checking.
 ### Added
 
 - `scripts/check-skill-scripts.sh` and the tests it runs:
-  `post-deploy-verification/tests/test_vet_smoke.py` (20 tests; 15 checks, subtests included,
-  fail on 0.12.0) and `qa-verification/tests/test_compose_isolation.sh` (11).
+  `post-deploy-verification/tests/test_vet_smoke.py` (27 tests; 22 checks, subtests included,
+  fail on 0.12.0), cross-checked against Bruno's own parser
+  (`@usebruno/lang` 0.39.0: no case vetted RUN that Bruno reads as scripted,
+  tenant-rebound or re-targeted) and `qa-verification/tests/test_compose_isolation.sh` (11).
 
 ## [0.12.0] - 2026-09-23
 
