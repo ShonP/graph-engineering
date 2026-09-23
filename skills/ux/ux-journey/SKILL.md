@@ -89,14 +89,16 @@ feature.
      a generated sketch. `references/render-media.md` says how to check what
      is available and how to choose. Whatever the medium, a PNG of each
      changed screen goes to `to-be/` beside the spec and is committed with it
-     by the first UI task; an interactive medium is linked in addition. The owner approves what they can see, not
-     a paragraph describing it. Only explore-mode variants are never merged.
+     by the first UI task; an interactive medium is linked in addition. The
+     owner approves what they can see, not a paragraph describing it. What
+     else is kept or dropped: the "Where things go" table in that reference.
 
 6. **Write the experience spec** as `experience.md` in one self-contained
    folder - in a run, `.graph/<run>/design/`, with the captures and renders it
    shows under `as-is/` and `to-be/` beside it, linked by relative paths. The
-   first UI task of the plan commits that folder to
-   `<docsPath>/ux/<date>-<feature>/`, so the spec and its images reach the PR
+   first UI task of the plan commits `experience.md`, `as-is/` and `to-be/`
+   to `<docsPath>/ux/<date>-<feature>/` - never the rest of the folder (see
+   "Where things go" in `references/render-media.md`) - so the spec and its images reach the PR
    together and the next feature's step 2 finds them. (Outside a run, write it
    there directly.) It holds:
    goal + emotional job; as-is captures and the inventory; the placement

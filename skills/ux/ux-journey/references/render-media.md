@@ -22,13 +22,13 @@ PNG in the PR cannot.
 | **Storybook story** - the repo's Storybook, one story per state from the state table | no: the component alone | yes: every state, controls | the change is a **new or reworked component** and the repo already runs Storybook. The stories are product code, so they are **implementer work**: the designer drafts them in `design/stories/` and the plan's UI task moves them in; the designer shows the states in another medium meanwhile | the repo has no Storybook (never add it for a design) |
 | **Standalone HTML mock** - one self-contained `.html` built with the house design tokens and component markup | only if the surrounding screen is recreated | yes: clicks, hover, simple state | a **new screen or flow** with no screen to inject into, and no Storybook; or a layout comparison that needs live resizing | the change sits on an existing screen - recreating the page by hand loses the context the placement decision depends on |
 | **Claude artifact** - a private claude.ai page (an HTML file published as an artifact) | as much as the page embeds: usually the as-is / to-be captures side by side, plus the flow | yes, and it opens on a phone | a **new flow** the owner should click through at the plan gate, step by step, with the rejected alternatives beside the chosen one; or the owner reviews away from the terminal | a single placement - the PNG pair says it faster. Never for anything the owner presented as sensitive |
-| **Claude Design** - a canvas in Claude Design, built on the owner's design system; the designer writes a brief, the engine (which holds the connector) runs it at the plan gate | no: a canvas, not the running app | yes | **explore mode** (3-5 variants to compare), a new visual pattern the design system does not have yet, or the owner asked for it | the placement is on an existing screen, or the Claude Design connector is not available in this session |
+| **Claude Design** - a canvas in Claude Design, built on the owner's design system; the designer writes a brief, the engine (which holds the connector) runs it at the plan gate | no: a canvas, not the running app | yes | **explore mode** (3-5 variants to compare), a new visual pattern the design system does not have yet, or the owner asked for it | the placement is on an existing screen (the engine skips the brief when no connector is present) |
 | **Generated mockup image** - an image model draws the screen | no | no | a mood or concept sketch for a greenfield product with no UI yet, explicitly labelled as a sketch | anything the implementer will build against: generated screens invent components and misplace text |
 
 ## First: what is available here
 
 Check before choosing, and list the result in the spec (`available: live-app,
-html, artifact; not: storybook (no .storybook/), claude-design (not connected)`).
+html, artifact; not: storybook (no .storybook/), claude-design (brief; pending engine)`).
 Choose only among what is available; the best-suited available medium wins.
 
 | Medium | Available when |
@@ -72,4 +72,4 @@ the committer never has to guess:
 | `stories/` | draft Storybook stories | moved next to their component as product code by the UI task |
 | `artifact/` | the HTML of a published artifact page | never committed; the spec links the artifact |
 | `explore/` | explore-mode variants | never committed |
-| `claude-design-brief.md` | what the engine asks Claude Design for | never committed; the spec links the canvas if one was made |
+| `claude-design-brief.md` | what the engine asks Claude Design for | never committed; the engine adds the canvas link to `experience.md` when it runs the brief |
