@@ -10,6 +10,57 @@ commits.
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-09-23
+
+Hardening from the final review of 0.12.0. Nothing here changes a playbook's
+shape; each fix closes a way a check could pass without checking.
+
+### Fixed
+
+- **Run ids no longer depend on an exported variable.** Every Bash call is a
+  fresh shell, so `export GRAPH_RUN_ID` in one call left the next call's
+  `docker compose -p ge-` pointing at project `ge-`, which never got torn down
+  and whose `down -v` could hit anything else named that. The engine now names
+  the id in the dispatch text - `<run-id>` for qa nodes, `<run-id>-t<N>` per
+  implementer task so parallel tasks never share a database - agents prefix
+  it on every call, and the template's commands use `${GRAPH_RUN_ID:?}` so a
+  missing id fails loudly. `down` is its own final call, not a trap.
+- **Compose isolation check is a tested script**
+  (`qa-verification/compose_isolation.sh`). It also catches host networking,
+  `network_mode`/`volumes_from` on another container, host-backed volumes,
+  bind mounts from outside the worktree and leaks behind a compose profile,
+  and exits 2 (`BLOCKED`) when the config cannot be rendered instead of
+  printing nothing.
+- **Template `down` uses the same `-f` files as `up`**, so the renamed
+  volumes are removed and `-v` never targets the original names.
+- **`vet_smoke.py` is an allowlist now**: a smoke request is refused when it,
+  or a `folder.bru` / `collection.bru` above it, has any non-empty `script:*`
+  or `tests` block (Bruno scripts run arbitrary JavaScript with axios and
+  fetch, so no list of forbidden calls is complete), a `vars` block that
+  mentions `testTenant`, a second method block or `url` key, or a stray
+  carriage return. Blocks end only at a column-0 `}`, as in Bruno's grammar. A missing collection or zero smoke requests
+  exits 2 (`BLOCKED`) instead of a silent pass.
+- **Post-deploy baseline ends when the rollout started** (`deploy.startedAt`,
+  the earliest Argo `status.history[].deployStartedAt` for the merge SHA; fallback the
+  merge commit's time), not when `wait` returned - which let a regression
+  into its own baseline on resumed runs and rolling updates.
+- **Fix loop re-runs every check that produced a qa finding** (Schemathesis
+  drift re-runs Schemathesis), qa always writes `qa-findings.json` (`[]` when
+  clean), and `--auto-merge` treats an absent file as not-checked.
+- **Infra playbook reads one `<app>.diff` per Application**, matching
+  `infra-verification`.
+- `/graph-init` proposes a `deploy` block or lists it as a gap; post-deploy
+  passes one `--env-var` per `deploy.env` name and writes `vetted.txt` to an
+  absolute, created path; README catalog lists every process skill.
+
+### Added
+
+- `scripts/check-skill-scripts.sh` and the tests it runs:
+  `post-deploy-verification/tests/test_vet_smoke.py` (27 tests; 22 checks, subtests included,
+  fail on 0.12.0), cross-checked against Bruno's own parser
+  (`@usebruno/lang` 0.39.0: no case vetted RUN that Bruno reads as scripted,
+  tenant-rebound or re-targeted) and `qa-verification/tests/test_compose_isolation.sh` (11).
+
 ## [0.12.0] - 2026-09-23
 
 ### Added

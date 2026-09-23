@@ -46,13 +46,13 @@ next: implement
 ## node: implement
 agent: implementer
 in: .graph/<run>/tasks/<n>.md
-out: worktree commits, the rendered diff against base in .graph/<run>/qa/infra/rendered.diff, appended rows in .graph/<run>/followups.md
+out: worktree commits, the rendered diffs against base, one per Application or overlay, in .graph/<run>/qa/infra/<app>.diff, appended rows in .graph/<run>/followups.md
 gate: no
 next: review, verify
 
 ## node: review
 agent: reviewer
-in: the worktree diff, .graph/<run>/qa/infra/rendered.diff
+in: the worktree diff, every .graph/<run>/qa/infra/<app>.diff
 out: .graph/<run>/findings.json
 gate: no
 next: fix
@@ -74,7 +74,7 @@ next: merge
 
 ## node: merge
 agent: planner
-in: the reviewed diff, the gate verdict, .graph/<run>/qa/infra/rendered.diff, .graph/<run>/followups.md
+in: the reviewed diff, the gate verdict, every .graph/<run>/qa/infra/<app>.diff, .graph/<run>/followups.md
 out: .graph/<run>/ledger.md
 gate: yes
 next: post-deploy

@@ -28,7 +28,10 @@ uxEvidence:
 # the merge gate does not open. Each field is a shell command run from the repo
 # root, so any stack works: compose, kind, `uv run`, `npm run dev`.
 #   up      start the stack. Compose repos:
-#             docker compose -p ge-${GRAPH_RUN_ID} up -d --wait --wait-timeout 120
+#             docker compose -p ge-${GRAPH_RUN_ID:?} up -d --wait --wait-timeout 120
+#           `:?` makes an unset id fail loudly: agents pass it inline on each
+#           call (a fresh shell per call), and a bare `${GRAPH_RUN_ID}`
+#           left empty would run - and later `down -v` - project `ge-`.
 #           `--wait` blocks on every service's healthcheck (a service with no
 #           `healthcheck:` counts as ready the moment it starts). `-p` is not
 #           optional: it overrides a top-level `name:` and the directory name,
@@ -38,7 +41,7 @@ uxEvidence:
 #           `external: true` - those stay shared, so qa's app could resolve
 #           `db` to the developer's database, seed and fuzz it, and `down -v`
 #           it. Rename or drop them in a committed override and pass it too:
-#             docker compose -p ge-${GRAPH_RUN_ID} -f compose.yaml -f compose.qa.yaml up ...
+#             docker compose -p ge-${GRAPH_RUN_ID:?} -f compose.yaml -f compose.qa.yaml up ...
 #           compose.qa.yaml, BLOCK style (`${...}` inside a `{ }` flow map is
 #           a YAML parse error):
 #             services:
@@ -52,10 +55,11 @@ uxEvidence:
 #             volumes:
 #               pgdata:
 #                 name: ge-${GRAPH_RUN_ID}_pgdata
-#           qa refuses to start while `docker compose ... config` shows any
-#           volume, network or container name without the `ge-${GRAPH_RUN_ID}`
-#           prefix, or anything external (`qa-verification`). The engine
-#           exports GRAPH_RUN_ID for every qa dispatch.
+#           qa refuses to start while `compose_isolation.sh` (`qa-verification`)
+#           finds any name without the `ge-${GRAPH_RUN_ID}` prefix, anything
+#           external, host networking, a host-backed volume or a bind mount
+#           from outside the worktree. The engine names GRAPH_RUN_ID in every
+#           dispatch that stands the stack up.
 #   seed    load deterministic data, once, after health passes. No spec has
 #           this field (compose and devcontainer both lack it); it is ours.
 #   port    the port `up` binds. qa checks it is FREE before `up`
@@ -73,7 +77,9 @@ uxEvidence:
 #           that are not HTTP. Give one of url or command.
 #   baseUrl what Bruno's `local` environment and Playwright point at.
 #   down    always run afterwards, pass or fail. Compose:
-#             docker compose -p ge-${GRAPH_RUN_ID} down -v
+#             docker compose -p ge-${GRAPH_RUN_ID:?} -f compose.yaml -f compose.qa.yaml down -v
+#           Same -p and -f files as `up`: torn down with a different config,
+#           the renamed volumes leak and `-v` targets the original names.
 #   env     NAMES (never values) of the variables qa must have exported:
 #           the API token Bruno passes as `--env-var` and Schemathesis as `-H`,
 #           and anything `up` needs. Say in a comment where a local token
@@ -104,6 +110,12 @@ runtime:
 # `wait` empty and the post-deploy node reports SKIPPED; retro still runs.
 #   wait        blocks until the merged commit serves, e.g.
 #               argocd app wait <app> --sync --health --timeout 600
+#   startedAt   prints (RFC3339) when the merged revision ${SHA} started rolling
+#               out - the baseline ends there. Argo CD:
+#               kubectl get application <app> -n argocd -o json | jq -r
+#                 --arg s "$SHA" '[.status.history[] | select(.revision == $s)
+#                 | .deployStartedAt] | min // empty'
+#               Empty: the merge commit's time, which is never after the rollout.
 #   bruEnv      the Bruno environment for the deployed target
 #   env         NAMES of credential variables (never values)
 #   testTenant  the tenant smoke writes may touch - a write runs only if
@@ -121,6 +133,7 @@ runtime:
 #   rollback    the command the owner would run, filled in on FAIL
 deploy:
   wait: ""
+  startedAt: ""
   bruEnv: ""
   env: []
   testTenant: ""
@@ -133,8 +146,8 @@ deploy:
 # static-only verification (render, validate, policy, diff): qa then reports
 # `PASS (static-only)` for what it checked, the merge gate shows that, and
 # --auto-merge refuses it. A kind node image is about 1 GB; check disk first.
-#   cluster.create   e.g. kind create cluster --name ge-${GRAPH_RUN_ID} --kubeconfig ${KUBECONFIG} --wait 120s
-#   cluster.delete   e.g. kind delete cluster --name ge-${GRAPH_RUN_ID} --kubeconfig ${KUBECONFIG}
+#   cluster.create   e.g. kind create cluster --name ge-${GRAPH_RUN_ID:?} --kubeconfig "<repo>/.graph/<run>/kubeconfig" --wait 120s
+#   cluster.delete   e.g. kind delete cluster --name ge-${GRAPH_RUN_ID:?} --kubeconfig "<repo>/.graph/<run>/kubeconfig"
 #   cluster.context  e.g. kind-ge-${GRAPH_RUN_ID}
 #                    (qa sets KUBECONFIG to the ABSOLUTE path
 #                    $REPO_ROOT/.graph/<run>/kubeconfig in the same command)
