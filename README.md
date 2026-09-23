@@ -33,10 +33,11 @@ flowchart LR
     goal([goal]) --> rux([research-ux]) & rtech([research-tech]) & rcomp([research-competitor])
     rux & rtech & rcomp --> plan{{"plan (gate)"}}
     plan --> implement([implement])
-    implement --> review([review])
+    implement --> review([review]) & qa([qa])
     review -->|findings| fix([fix])
-    fix -.->|"max 3 rounds"| review
-    review -->|PASS| merge{{"merge (gate)"}}
+    qa -->|FAILED rows| fix
+    fix -.->|"max 3 rounds"| review & qa
+    review & qa -->|PASS| merge{{"merge (gate)"}}
 
     subgraph agents [" "]
         direction LR
@@ -44,12 +45,18 @@ flowchart LR
         a0["researcher: research-ux / tech / competitor (parallel)"]
         a2["implementer / implementer-simple: implement, fix"]
         a3["reviewer: review"]
+        a4["qa: qa (runs the change on the profile's runtime)"]
     end
 ```
 
 Gates (`plan`, `merge`) stop and wait for the owner. The engine derives each
 node's REQUIRED skills from the profile's routing table matched against the
 task's files - the agent never chooses its conditional skills.
+
+Review reads the diff; qa runs it. The qa node stands the repo up from the
+profile's `runtime` block, runs the PR's Bruno suite, Schemathesis and browser
+flows against it, and its `FAILED` rows go into the same fix loop as review findings. A qa leg
+that could not run (`BLOCKED`) keeps the merge gate closed.
 
 ## Install
 
@@ -142,8 +149,9 @@ The engine picks the implementer by the task's `size` in the plan: `small` goes
 to `implementer-simple`, everything else to `implementer`. Every agent below its
 skill floor returns `NEEDS_SETUP` instead of improvising.
 
-Still planned: the `bug` and `infra` playbooks, the `qa` leg in the feature
-playbook, board sync, and `/graph-doctor`.
+Still planned: the `bug` and `infra` playbooks, a `definition-of-done` skill and
+an impact-mapping recon node, post-deploy smoke and a retro node, board sync,
+and `/graph-doctor`.
 
 ## Competencies
 
@@ -164,12 +172,12 @@ routing table and the roster reference actually resolves to one skill.
 | `agents` | microsoft-agent-framework | `**/agents/**/*.py` |
 | `k8s-gitops` | argocd, helm, kubectl, kustomize, cloudnativepg, envoy-gateway, agent-router, sops-age | `argocd/**`, `manifests/**`, `**/Chart.yaml`, `**/kustomization.{yaml,yml}`, `**/*.enc.yaml` |
 | `temporal` | temporal-developer | `**/{workflows,activities}/**/*.py` |
-| `qa` | playwright-cli, playwright-trace, playwright-component-testing, bruno | `tests/**/*.spec.ts`, `playwright.config.ts`, `**/*.bru` |
+| `qa` | playwright-cli, playwright-trace, playwright-component-testing, bruno, schemathesis | `tests/**/*.spec.ts`, `playwright.config.ts`, `**/*.bru`; bruno and schemathesis also on every API-surface row |
 | `observability` | promql, loki, tempo | `observability/**`, `**/dashboards/**/*.json`, `**/*rule*.{yaml,yml}` |
 | `security` | security-review | `always.review` |
 | `privacy` | privacy-review, gdpr-consent, gdpr-erasure-retention | `always.review`, `**/{migrations,schemas}/**` |
 | `ux` | ux-journey, ui-ux-pro-max | `always.design` |
-| `process` | prior-art, review-protocol, ux-evidence, product-spec, qa-verification | prior-art on `always.impl`, review-protocol on `always.review`, ux-evidence on every UI-bearing row; product-spec preloaded by `planner`, qa-verification preloaded by `qa` |
+| `process` | prior-art, review-protocol, ux-evidence, api-contract, product-spec, qa-verification | prior-art on `always.impl`, review-protocol on `always.review`, ux-evidence on every UI-bearing row, api-contract on every API-surface row (`routers/`, `controllers/`, `handlers/`, OpenAPI specs, `*.bru`); product-spec preloaded by `planner`, qa-verification preloaded by `qa` |
 | `rules` | backend-rules, frontend-rules, architecture-resilience-rules, agent-workflow-rules, review-testing-rules | ride along on their stack's rows; `review-testing-rules` is on `always.impl` |
 
 **Provenance.** Some of these are written here from the vendor's own docs; some
@@ -222,6 +230,15 @@ standing rules and every agent carries them:
   `docs/ux/changes`) and embedded in the PR body. The implementer captures
   *before* on the base commit, first, before touching UI. The reviewer treats a
   missing pair on a UI diff as Blocking. `skills/process/ux-evidence`.
+- **API contract.** Every change to an API surface ships its Bruno requests in
+  the same PR - happy path asserting values, auth, validation, edge, non-leak -
+  under the profile's `api.collection`, with the served OpenAPI schema kept
+  current. qa runs the requests, the whole collection, and Schemathesis (tests
+  generated from the schema: the cases nobody wrote) against the disposable
+  stack the profile's `runtime` block stands up. A 5xx or a response that breaks
+  the schema blocks; spec drift is Important. The reviewer treats a missing
+  suite on an API diff as Blocking.
+  `skills/process/api-contract`.
 - **Prior art.** No ask starts from priors. At the start of every task, and
   again at every mid-task fork, look at what others do - reuse candidates
   first (an existing skill, plugin or library), then competitors, open source,

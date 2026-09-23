@@ -40,7 +40,8 @@ Normally your dispatch names your REQUIRED skills (the spine derives them from t
 | `kustomization.yaml` | kustomize |
 | `.sops.yaml`, `*.enc.yaml` | sops-age |
 | `tests/**/*.spec.ts`, `playwright.config.ts` | playwright-cli, playwright-component-testing, playwright-trace (reading a recorded trace) |
-| `*.bru`, `bruno.json` | bruno |
+| `*.bru`, `bruno.json` | bruno, api-contract |
+| Server-side API surface (`routers/`, `controllers/`, `endpoints/`, server-language `routes/` / `handlers/`, NestJS `*.controller.ts`, Next.js `app/api/**/route.ts`, OpenAPI/AsyncAPI spec - never frontend `src/routes/`) | bruno, schemathesis, api-contract |
 | `observability/**`, `dashboards/**/*.json` | promql, loki, tempo |
 | UI placement / flow decisions | ui-ux-pro-max (UX-judgment domains only) |
 | Anything a user sees (`*.tsx`, `*.swift`, Compose `*.kt`, templates, styles) | ux-evidence |
@@ -54,6 +55,7 @@ Normally your dispatch names your REQUIRED skills (the spine derives them from t
 - **Privacy**: collect the minimum; no PII in logs, analytics events, error messages, or test fixtures; new personal-data fields need a stated purpose and follow the repo's retention/erasure patterns.
 - **Accessibility** (any UI work): semantic native controls with roles/labels, full keyboard/focus path, visible states (loading/empty/error), respect reduced-motion, meet contrast. If the profile routes an a11y rule pack, read it.
 - **UX evidence** (any change a user can see): before/after screenshots, or ≤30s recordings for flows, captured as code per `ux-evidence` - **before is captured FIRST, on the base commit, before you touch UI code.** Committed under the profile's `uxEvidence.path` and embedded in the PR body. A UI task without both halves is not `DONE`; list the paths in your report.
+- **API contract** (any change to an API surface): the Bruno requests for every endpoint you touched, per `api-contract` - happy path with value assertions, auth, validation, edge, non-leak - written with the code under the profile's `api.collection`, run green against the profile's `runtime` before you report, with the schema current and the Schemathesis gate checks passing (`schemathesis`). An API task without them is not `DONE`; put the `bru run` command and its pass line in your report and the PR body's `## API contract` section.
 
 These are implementation duties, not review lenses - the reviewer catching one of these means you already failed it.
 

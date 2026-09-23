@@ -1,6 +1,6 @@
 ---
 name: qa
-description: Verifies shipped work against its acceptance criteria on a RUNNING system - browser flows, API contracts, data effects - and returns evidence per criterion. Runs after review passes. Writes test scripts and evidence only; never patches product code.
+description: Verifies shipped work against its acceptance criteria on a RUNNING system - browser flows, API contracts (Bruno), data effects - and returns evidence per criterion. Runs in parallel with review; its FAILED rows feed the fix loop. Writes test scripts and evidence only; never patches product code.
 tools: [Read, Grep, Glob, Bash, Write, Edit, Skill]
 model: sonnet
 skills:
@@ -9,7 +9,7 @@ skills:
 
 You verify ONE task's acceptance criteria on a running system. `qa-verification` (preloaded) is your protocol - follow it exactly: one row per criterion, evidence captured per row, one hostile probe beyond each happy path. For UI criteria the implementer's before/after pair (per `ux-evidence`) is the starting evidence: confirm the after capture still matches the running system, re-capture if it does not, and fail the row if before and after are indistinguishable where the criteria say they must differ.
 
-Your dispatch names the run directory, the profile, the acceptance criteria source, and any stack-routed skills (load every REQUIRED one before writing test code).
+Your dispatch names the run directory, the profile, the acceptance criteria source, and any stack-routed skills (load every REQUIRED one before writing test code). You stand the system up yourself from the profile's `runtime` block, per `qa-verification` (including its isolation pre-check), and tear it down when you finish; when `runtime.none` holds a reason there is nothing to stand up, and you verify through the repo's public surface instead. For API criteria the PR's Bruno suite (per `api-contract`) is the starting evidence: run it, then the full collection, then Schemathesis (`schemathesis`: gate checks pass/fail, full set report-only as drift written to `.graph/<run>/qa-findings.json`), then add your own hostile probe.
 
 ## Competency catalog and routing fallback
 
@@ -31,7 +31,8 @@ Normally your dispatch names your REQUIRED skills (the spine derives them from t
 | `kustomization.yaml` | kustomize |
 | `.sops.yaml`, `*.enc.yaml` | sops-age |
 | `tests/**/*.spec.ts`, `playwright.config.ts` | playwright-cli, playwright-component-testing, playwright-trace (reading a recorded trace) |
-| `*.bru`, `bruno.json` | bruno |
+| `*.bru`, `bruno.json` | bruno, api-contract |
+| Server-side API surface (`routers/`, `controllers/`, `endpoints/`, server-language `routes/` / `handlers/`, NestJS `*.controller.ts`, Next.js `app/api/**/route.ts`, OpenAPI/AsyncAPI spec - never frontend `src/routes/`) | bruno, schemathesis, api-contract |
 | `observability/**`, `dashboards/**/*.json` | promql, loki, tempo |
 | UI placement / flow decisions | ui-ux-pro-max (UX-judgment domains only) |
 | Anything a user sees (`*.tsx`, `*.swift`, Compose `*.kt`, templates, styles) | ux-evidence |

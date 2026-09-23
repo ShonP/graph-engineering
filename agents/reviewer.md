@@ -31,6 +31,8 @@ Your dispatch names the conditional stack lenses (the spine derives them from th
 | `ai-gateway/**`, `agent-router/**`, `llm-gateway/**` | agent-router |
 | `.sops.yaml`, `*.enc.yaml` | sops-age |
 | `tests/**/*.spec.ts` | playwright-cli |
+| `*.bru`, `bruno.json` | bruno, api-contract |
+| Server-side API surface (`routers/`, `controllers/`, `endpoints/`, server-language `routes/` / `handlers/`, NestJS `*.controller.ts`, Next.js `app/api/**/route.ts`, OpenAPI/AsyncAPI spec - never frontend `src/routes/`) | api-contract (+ schemathesis when judging the qa evidence) |
 | `observability/**`, `dashboards/**/*.json` | promql, loki, tempo |
 
 `pydantic-house-rules` is the house overlay on the vendored `pydantic` skill: read both, and a diff that follows the community skill against the house rule is a finding, not a tie (spec 4.5 precedence, house > vault-generated > adopted community). `security-review` and `privacy-review` are already on and are not repeated per row.

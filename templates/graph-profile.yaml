@@ -23,6 +23,90 @@ docsPath: "docs/superpowers"
 uxEvidence:
   path: "docs/ux/changes"
 
+# How qa stands this repo up. The qa node runs the change against a live stack,
+# never against a shared environment; without this block it returns BLOCKED and
+# the merge gate does not open. Each field is a shell command run from the repo
+# root, so any stack works: compose, kind, `uv run`, `npm run dev`.
+#   up      start the stack. Compose repos:
+#             docker compose -p ge-${GRAPH_RUN_ID} up -d --wait --wait-timeout 120
+#           `--wait` blocks on every service's healthcheck (a service with no
+#           `healthcheck:` counts as ready the moment it starts). `-p` is not
+#           optional: it overrides a top-level `name:` and the directory name,
+#           so project-scoped containers and volumes are qa's own instead of
+#           the developer's. It does NOT rename a volume or network with its
+#           own `name:`, a service's `container_name:`, or anything
+#           `external: true` - those stay shared, so qa's app could resolve
+#           `db` to the developer's database, seed and fuzz it, and `down -v`
+#           it. Rename or drop them in a committed override and pass it too:
+#             docker compose -p ge-${GRAPH_RUN_ID} -f compose.yaml -f compose.qa.yaml up ...
+#           compose.qa.yaml, BLOCK style (`${...}` inside a `{ }` flow map is
+#           a YAML parse error):
+#             services:
+#               db:
+#                 container_name: ge-${GRAPH_RUN_ID}-db
+#                 networks: !override [appnet]      # drop external networks
+#             networks:
+#               appnet:
+#                 name: ge-${GRAPH_RUN_ID}_net
+#               corp_shared: !reset null            # an external network
+#             volumes:
+#               pgdata:
+#                 name: ge-${GRAPH_RUN_ID}_pgdata
+#           qa refuses to start while `docker compose ... config` shows any
+#           volume, network or container name without the `ge-${GRAPH_RUN_ID}`
+#           prefix, or anything external (`qa-verification`). The engine
+#           exports GRAPH_RUN_ID for every qa dispatch.
+#   seed    load deterministic data, once, after health passes. No spec has
+#           this field (compose and devcontainer both lack it); it is ours.
+#   port    the port `up` binds. qa checks it is FREE before `up`
+#           (`lsof -nP -iTCP:<port> -sTCP:LISTEN` prints nothing); a port
+#           already taken means health would be answered by some other process.
+#   health  readiness. `url` is polled with
+#           `curl -fsS --max-time 5 --retry <n> --retry-delay 2
+#           --retry-max-time <timeout> --retry-connrefused --retry-all-errors`
+#           (--max-time stops a listener that accepts and never answers from
+#           holding the poll past `timeout`), and the body must contain
+#           `expect`, matched as a substring of the raw body - so pick a token
+#           without JSON spacing, e.g. `ok`, not `"status":"ok"`. A 200
+#           proves something answered, `expect` proves it is this service.
+#           `command` is the escape hatch for images with no curl or checks
+#           that are not HTTP. Give one of url or command.
+#   baseUrl what Bruno's `local` environment and Playwright point at.
+#   down    always run afterwards, pass or fail. Compose:
+#             docker compose -p ge-${GRAPH_RUN_ID} down -v
+#   env     NAMES (never values) of the variables qa must have exported:
+#           the API token Bruno passes as `--env-var` and Schemathesis as `-H`,
+#           and anything `up` needs. Say in a comment where a local token
+#           comes from - printed by `seed`, a fixture user, a dev-only signer.
+#   none    a reason string, for a repo with nothing to stand up (a library,
+#           a CLI, a plugin). Set, it replaces every field above: qa skips the
+#           stand-up and verifies through the repo's own public surface - the
+#           CLI invoked as a user would, the package imported from a clean
+#           venv, the documented commands - and never returns BLOCKED for a
+#           missing runtime. Empty for any repo that serves something.
+# Every field ships empty: /graph-init fills what it detects and lists the
+# rest as gaps. An empty required field is qa `BLOCKED` naming that field,
+# which is clearer than a guessed command failing.
+runtime:
+  up: ""
+  seed: ""
+  port: null
+  health: { url: "", expect: "", timeout: 120 }
+  baseUrl: ""
+  down: ""
+  env: []
+  none: ""
+
+# House rule: every API change ships a Bruno suite in the same PR, and qa runs
+# it against `runtime`. Bruno sets no convention for where a collection lives,
+# so this is the house one. See `api-contract`.
+api:
+  collection: "bruno"
+  env: "local"
+  # The served schema Schemathesis generates from (a path under baseUrl, or a
+  # repo file). api-contract requires every HTTP API to serve one.
+  schema: "/openapi.json"
+
 # The spine reads this to name each agent's REQUIRED skills in its dispatch.
 # Agents never choose their own conditional skills: an agent that picks can skip
 # loading and write from priors instead.
@@ -197,8 +281,40 @@ routing:
   # API collections: Bruno runs them in CI, so it is an implementation and a qa
   # competency both.
   "{**/*.bru,**/bruno.json}":
-    impl: [bruno]
-    qa: [bruno]
+    impl: [bruno, api-contract]
+    review: [bruno, api-contract]
+    qa: [bruno, api-contract]
+  # API surfaces: an edit here must ship a Bruno update and a current schema,
+  # and qa runs Schemathesis against it (`api-contract`), so the competency is
+  # routed by the code that changes the contract, not only by the .bru files.
+  # No framework enforces a layout; these are the common SERVER-side ones plus
+  # the spec file, the only cross-framework anchor.
+  #
+  # `routes/` and `handlers/` are restricted to server-only languages on
+  # purpose: in TypeScript they are just as often the frontend - TanStack
+  # Router and Remix `src/routes/*.tsx`, SvelteKit `src/routes/`, Angular
+  # `app.routes.ts`, MSW `mocks/handlers/*.ts` - and routing api-contract
+  # there makes a route-component task demand a Bruno suite and a schema the
+  # SPA cannot serve, so qa blocks forever. An Express/Hono/Fastify repo whose
+  # TS routes are server code gets its own row from /graph-init, which finds
+  # them by content (`Router()`, `app.get(`), not by name.
+  "**/{routers,controllers,Controllers,endpoints}/**/*.{py,go,java,kt,rb,php,cs,ts,js}":
+    impl: [bruno, schemathesis, api-contract]
+    review: [api-contract]
+    qa: [bruno, schemathesis, api-contract]
+  "**/{routes,handlers}/**/*.{py,go,java,kt,rb,php,cs}":
+    impl: [bruno, schemathesis, api-contract]
+    review: [api-contract]
+    qa: [bruno, schemathesis, api-contract]
+  # NestJS `nest g controller` output, and Next.js route handlers.
+  "{**/*.controller.{ts,js},**/app/api/**/route.{ts,js},**/pages/api/**/*.{ts,js}}":
+    impl: [bruno, schemathesis, api-contract]
+    review: [api-contract]
+    qa: [bruno, schemathesis, api-contract]
+  "**/{openapi,asyncapi,swagger}*.{yaml,yml,json}":
+    impl: [bruno, schemathesis, api-contract]
+    review: [api-contract]
+    qa: [bruno, schemathesis, api-contract]
   # Observability: PromQL for metrics and alert rules, LogQL for logs, TraceQL for
   # traces. Dashboards are JSON, alert rules are YAML.
   "{observability/**,**/dashboards/**/*.json,**/*rule*.{yaml,yml}}":
