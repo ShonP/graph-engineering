@@ -10,6 +10,42 @@ commits.
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-09-23
+
+Agents building frontend features put new elements wherever the diff was
+easiest: the `research-ux` node read how other products solve the moment, but
+nothing looked at this app's screens, decided placement, or held the build to
+a decision. The spec's design branch was never built; this builds it.
+
+### Added
+
+- **`design` node in the feature playbook** (`agent: ux-designer`, after
+  `research-ux` and `research-competitor`, before `plan`). It captures the
+  screens the goal touches from the running app, inventories their regions,
+  actions and reusable components, checks earlier experience specs for the
+  consistency baseline, decides placement per element (screen, region,
+  hierarchy, what it displaces, the existing pattern it matches, rejected
+  alternatives), renders the decision into the as-is capture, and writes a
+  persistent experience spec with a state table and **UI acceptance rows**.
+- **`when: <flag>`** node field in the engine, read from `goal.md`
+  (`ui: yes|no - <reason>`, written by the planner, `yes` when unsure). A
+  missing flag runs the node.
+
+### Changed
+
+- **The plan gate is the design gate.** `plan.md` embeds an `## Experience`
+  section (placement, alternatives, renders inline, state table) and the gate
+  exhibit shows the `ui:` line and the images. UI tasks carry the spec's
+  acceptance rows; a UI task that does not say where its elements go is a
+  planning error.
+- **Held downstream:** implementers build the spec's placement and states
+  (deviation = `DONE_WITH_CONCERNS` with a reason); the reviewer opens the spec
+  first and a placement or missing-state deviation without a reason is
+  Important; the `definition-of-done` UI row's Contract cell is the spec's
+  rows; qa verifies them on the running app, empty and error states included.
+- `ux-journey` rewritten around grounding in the real UI and the placement
+  decision; `ux-designer` moves to opus and preloads `ux-evidence` for capture.
+
 ## [0.12.1] - 2026-09-23
 
 Hardening from the final review of 0.12.0. Nothing here changes a playbook's

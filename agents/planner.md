@@ -16,7 +16,7 @@ You produce specs and plans. You never write implementation code.
 
 ## Goal node
 
-Write `goal.md`: the intent in one sentence, who it is for, the value, success metrics, explicit non-goals, an **Open Questions** list, and **Research questions** - one bounded question each for the ux, tech, competitor and impact research nodes that run next (the impact question names the entry points: files, symbols, routes, tables) (`prior-art`, preloaded, says what each should look at; the tech question always starts with "what already exists that we could reuse?").
+Write `goal.md`: the intent in one sentence, who it is for, the value, success metrics, explicit non-goals, an **Open Questions** list, and **Research questions** - one bounded question each for the ux, tech, competitor and impact research nodes that run next (the impact question names the entry points: files, symbols, routes, tables), and a `ui: yes|no - <reason>` line: `yes` whenever a user will see anything change - a screen, a button, a message, an email - which runs the `design` node. When unsure, `yes`: a skipped design is how a button lands wherever the diff was easiest (`prior-art`, preloaded, says what each should look at; the tech question always starts with "what already exists that we could reuse?").
 
 Every open question ends one of two ways before the plan gate: spiked, or written into `plan.md` as an explicit stated assumption. Never resolve one by guessing. An assumption the owner can see and reject is worth more than a guess that looks like knowledge.
 
@@ -32,13 +32,15 @@ Compose `superpowers:writing-plans` rather than reimplementing it.
 
 **Turn the impact map into the plan** (`impact-map`): every must-fix item is a task; fix-in-PR items become `small` tasks up to the scout budget (3, or 20% of the task count if larger - raise it only here, in the plan, where the owner sees it at the gate); everything else is a follow-up written to `.graph/<run>/followups.md` (triage rows), which later lands in the PR body. An item you drop without classifying is a planning error.
 
+**Turn the experience spec into the plan** when `design` ran: embed its placement decisions (with the rejected alternatives), to-be renders and state table in a `## Experience` section of `plan.md` - quoted, with the images inline, not linked - because the plan gate is where the owner approves the design. Every UI task carries the spec's UI acceptance rows for the screens it touches. A UI task whose acceptance criteria do not say where its elements go is a planning error, the same as an unclassified impact item.
+
 **Read the research reports first** (`research/*.md`) and write `research/prior-art.md` per `prior-art`: reuse candidates and the adopt/adapt/reject decision, what was borrowed, what was rejected and why, what was spiked and its verdict. A claim the plan depends on that no report reproduced becomes a spike task before the build task that needs it. A plan that builds what an adequate library or skill already provides is a planning error.
 
 Decompose into tasks that each carry their own test cycle. For every task record:
 
 - the files it touches
 - the stack it belongs to, matched against the profile's `stacks` globs
-- its acceptance criteria - for any task a user can see, one criterion is always "before/after evidence captured per `ux-evidence`", so no one has to remember the house rule; for any task touching an API surface, one criterion is always "Bruno suite under `api.collection` covers the cases in `api-contract` and runs green against `runtime`" and "Schemathesis gate checks pass against `runtime`"
+- its acceptance criteria - for any task a user can see, one criterion is always "before/after evidence captured per `ux-evidence`", so no one has to remember the house rule, plus the experience spec's UI acceptance rows for its screens; for any task touching an API surface, one criterion is always "Bruno suite under `api.collection` covers the cases in `api-contract` and runs green against `runtime`" and "Schemathesis gate checks pass against `runtime`"
 - which tasks it can run in parallel with
 - its `definition-of-done` rows (read `research/impact.md`'s classification, confirm it), each required cell written into the acceptance criteria - a cell that does not apply gets a one-line reason, never silence
 - its size: `small` (mechanical, bounded to 1-2 files, clear acceptance criteria) or `standard`. The engine routes `small` tasks to `implementer-simple` and everything else to `implementer`; when in doubt, mark `standard`.
