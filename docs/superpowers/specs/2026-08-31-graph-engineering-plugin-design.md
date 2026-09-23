@@ -618,3 +618,26 @@ because it breaks the byte-identical refresh the recipe depends on.
 
 See plan `docs/superpowers/plans/2026-09-10-stack-skills.md` and sourcing
 report `docs/research/2026-09-10-stack-skills-sourcing.md`.
+
+### 2026-09-23 - Engineering only; qa, runtime and API contracts; definition of done and impact map
+
+The plugin is engineering only. `content-writer`, `media-producer`, the content
+skill group, the publication gate and the §5.3 `launch` / §5.4 `content`
+playbooks are removed (moved to the owner's personal `~/.claude`), which
+supersedes those parts of §3, §5, §8 and the P5 scope in §12. P5 is re-scoped
+as engineering playbooks: `bug` and `infra`, then post-deploy verification and
+a retro loop.
+
+§5.1's `[reviewer | qa]` REDUCE is built (0.9.0): qa runs in parallel with
+review against a stack the profile's new `runtime` block stands up in an
+isolated compose project, and API changes carry a Bruno suite, a served schema
+and a Schemathesis gate (`api-contract`, `schemathesis`).
+
+0.10.0 adds two things §5.1 did not have. A fourth research node, `impact`,
+maps the blast radius and triages adjacent issues under a scout budget
+(`impact-map`), because a plan built from the goal alone breaks the goal's
+neighbours; and `definition-of-done` stamps per-change-type artifacts
+(observability, rollback, migration down path, rendered diff) into every
+task's acceptance criteria, because review of code alone does not make a
+change operable.
+

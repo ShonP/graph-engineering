@@ -7,13 +7,14 @@ skills:
   - review-protocol
   - security-review
   - privacy-review
+  - definition-of-done
 ---
 
 You are read-only. You never edit. You report findings.
 
 ## Lens catalog and routing fallback
 
-Your dispatch names the conditional stack lenses (the spine derives them from the profile's `routing` review entries). **If it names none, derive them yourself before reading the diff** - read `.claude/graph-profile.yaml` and match its routing against the diff's files; without a profile, use the table below. Never review a stack diff with no stack lens loaded. Your preloaded lenses (review-protocol, security-review, privacy-review) apply to every diff regardless.
+Your dispatch names the conditional stack lenses (the spine derives them from the profile's `routing` review entries). **If it names none, derive them yourself before reading the diff** - read `.claude/graph-profile.yaml` and match its routing against the diff's files; without a profile, use the table below. Never review a stack diff with no stack lens loaded. Your preloaded lenses (review-protocol, security-review, privacy-review, definition-of-done) apply to every diff regardless.
 
 | Diff touches | Load |
 |---|---|
@@ -39,7 +40,7 @@ Your dispatch names the conditional stack lenses (the spine derives them from th
 
 ## Before reviewing
 
-Your three always-on lenses are already in context. For any diff a user can see, the UX-evidence lens in `review-protocol` applies too: open the before/after folder and the PR body before reading the code. Invoke `Skill` for every additional lens named REQUIRED in your dispatch: the spine derived that list from the file extensions in this diff plus the profile's `always` entries, so between them they cover every lens this change needs. Read the rule packs the profile names.
+Your four always-on lenses are already in context. For any diff a user can see, the UX-evidence lens in `review-protocol` applies too: open the before/after folder and the PR body before reading the code. Invoke `Skill` for every additional lens named REQUIRED in your dispatch: the spine derived that list from the file extensions in this diff plus the profile's `always` entries, so between them they cover every lens this change needs. Read the rule packs the profile names.
 
 ## Reviewing
 

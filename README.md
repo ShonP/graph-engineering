@@ -30,8 +30,8 @@ The feature playbook, the only one shipped so far:
 
 ```mermaid
 flowchart LR
-    goal([goal]) --> rux([research-ux]) & rtech([research-tech]) & rcomp([research-competitor])
-    rux & rtech & rcomp --> plan{{"plan (gate)"}}
+    goal([goal]) --> rux([research-ux]) & rtech([research-tech]) & rcomp([research-competitor]) & rimp([research-impact])
+    rux & rtech & rcomp & rimp --> plan{{"plan (gate)"}}
     plan --> implement([implement])
     implement --> review([review]) & qa([qa])
     review -->|findings| fix([fix])
@@ -42,7 +42,7 @@ flowchart LR
     subgraph agents [" "]
         direction LR
         a1["planner: goal, plan, merge"]
-        a0["researcher: research-ux / tech / competitor (parallel)"]
+        a0["researcher: research-ux / tech / competitor / impact (parallel)"]
         a2["implementer / implementer-simple: implement, fix"]
         a3["reviewer: review"]
         a4["qa: qa (runs the change on the profile's runtime)"]
@@ -136,7 +136,7 @@ The full organization - seven agents, engineering only:
 | Agent | Model | Job | Writes |
 |---|---|---|---|
 | `planner` | fable | spec, then task-decomposed plan with per-task sizing | specs only |
-| `researcher` | sonnet | one bounded question, four modes: ux / tech / competitor / spike (strict turn budget) | reports only |
+| `researcher` | sonnet | one bounded question, five modes: ux / tech / competitor / impact (blast radius + adjacent-issue triage) / spike (strict turn budget) | reports only |
 | `ux-designer` | sonnet | experience spec before implementation; variant exploration scored against the house rubric | mockups only |
 | `implementer` | opus | one non-trivial task, test-first, with spine-named skills | yes |
 | `implementer-simple` | sonnet | one SMALL task (mechanical, 1-2 files); escalates instead of pushing through | yes |
@@ -149,9 +149,8 @@ The engine picks the implementer by the task's `size` in the plan: `small` goes
 to `implementer-simple`, everything else to `implementer`. Every agent below its
 skill floor returns `NEEDS_SETUP` instead of improvising.
 
-Still planned: the `bug` and `infra` playbooks, a `definition-of-done` skill and
-an impact-mapping recon node, post-deploy smoke and a retro node, board sync,
-and `/graph-doctor`.
+Still planned: the `bug` and `infra` playbooks, post-deploy smoke and a retro
+node, board sync, and `/graph-doctor`.
 
 ## Competencies
 
@@ -177,7 +176,7 @@ routing table and the roster reference actually resolves to one skill.
 | `security` | security-review | `always.review` |
 | `privacy` | privacy-review, gdpr-consent, gdpr-erasure-retention | `always.review`, `**/{migrations,schemas}/**` |
 | `ux` | ux-journey, ui-ux-pro-max | `always.design` |
-| `process` | prior-art, review-protocol, ux-evidence, api-contract, product-spec, qa-verification | prior-art on `always.impl`, review-protocol on `always.review`, ux-evidence on every UI-bearing row, api-contract on every API-surface row (`routers/`, `controllers/`, `handlers/`, OpenAPI specs, `*.bru`); product-spec preloaded by `planner`, qa-verification preloaded by `qa` |
+| `process` | prior-art, review-protocol, ux-evidence, api-contract, definition-of-done, impact-map, product-spec, qa-verification | prior-art, definition-of-done and impact-map on `always.impl`, review-protocol and definition-of-done on `always.review`, ux-evidence on every UI-bearing row, api-contract on every API-surface row (`routers/`, `controllers/`, `handlers/`, OpenAPI specs, `*.bru`); product-spec preloaded by `planner`, qa-verification preloaded by `qa` |
 | `rules` | backend-rules, frontend-rules, architecture-resilience-rules, agent-workflow-rules, review-testing-rules | ride along on their stack's rows; `review-testing-rules` is on `always.impl` |
 
 **Provenance.** Some of these are written here from the vendor's own docs; some
@@ -239,6 +238,19 @@ standing rules and every agent carries them:
   the schema blocks; spec drift is Important. The reviewer treats a missing
   suite on an API diff as Blocking.
   `skills/process/api-contract`.
+- **Definition of done.** Every task is classified by change type - API,
+  DB schema, infra, background job, UI, config/flag, dependency bump, AI
+  agent/prompt - and its PR carries that type's artifacts beyond the code:
+  tests, contract suite, migration with a down path, rendered-manifest diff,
+  observability, docs, a rollback that was actually run. The planner stamps the
+  cells into acceptance criteria, the reviewer checks them.
+  `skills/process/definition-of-done`.
+- **Impact map and the scout rule.** Before planning, the researcher's impact
+  mode maps callers, contracts, infra and tests around the change and triages
+  every adjacent issue: must-fix (a plan task), fix-in-PR (a small task, capped
+  at 3 or 20% of the plan), follow-up (listed in the PR, not fixed). That is how
+  related bugs get fixed without a two-hour fix becoming a two-day refactor.
+  `skills/process/impact-map`.
 - **Prior art.** No ask starts from priors. At the start of every task, and
   again at every mid-task fork, look at what others do - reuse candidates
   first (an existing skill, plugin or library), then competitors, open source,

@@ -10,6 +10,46 @@ commits.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-23
+
+### Added
+
+- **`skills/process/definition-of-done`** — a change-type matrix (API endpoint,
+  DB schema, infra/k8s/Helm/Argo, background job, UI, config/flag, dependency
+  bump, AI agent/prompt) × the artifacts a PR carries beyond the code (tests,
+  contract, data change, rendered diff, observability, docs, rollout/rollback).
+  A house synthesis of Google eng-practices, the SRE launch checklist, DORA
+  capabilities and Fowler's ParallelChange; it composes `api-contract`,
+  `ux-evidence` and `superpowers:verification-before-completion` rather than
+  restating them. The planner preloads it and stamps each task's cells into its
+  acceptance criteria, implementers ship them, and the reviewer uses it as an
+  always-on lens (missing without a reason = Important). Planner, reviewer and
+  both implementers preload `definition-of-done` (and the planner and
+  implementers `impact-map`) in frontmatter rather than through the profile's
+  `always` lists, so profiles written before 0.10.0 get them with no edit.
+- **`skills/process/impact-map`** and the researcher's fifth mode, `impact`:
+  entry points, callers two hops out, API/event/DB/config contracts, infra,
+  tests and gaps, every row with file:line, plus a shared triage for adjacent
+  issues - must-fix (a plan task), fix-in-PR (a `small` task under a scout
+  budget of 3 or 20% of the plan), follow-up (listed in the PR, not fixed).
+  Only the planner spends the budget, at plan time, so the owner sees every
+  scout fix at the plan gate; implementers never fix unplanned adjacent code -
+  a must-fix is `NEEDS_CONTEXT`, anything else is appended to
+  `.graph/<run>/followups.md`, which the merge node carries into the PR body.
+  The reviewer flags unplanned adjacent edits as scope creep.
+- **`research-impact` joins the feature playbook's research MAP**, in parallel
+  with ux, tech and competitor. The plan node now stamps definition-of-done
+  rows and turns the map into tasks and a `## Follow-ups` list the merge node
+  carries into the PR body.
+
+Prior art: `graphify` was weighed as the recon engine and rejected - a whole-
+corpus LLM-extraction graph with no contract-typed edges, the wrong latency for
+a per-run map. The `caveman` plugin's `migration` and `verify-and-stop` skills
+were read but not composed, because that plugin is not a dependency of this
+one; their ideas are cited to primary sources instead (ParallelChange). The
+Claude Code `LSP` tool is not in the researcher's tool list, so the map is
+built with `rg`. Every cited URL returned 200 on 2026-09-23.
+
 ## [0.9.0] - 2026-09-23
 
 ### Added

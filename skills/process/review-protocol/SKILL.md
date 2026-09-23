@@ -64,6 +64,7 @@ skill load, on every diff they touch:
   Blocking - it is a stated house rule. Evidence that contradicts the
   experience spec or the acceptance criteria is Important. Look at the images;
   a folder that exists is not evidence that it shows the change.
+- **Definition of done** (every diff): each `definition-of-done` cell the task's acceptance criteria name has its artifact in the diff or a one-line reason. Missing with no reason is Important (Blocking where the cell is itself a house rule, like `api-contract` or `ux-evidence`). A diff that fixes adjacent code no plan task covers is Important scope creep - implementers record those in `.graph/<run>/followups.md` instead (`impact-map`); name it as a follow-up.
 - **API contract** (any API-surface diff): the collection under the profile's
   `api.collection` changes with the endpoint, and the PR body carries the
   `## API contract` section with the `bru run` command and pass line, per

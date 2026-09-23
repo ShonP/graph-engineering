@@ -326,6 +326,9 @@ routing:
     # preloaded, every implementer loads it, the reviewer checks for its note.
     # review-testing-rules is the pack every task in every stack reads; it is
     # portable now that it ships in the plugin instead of one machine's ~/.claude.
+    # definition-of-done and impact-map are NOT listed here: they apply to every
+    # task, so implementers, planner and reviewer preload them in frontmatter
+    # (spec 2.3). That also covers profiles written before 0.10.0.
     impl: [prior-art, review-testing-rules]
     review: [review-protocol, security-review, privacy-review]
     design: [ux-journey, ui-ux-pro-max]

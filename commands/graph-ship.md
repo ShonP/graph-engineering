@@ -38,6 +38,6 @@ Execute a playbook. **The engine is playbook-agnostic:** it reads `graphs/<name>
 
    A repo whose profile sets `runtime.none` still runs the qa node; qa verifies through the public surface instead of a stood-up stack, so this rule does not trap libraries and CLIs. A qa `BLOCKED` is not a fix-loop input: the system could not be stood up, which is a missing `runtime` block, seed or env, not a code defect. Treat it like `NEEDS_SETUP` (step 6) and name what is missing. The merge gate does not open on a run whose qa leg never ran.
 
-8. **Update the ledger after every node:** status, artifact path, timestamp. This is what lets a run survive compaction and what `--resume` reads. Trust it over your own recollection of what you did.
+8. **Update the ledger after every node:** status, artifact path, timestamp. Follow-ups live beside it in `.graph/<run>/followups.md` (written by the plan node, appended by implementers); the engine never rewrites that file, and the merge node reads it. This is what lets a run survive compaction and what `--resume` reads. Trust it over your own recollection of what you did.
 
 9. **Report** the run id, each node's status, and the gate verdict.
