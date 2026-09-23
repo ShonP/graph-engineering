@@ -1,25 +1,27 @@
-# feature - reduced walking skeleton
+# feature
 
-The full feature graph in the spec adds a UX design branch. This reduced form
-is deliberately the smallest graph that still proves the engine works: a gate
-that actually stops, two parallel MAPs (the four research nodes share
-`next: plan`; review and qa share `next: fix`), a dispatch that carries
+A gate that actually stops, two parallel MAPs (the research nodes feed
+`plan`, through `design` for the ux and competitor reports; review and qa
+share `next: fix`), a dispatch that carries
 spine-named skills, a review that ranks, a qa leg that runs the change, and a
 fix loop fed by both. The research MAP is here because `prior-art` is a house
 rule: no run plans from priors; `research-impact` is in it because a plan written
 from the goal alone fixes the named thing and breaks its neighbours
 (`impact-map`). The qa leg is here because review reads code
-and qa runs it; a change nobody ran is not verified. After the merge gate,
+and qa runs it; a change nobody ran is not verified. `design` is here because
+research on how others solve a moment does not say where the button goes in
+*this* app: the ux-designer captures the screens as they run now, decides
+placement against them, and writes UI acceptance rows the plan, review and qa
+are held to. It runs only when the goal has a user-facing surface (`when:
+ui`), and its owner approval is the plan gate: the plan embeds the design, so
+one stop covers both. After the merge gate,
 `post-deploy` checks the change where it was deployed and `retro` turns what
 leaked past each gate into proposed rules.
-
-Later phases add the missing nodes. Nothing here changes when they do, because
-the engine reads whatever playbook it is given.
 
 ## node: goal
 agent: planner
 in: the owner's stated goal
-out: .graph/<run>/goal.md (with the research questions for the four nodes below)
+out: .graph/<run>/goal.md (with the research questions for the four nodes below, and the `ui: yes|no - <reason>` line that decides whether `design` runs)
 gate: no
 next: research-ux, research-tech, research-competitor, research-impact
 
@@ -29,7 +31,7 @@ mode: ux
 in: .graph/<run>/goal.md
 out: .graph/<run>/research/ux.md
 gate: no
-next: plan
+next: design
 
 ## node: research-tech
 agent: researcher
@@ -45,7 +47,7 @@ mode: competitor
 in: .graph/<run>/goal.md
 out: .graph/<run>/research/competitor.md
 gate: no
-next: plan
+next: design
 
 ## node: research-impact
 agent: researcher
@@ -55,10 +57,18 @@ out: .graph/<run>/research/impact.md (callers, contracts, infra, tests, definiti
 gate: no
 next: plan
 
+## node: design
+agent: ux-designer
+when: ui
+in: .graph/<run>/goal.md, .graph/<run>/research/ux.md, .graph/<run>/research/competitor.md, the running app (the profile's `runtime`)
+out: .graph/<run>/design/experience.md with its as-is/ and to-be/ images, at the size `ux-journey`'s scale rule picks (copy change: acceptance rows only; new element: capture, placement, render, rows; new flow: everything), ending in UI acceptance rows
+gate: no
+next: plan
+
 ## node: plan
 agent: planner
-in: .graph/<run>/goal.md, .graph/<run>/research/*.md
-out: .graph/<run>/plan.md (every task stamped with its `definition-of-done` rows; must-fix and in-budget fix-in-PR items as tasks), .graph/<run>/followups.md (the map's follow-ups), .graph/<run>/research/prior-art.md
+in: .graph/<run>/goal.md, .graph/<run>/research/*.md, the experience spec from `design` when it ran
+out: .graph/<run>/plan.md (an `## Experience` section embedding the design's placement decisions, to-be renders and state table when `design` ran; every task stamped with its `definition-of-done` rows and, for UI tasks, the spec's UI acceptance rows; must-fix and in-budget fix-in-PR items as tasks), .graph/<run>/followups.md (the map's follow-ups), .graph/<run>/research/prior-art.md
 gate: yes
 next: implement
 

@@ -31,7 +31,8 @@ Three playbooks ship: `feature`, `bug` and `infra`. The feature playbook:
 ```mermaid
 flowchart LR
     goal([goal]) --> rux([research-ux]) & rtech([research-tech]) & rcomp([research-competitor]) & rimp([research-impact])
-    rux & rtech & rcomp & rimp --> plan{{"plan (gate)"}}
+    rux & rcomp --> design(["design (when ui)"])
+    design & rtech & rimp --> plan{{"plan (gate)"}}
     plan --> implement([implement])
     implement --> review([review]) & qa([qa])
     review -->|findings| fix([fix])
@@ -44,13 +45,20 @@ flowchart LR
         direction LR
         a1["planner: goal, plan, merge, retro"]
         a0["researcher: research-ux / tech / competitor / impact (parallel)"]
+        a5["ux-designer: design (captures the running UI, decides placement)"]
         a2["implementer / implementer-simple: implement, fix"]
         a3["reviewer: review"]
         a4["qa: qa (runs the change on the profile's runtime), post-deploy (read-only, on the deployed env)"]
     end
 ```
 
-Gates (`plan`, `merge`) stop and wait for the owner. The engine derives each
+Gates (`plan`, `merge`) stop and wait for the owner. When the goal changes
+anything a user sees, `design` runs first: the ux-designer captures the
+screens as they run now, decides where each new element goes and why (against
+what the app already does, with the alternatives that lost), renders the
+decision, and writes UI acceptance rows. The plan embeds it, so the plan gate
+is where the owner approves the design; implementer, reviewer and qa are held
+to it. The engine derives each
 node's REQUIRED skills from the profile's routing table matched against the
 task's files - the agent never chooses its conditional skills.
 
@@ -105,7 +113,7 @@ the owner sees it at the first gate.
 
 | Playbook | Shape | For |
 |---|---|---|
-| `feature` | goal -> research ux / tech / competitor / impact -> **plan gate** -> implement -> review ∥ qa -> fix (≤3) -> **merge gate** -> post-deploy -> retro | new behaviour, chores, mixed app + infra |
+| `feature` | goal -> research ux / tech / competitor / impact -> design (UI goals: placement in the running app) -> **plan gate** -> implement -> review ∥ qa -> fix (≤3) -> **merge gate** -> post-deploy -> retro | new behaviour, chores, mixed app + infra |
 | `bug` | report -> reproduce (a **failing test**, by qa) -> diagnose (`systematic-debugging`) -> sibling search (same bug shape elsewhere, Semgrep) -> **plan gate** -> implement -> review ∥ qa -> fix -> **merge gate** -> post-deploy -> retro | existing behaviour that is wrong |
 | `infra` | goal -> research tech / impact -> **plan gate** -> implement -> review ∥ verify (render, validate CRDs too, rendered diff, apply to a throwaway cluster) -> fix -> **merge gate** -> post-deploy -> retro | Helm, kustomize, Argo CD, manifests, gateway and policy config |
 
@@ -148,7 +156,7 @@ The full organization - seven agents, engineering only:
 |---|---|---|---|
 | `planner` | fable | spec, then task-decomposed plan with per-task sizing | specs only |
 | `researcher` | sonnet | one bounded question, five modes: ux / tech / competitor / impact (blast radius + adjacent-issue triage) / spike (strict turn budget) | reports only |
-| `ux-designer` | sonnet | experience spec before implementation; variant exploration scored against the house rubric | mockups only |
+| `ux-designer` | opus | the `design` node: captures the running UI, decides placement, writes the experience spec with UI acceptance rows; variant exploration scored against the house rubric | mockups only |
 | `implementer` | opus | one non-trivial task, test-first, with spine-named skills | yes |
 | `implementer-simple` | sonnet | one SMALL task (mechanical, 1-2 files); escalates instead of pushing through | yes |
 | `reviewer` | opus | reads the diff once through every lens it needs | no (read-only) |
@@ -278,6 +286,12 @@ standing rules and every agent carries them:
   docs, articles - rank each source, run the skepticism checklist, spike any
   load-bearing claim, and write the prior-art note. The feature graph opens
   with a four-way research MAP for this reason. `skills/process/prior-art`.
+- **Design before build.** Anything a user sees gets a placement decision made
+  against the running app, not against the component code: as-is captures, the
+  screen's existing actions and hierarchy, the prior decision it stays
+  consistent with, rejected alternatives, a to-be render, a state table. The
+  owner approves it at the plan gate; a diff that puts the element elsewhere
+  without a reason is a review finding. `skills/ux/ux-journey`.
 - **Security, privacy, accessibility** are implementer non-negotiables and
   always-on review lenses; see `agents/implementer.md` and
   `skills/process/review-protocol`.
