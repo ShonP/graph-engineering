@@ -26,8 +26,8 @@ missed check.
 ## Budget
 
 Scale to the ask. A small task gets 2-4 searches and one fetch, under five
-minutes. A feature run dispatches the `researcher` MAP (ux, tech, competitor in
-parallel) and each report has its own turn budget. A spike gets its dispatch's
+minutes. A feature run dispatches the `researcher` MAP (ux, tech, competitor, impact
+in parallel) and each report has its own turn budget. A spike gets its dispatch's
 `maxTurns` and reports `PARTIAL` when it runs out. Research past the budget is
 procrastination wearing a lab coat.
 
@@ -97,7 +97,7 @@ Skipped          : <reason>   (only when the skip rule applied)
 | Role | Duty |
 | --- | --- |
 | planner | goal node frames the research questions; plan node reads the reports, writes the note, and names the reuse decision before any build task |
-| researcher | executes ux / tech / competitor / spike modes; the note cites its reports |
+| researcher | executes ux / tech / competitor / impact / spike modes; the note cites its reports |
 | implementer | reads the run's note before code; runs the small-task version when there is none; re-fires on any mid-task trigger and appends to the note |
 | reviewer | plan or PR without a prior-art note or a written skip reason is Important; new code that re-implements an available, adequate library or skill is Important |
 | ux-designer | pattern research in `ux-journey` step 3 is this rule for UX; cite patterns, not pixels |
