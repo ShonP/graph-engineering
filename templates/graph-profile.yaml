@@ -97,6 +97,31 @@ runtime:
   env: []
   none: ""
 
+# How qa proves an infra change (`infra-verification`). `cluster` is a
+# THROWAWAY cluster the run creates and deletes, with its own kubeconfig file -
+# never an existing cluster, never ~/.kube/config. Leave `cluster` empty for
+# static-only verification (render, validate, policy, diff): qa then reports
+# `PASS (static-only)` for what it checked, the merge gate shows that, and
+# --auto-merge refuses it. A kind node image is about 1 GB; check disk first.
+#   cluster.create   e.g. kind create cluster --name ge-${GRAPH_RUN_ID} --kubeconfig ${KUBECONFIG} --wait 120s
+#   cluster.delete   e.g. kind delete cluster --name ge-${GRAPH_RUN_ID} --kubeconfig ${KUBECONFIG}
+#   cluster.context  e.g. kind-ge-${GRAPH_RUN_ID}
+#                    (qa sets KUBECONFIG to the ABSOLUTE path
+#                    $REPO_ROOT/.graph/<run>/kubeconfig in the same command)
+#   prereqs          pinned commands that install the operators/CRDs the
+#                    rendered CRs need on the throwaway cluster (Argo CD, CNPG,
+#                    Envoy Gateway, cert-manager...); a CR without its
+#                    controller is validated but reported SKIPPED live
+#   render           override for the Argo-faithful default render; ${APP} and
+#                    ${OUT} are substituted per Application
+#   policy           run per rendered file with ${RENDERED} set to its path,
+#                    e.g. conftest test ${RENDERED} -p policy/ ; empty = none
+infra:
+  cluster: { create: "", delete: "", context: "" }
+  prereqs: []
+  render: ""
+  policy: ""
+
 # House rule: every API change ships a Bruno suite in the same PR, and qa runs
 # it against `runtime`. Bruno sets no convention for where a collection lives,
 # so this is the house one. See `api-contract`.
@@ -218,28 +243,33 @@ routing:
     review: [temporal-developer, architecture-resilience-rules]
   # GitOps: Argo CD Applications. Argo renders Helm and kustomize, so both ride
   # along; kubectl is on the qa half because verification happens on a cluster.
+  # infra-verification (render, validate, diff, ephemeral apply) rides on every
+  # infra row: the implementer produces the rendered diff, qa runs the recipe.
   "argocd/**/*.{yaml,yml}":
-    impl: [argocd, helm, kubectl, architecture-resilience-rules]
+    impl: [argocd, helm, kubectl, architecture-resilience-rules, infra-verification]
     review: [argocd, helm]
-    qa: [kubectl]
+    qa: [kubectl, infra-verification]
   # Plain Kubernetes manifests, kustomize overlays included.
   "manifests/**":
-    impl: [kubectl, kustomize]
+    impl: [kubectl, kustomize, infra-verification]
     review: [kubectl]
-    qa: [kubectl]
+    qa: [kubectl, infra-verification]
   # Helm: a chart's metadata, and the templates it renders. The templates row is
   # anchored under chart/ or charts/ on purpose: a bare **/templates/** also
   # matches every other meaning of the word, including this plugin's own
   # templates/graph-profile.yaml, and would route helm at a profile edit.
   "**/Chart.yaml":
-    impl: [helm]
+    impl: [helm, infra-verification]
     review: [helm]
+    qa: [infra-verification]
   "**/{chart,charts}/**/templates/**/*.{yaml,yml,tpl}":
-    impl: [helm]
+    impl: [helm, infra-verification]
     review: [helm]
+    qa: [infra-verification]
   "**/kustomization.{yaml,yml}":
-    impl: [kustomize]
+    impl: [kustomize, infra-verification]
     review: [kustomize]
+    qa: [infra-verification]
   # CloudNativePG: a glob cannot see `apiVersion: postgresql.cnpg.io`, so route on
   # the directory that holds your Cluster manifests (forge: manifests/forge-pg*).
   "**/{postgres,cnpg}/**":

@@ -10,6 +10,49 @@ commits.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-09-23
+
+### Added
+
+- **`graphs/bug.md`** — report -> reproduce -> diagnose -> sibling-search ->
+  plan gate -> implement -> review ∥ qa -> fix -> merge gate. It keeps the spec's
+  §5.2 agents and its `compose: superpowers:systematic-debugging`, and adds a
+  reproduction that is a failing automated test written by qa before any code
+  moves, a sibling search for the same bug shape elsewhere (Semgrep rule with
+  `pattern-not-inside` for the guard; spiked on semgrep 1.174.0: found the
+  seeded bug and its one unguarded sibling, skipped the guarded site), and qa
+  re-running the reproduction on the live stack.
+- **`graphs/infra.md`** — goal -> research tech ∥ impact -> plan gate ->
+  implement -> review ∥ verify -> fix -> merge gate, for deployment config.
+- **`skills/process/infra-verification`** — render as Argo does (release name,
+  `--namespace`, `--include-crds`, its value files; one file per Application),
+  validate, policy, rendered diff against base, apply to a throwaway cluster
+  (prereq operators, namespaces, CRDs Established, then the rest), smoke,
+  rollback render, teardown. The run owns its kubeconfig
+  (`.graph/<run>/kubeconfig`), so the developer's current-context is never
+  touched and no cluster the run did not create is ever used. With no cluster
+  configured it reports `PASS (static-only)`, which the merge gate shows and
+  `--auto-merge` refuses. Spiked: kubeconform v0.8.0
+  errors on every CRD without a schema and `-ignore-missing-schemas` silently
+  skips them, so the recipe adds the datree CRDs-catalog schema location, which
+  failed an Argo `Application` missing `destination`/`project` and passed a
+  complete one. helm v4.2.4 lint/template and a planted `containerPort` type
+  error (caught, exit 1) also spiked. conftest and kube-linter are named but
+  were not run.
+- **Profile `infra` block** (`cluster.create/delete/context`, `prereqs`,
+  `render`, `policy` with `${RENDERED}`), empty by default; `/graph-init` proposes it and lists the existing
+  contexts qa will never touch.
+- **Engine: triage, `skills:`/`compose:`, worktree.** With no `--graph`, the
+  engine classifies the goal as bug, infra or feature and records the pick and
+  its reason as the ledger's first line - no question asked; every playbook
+  gates at `plan` before product code moves, and the pick heads that gate's
+  exhibit. `--resume` never re-triages: it uses the run's playbook copy. Nodes
+  receive their `out:` contract, and the implementer has a diagnose role that
+  investigates without fixing. A node's `skills:` and `compose:` join its REQUIRED list.
+  The run's worktree is created before the first node that writes (qa's
+  reproduction test included). The fix loop re-runs every node that feeds
+  `fix`, so infra's `verify` is re-run like feature's `qa`.
+
 ## [0.10.0] - 2026-09-23
 
 ### Added
