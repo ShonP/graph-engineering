@@ -7,20 +7,20 @@ license: MIT
 # NATS JetStream
 
 Written against **NATS Server 2.14.6**, **nats-py 2.16.0** (PyPI, published 2026-09-16) and
-**natscli 0.4.0** — the versions the measurements below were taken on. Docs fetched
-2026-09-23, HTTP 200:
+**natscli 0.4.0** — the versions the measurements below were taken on. Fetched 2026-09-23,
+HTTP 200. docs.nats.io is unversioned, so its pages are pinned to the `nats.docs` commit
+current on that date (`f115bec`, 2026-08-24, i.e. the 2.14 docs); source is pinned to tags:
 
-- https://docs.nats.io/nats-concepts/jetstream/streams - "Streams"
-- https://docs.nats.io/running-a-nats-service/configuration/securing_nats/authorization - "Authorization"
-- https://nats-io.github.io/nats.py/ - nats-py API reference
-- https://github.com/nats-io/nats-architecture-and-design/blob/main/adr/ADR-1.md - the
-  `$JS.API` subject namespace
+- https://github.com/nats-io/nats.docs/blob/f115becf6563e3bbe16bb94cbf87bfceb84199c1/nats-concepts/jetstream/streams.md
+- https://github.com/nats-io/nats.docs/blob/f115becf6563e3bbe16bb94cbf87bfceb84199c1/running-a-nats-service/configuration/securing_nats/authorization.md
+- https://github.com/nats-io/nats.py/blob/v2.16.0/nats/src/nats/js/client.py - nats-py 2.16.0
+- https://github.com/nats-io/nats-architecture-and-design/blob/02f151ed4918978ec35593f22be6c5e6eb909ca3/adr/ADR-1.md
+  - the `$JS.API` subject namespace
 
-Measured in-repo, rung 1 — every rule marked "measured" was run against a live 2.14.6 server
-and most were watched going red first:
-`docs/adr/0004-nats-jetstream-bus.md`, "Per-user permissions" (as shipped) and "What SP1's
-proposal got wrong, measured on a real 2.14.6 server";
-`docs/adr/0016-outbox-relay-under-crash.md` §§8, 10, 11.
+Measured in-house, rung 1 — every rule marked "measured" was run against a live 2.14.6 server
+and most were watched going red first. **ADR 00nn** is `Equival-io/forge-platform`
+`docs/adr/00nn-*.md` (a private repo): 0004 "Per-user permissions" and "What SP1's proposal
+got wrong, measured on a real 2.14.6 server"; 0016 §§8, 10, 11.
 
 ## When to apply
 
@@ -38,8 +38,7 @@ proposal got wrong, measured on a real 2.14.6 server";
 - **`Nats-Msg-Id` only dedupes inside the stream's `duplicate_window`.** Outside it, a
   redelivered copy is stored as a new message. The window is a stream config value and it is
   the *only* thing making a publish idempotent — pick it deliberately against how long a
-  crashed producer might take to come back.
-  https://docs.nats.io/nats-concepts/jetstream/streams
+  crashed producer might take to come back (`streams.md`, `DuplicateWindow`).
 - **A JetStream publish is a request.** `js.publish` is `nc.request` under the hood: the
   `PubAck` comes back on the client's own inbox, which is why `_INBOX.>` is not optional (see
   Authorization).
@@ -63,10 +62,11 @@ Measured, ADR 0004: the sharpest failure in this file.
 - **`pull_subscribe_bind(durable=..., stream=...)`, not `pull_subscribe`.** The second
   *creates* the consumer; in a GitOps repo the consumer is a declared resource and a service
   identity holds no create right.
-- **Ask `consumer_info` before binding.** `pull_subscribe_bind` makes no API call, so a typo
+- **Ask `consumer_info` before binding.** `pull_subscribe_bind` makes no API call — it is a
+  core `subscribe` on a fresh inbox (`client.py:625-689` at v2.16.0) — so a typo
   in the durable name binds to nothing and the pod idles forever looking healthy. Worse,
-  `fetch` cannot tell the two 404s apart — nats-py's `_is_temporary_error` reads the status
-  code only, so `404 Consumer Not Found` is swallowed exactly like `404 No Messages`.
+  `fetch` cannot tell the two 404s apart — nats-py's `_is_temporary_error` (`client.py:707`)
+  reads the status code only, so `404 Consumer Not Found` is swallowed exactly like `404 No Messages`.
   Distinguish up front: 404 is a permanent misconfiguration, **503** is JetStream not ready
   yet (a rolling restart, no meta leader) and is worth retrying with a bounded count.
 - **Handlers must be order-independent as well as idempotent.** Measured (ADR 0016 §8):
@@ -77,14 +77,16 @@ Measured, ADR 0004: the sharpest failure in this file.
 
 ### Authorization - the part that fails silently
 
-Subjects are the only vocabulary: "the moment you write an allow list, every subject not on
-it is denied", and **a user with no `permissions` block can do anything on the server**.
-https://docs.nats.io/running-a-nats-service/configuration/securing_nats/authorization
+Subjects are the only vocabulary. Once a user has an allow-list, anything "that has not been
+_allow listed_ ... fails and is logged at the server" (`authorization.md`, verbatim), and
+**a user with no `permissions` block — and no `default_permissions` — can do anything on
+the server** (ADR 0004, measured: such a user could purge `forge-events`).
 
 - **`*` is ONE WHOLE TOKEN, so `forge-*` matches nothing.** Measured: a list written as
   `$JS.API.CONSUMER.MSG.NEXT.forge-*.>` reads as if it grants every `forge-` stream and
   grants none of them — the token is the literal string `forge-*`. Name each stream.
-- **`_INBOX.>` on every subscribe allow-list.** Without it every JetStream publish times out,
+- **`_INBOX.>` on every subscribe allow-list** (`authorization.md`: "you need to add rules
+  for the `_INBOX.>` pattern"). Without it every JetStream publish times out,
   and a relay reads a timeout as a failure and eventually marks the row dead (ADR 0016 §11).
 - **Scope ack subjects per stream: `$JS.ACK.<stream>.>`, never `$JS.ACK.>`.** The ack subject
   embeds stream and consumer, so a blanket grant lets any holder settle **another identity's**
@@ -175,11 +177,24 @@ https://docs.nats.io/running-a-nats-service/configuration/securing_nats/authoriz
 ```bash
 # 1. Server and client versions the rules were measured against.
 nats server info --json 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["version"])'
-uv run python -c 'import nats; print(nats.__version__)'
-# expect: 2.14.6 and 2.16.0
+uv run python -c 'import importlib.metadata as m; print(m.version("nats-py"))'
+# expect: 2.14.6 and 2.16.0   (nats-py has no nats.__version__; it is an AttributeError)
 
-# 2. Every subscribe names its stream. Expect no output.
-grep -rn 'pull_subscribe\|js.subscribe' src/ | grep -v 'stream='
+# 2. Every JetStream subscribe names its stream. A grep hits the docstrings that WARN about
+#    it and misses a stream= on the next line; this reads the AST. Expect no output.
+uv run python - src <<'PY'
+import ast, pathlib, sys
+JS = {"pull_subscribe", "pull_subscribe_bind"}  # `.subscribe` counts only on a js receiver
+for f in sorted(pathlib.Path(sys.argv[1]).rglob("*.py")):
+    for n in ast.walk(ast.parse(f.read_text())):
+        if not (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)):
+            continue
+        name, receiver = n.func.attr, ast.unparse(n.func.value).lower()
+        if (name in JS or (name == "subscribe" and "js" in receiver)) \
+                and not any(k.arg == "stream" for k in n.keywords):
+            print(f"{f}:{n.lineno}: {ast.unparse(n.func)}(...) without stream=")
+PY
+# On `js.pull_subscribe("s", durable="d")` and `js.subscribe("s")` it prints one line each.
 
 # 3. Binding, not creating, and info before bind.
 grep -rn 'pull_subscribe_bind\|consumer_info' src/
