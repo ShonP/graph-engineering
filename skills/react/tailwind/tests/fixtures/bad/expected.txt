@@ -1,0 +1,34 @@
+bad/Arbitrary.tsx:2: bg-[red]
+bad/Arbitrary.tsx:2: text-[#f00]
+bad/Arbitrary.tsx:3: border-[oklch(0.5_0.2_27)]
+bad/Arbitrary.tsx:3: fill-[rebeccapurple]
+bad/Inline.tsx:2: backgroundColor: 'red'
+bad/Inline.tsx:5: color: "white"
+bad/Inline.tsx:9: rgb(0 0 0)
+bad/Palette.tsx:2: text-white
+bad/Palette.tsx:2: bg-black/50
+bad/Palette.tsx:3: bg-mauve-500
+bad/Palette.tsx:3: border-olive-200
+bad/Palette.tsx:4: text-mist-700
+bad/Palette.tsx:4: ring-taupe-300
+bad/Palette.tsx:4: bg-slate-900
+bad/Palette.tsx:5: bg-red-500!
+bad/Palette.tsx:5: from-rose-500
+bad/Palette.tsx:5: border-t-zinc-200
+bad/Palette.tsx:6: bg-primary
+bad/Palette.tsx:6: text-primary-foreground
+bad/Palette.tsx:6: ring-offset-ring
+bad/Palette.tsx:7: via-taupe-400
+bad/Palette.tsx:7: to-white
+bad/Palette.tsx:7: mask-t-from-mist-200
+bad/app.css:2: color: red
+bad/app.css:3: #333
+bad/app.css:4: hsl(0 0% 0%)
+bad/app.css:7: text-white
+bad/literals.ts:1: #FFF
+bad/literals.ts:2: #ffffff80
+bad/literals.ts:3: #abcd
+bad/literals.ts:4: #1234
+bad/literals.ts:5: hsl(210 40% 50%)
+bad/literals.ts:6: oklch(0.7 0.1 200)
+bad/literals.ts:7: color-mix(in oklab, var(--color-bg) 50%, black)

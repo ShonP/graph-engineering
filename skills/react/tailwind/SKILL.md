@@ -87,9 +87,7 @@ Sources (fetched 2026-09-24):
 - Because the tokens flip, **components do not write `dark:` for colour.** `dark:` remains for
   non-colour differences (an image swap). By default `dark:` follows `prefers-color-scheme` only
   and ignores a `.dark` class unless `@custom-variant dark (&:where(.dark, .dark *));` is declared.
-  https://tailwindcss.com/docs/dark-mode - `frontend-rules` says "use `dark:` variants"; with a
-  token layer that rule is satisfied by the tokens, and where the consuming repo's house rule says
-  otherwise, the house rule wins.
+  https://tailwindcss.com/docs/dark-mode
 - Each dark token pair meets WCAG AA contrast (4.5:1 text, 3:1 large text and UI boundaries) in
   **both** schemes; check the pair, not the colour.
 
@@ -99,8 +97,10 @@ Sources (fetched 2026-09-24):
   `rgb()`/`hsl()`/`oklch()`, no arbitrary colour (`bg-[#f00]`, `text-[oklch(...)]` -
   *measured*: arbitrary values still compile after the palette reset), no palette utility
   (`bg-red-500`), no `style={{ color: ... }}`. Colours exist in one file: the preset.
-- The plan-level grep `grep -rn "#[0-9a-f]\{6\}"` misses uppercase, 3- and 8-digit hex, every
-  functional colour and every palette utility; use the check under Verify.
+- A one-line grep misses uppercase, 3-, 4- and 8-digit hex, functional colours, named colours
+  (`bg-[red]`, `backgroundColor: 'red'`), `text-white` and the 4.3 palettes (`mauve`, `olive`,
+  `mist`, `taupe`), and flags `border-t-bg`, `ring-offset-bg`, `placeholder-shown:` and `#1234` in
+  a comment. Use the shipped script under Verify; its fixtures cover every one of those.
 
 ### Copied shadcn components onto house tokens
 
@@ -153,31 +153,20 @@ export const cn = (...inputs: ClassValue[]) => twMerge(clsx(inputs));
 
 ## Verify
 
+`scripts/check-no-literal-colours.sh` in this skill's directory (bash; node does the parsing).
+The preset is the first argument and the only exemption; its `--color-*` declarations are the
+token list, so a class naming anything else - a palette colour, `text-white`, a leftover shadcn
+`bg-primary` - is reported. Paths are separate arguments: zsh does not word-split `$SRC`, and
+the script exits 2 on a missing path, a preset with no token, or nothing to scan, so a mis-split
+list fails instead of passing on nothing. Tested by `tests/test_check_no_literal_colours.sh`
+against good and bad fixtures (run by the plugin's `scripts/check-skill-scripts.sh`).
+
 ```bash
-SRC="apps packages"            # component trees; the preset file is the only exemption
-PRESET=packages/config/tailwind.css
+# No literal colour outside the preset: hex, functional and named colours, arbitrary colour
+# values, colour-bearing style props, and colour utilities that name no declared token.
+bash "<this skill's dir>/scripts/check-no-literal-colours.sh" packages/config/tailwind.css apps packages
+# expect: no output, exit 0 (1 = violations as file:line: match; 2 = usage error)
 
-# 1. No literal colour outside the preset: hex, functional colours, arbitrary values, inline styles.
-grep -rnE --include='*.ts' --include='*.tsx' --include='*.css' \
-  '#[0-9a-fA-F]{3,8}\b|\b(rgba?|hsla?|oklch|oklab|lab|lch|color)\(|-\[(#|rgb|hsl|oklch)|style=\{\{[^}]*color' \
-  $SRC | grep -v "^$PRESET:" | grep -v node_modules
-# expect: no output
-
-# 2. No default-palette utility (the reset makes them silent no-ops).
-grep -rnoE --include='*.tsx' '\b[a-z-]+-(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-[0-9]{2,3}\b' $SRC | grep -v node_modules
-# expect: no output
-
-# 3. Every colour utility names a declared token (catches leftover shadcn names).
-node -e '
-const fs=require("fs"),path=require("path");
-const NONCOLOUR=/^(none|transparent|current|inherit|solid|dashed|dotted|double|hidden|x|y|t|b|l|r|s|e|offset|inset|auto|cover|contain|center|top|bottom|left|right|fixed|local|scroll|repeat|no-repeat|repeat-x|repeat-y|(clip|origin|linear|radial|conic|blend)(-[a-z-]+)?)$/;
-const tokens=new Set([...fs.readFileSync(process.argv[1],"utf8").matchAll(/--color-([a-z0-9-]+)\s*:/g)].map(m=>m[1]));
-const walk=d=>fs.readdirSync(d,{withFileTypes:true}).flatMap(e=>e.name==="node_modules"?[]:e.isDirectory()?walk(path.join(d,e.name)):/\.tsx$/.test(e.name)?[path.join(d,e.name)]:[]);
-let bad=0; for (const f of process.argv.slice(2).flatMap(walk)) for (const m of fs.readFileSync(f,"utf8").matchAll(/\b(?:bg|border|ring|fill|stroke|outline|divide|accent|caret|decoration|placeholder)-([a-z][a-z-]*[a-z])\b/g))
-  if (!tokens.has(m[1]) && !NONCOLOUR.test(m[1])) { console.log(f, m[0]); bad=1 }
-process.exit(bad)' $PRESET apps packages
-# expect: no output, exit 0 (extend the allow-list regex only for non-colour suffixes)
-
-# 4. Versions the rules were written for.
+# Versions the rules were written for.
 pnpm -r ls --depth 0 tailwindcss @tailwindcss/vite tailwind-merge   # expect 4.3.3, 4.3.3, 3.7.0
 ```

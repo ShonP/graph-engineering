@@ -1,0 +1,8 @@
+.banner {
+  color: red;
+  border: 1px solid #333;
+  background: hsl(0 0% 0%);
+}
+.tag {
+  @apply text-white bg-bg;
+}
