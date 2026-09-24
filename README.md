@@ -187,7 +187,7 @@ developer's.
 |---|---|---|
 | `ios` | swiftui-pro, healthkit, widgetkit, activitykit, photokit, push-notifications | `**/*.swift`, plus dir globs per framework |
 | `android` | compose-state, compose-ui, compose-performance, compose-build-and-test, kotlin-concurrency, kotlin-control-flow, kotlin-functions, kotlin-types-value-class | `**/*.{kt,kts}` |
-| `react` | react-rules, tanstack-query-rules, tanstack-router | `**/*.{ts,tsx}` |
+| `react` | react-rules, tanstack-query-rules, tanstack-router, tailwind, forms-i18n, turborepo | `**/*.{ts,tsx}`; tailwind also on `**/*.css`, forms-i18n on `**/{i18n,locales}/**` and `*.{form,forms}.tsx`, turborepo on `**/turbo.json`, `pnpm-workspace.yaml`, `**/package.json` |
 | `supabase` | supabase, supabase-postgres-best-practices | `**/*.sql` |
 | `python` | uv, pydantic, pydantic-house-rules, fastapi, building-pydantic-ai-agents, pydantic-ai-harness | `**/*.py`, `**/{pyproject.toml,uv.lock,.python-version}`; building-pydantic-ai-agents on `**/agents/**/*.py`; pydantic-ai-harness by the agent catalogs only, no routing row |
 | `agents` | microsoft-agent-framework | `**/agents/**/*.py` |
@@ -238,7 +238,9 @@ body. Pre-allow `Bash(npx:*)` and `Bash(npm:*)` on the runner, or pass
 How each skill was sourced, and what was rejected:
 `docs/superpowers/plans/2026-09-10-stack-skills.md` and
 `docs/research/2026-09-10-stack-skills-sourcing.md`; for `ruff`, `sqlalchemy`,
-`loguru` and `nats`, `docs/research/2026-09-23-python-skills-sourcing.md`.
+`loguru` and `nats`, `docs/research/2026-09-23-python-skills-sourcing.md`; for
+`tailwind`, `forms-i18n` and `turborepo`,
+`docs/research/2026-09-24-frontend-skills-sourcing.md`.
 
 ## House rules
 

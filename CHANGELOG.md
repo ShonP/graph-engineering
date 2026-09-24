@@ -10,6 +10,35 @@ commits.
 
 ## [Unreleased]
 
+### Added
+
+- **Three frontend competencies in `skills/react/`**, written from pinned vendor
+  docs plus rung-1 measurements on the exact versions (sourcing pass:
+  `docs/research/2026-09-24-frontend-skills-sourcing.md`; every upstream
+  candidate rejected with the lack named).
+  - `tailwind` - Tailwind 4.3.3: the `@theme` token preset with the palette
+    reset, light and dark values that flip without `dark:`, why `@theme inline`
+    breaks that, `@source` for workspace packages, the no-literal-colour check
+    (shipped as `scripts/check-no-literal-colours.sh`, tokens read from the
+    preset, fixture-tested by `check-skill-scripts.sh`),
+    and `cn()` configured so tailwind-merge 3.7.0 stops dropping a colour next to
+    a custom `text-*` size.
+  - `forms-i18n` - react-hook-form 7.88 + zod 4 + `@hookform/resolvers` 5.9
+    (the resolver path never moved; zod's did), the accessible `Field`,
+    validation messages as keys with a zod `customError` fallback, i18next 26 +
+    react-i18next 17 init, typed keys, and the DOM-walk test for hard-coded copy.
+  - `turborepo` - turbo 2.11.3 + pnpm 12.6.0: pipelines, `outputs`, remote cache
+    off by config, `--frozen-lockfile`, filters, and the rule that every package
+    declares `lint` and `typecheck` (otherwise the PostToolUse hook runs
+    `turbo run lint <file>` at the root and fails).
+- Template routing: `**/*.css` -> `tailwind`; `**/{i18n,locales}/**` and
+  `**/*.{form,forms}.tsx` -> `forms-i18n`; `**/turbo.json`,
+  `pnpm-workspace.yaml`, `**/package.json` -> `turborepo`; the
+  `**/*.{ts,tsx}` row's `impl` and `review` gain `tailwind` and `forms-i18n`.
+- `frontend-rules` defers colour and dark mode to `tailwind` (tokens in the
+  `@theme` preset flip themselves; `dark:` only for non-colour) and catalogue
+  paths to `forms-i18n` (`i18n/<ns>.<lng>.json`).
+
 ## [0.13.1] - 2026-09-23
 
 ### Added
