@@ -36,9 +36,13 @@ Sources (fetched 2026-09-24, turbo 2.11.3 current):
 
 - The root `package.json` declares exactly the contract graph-engineering's hooks key on:
   `test`, `lint`, `typecheck`, `e2e`, each `turbo run <task>` (plus `build`). The Stop hook runs
-  `pnpm run test` at the root; the PostToolUse hook runs `pnpm run lint <file>` and
-  `pnpm run typecheck` from the **nearest** `package.json` that declares them
-  (`hooks/scripts/lint-touched-file.sh`).
+  `pnpm run test` at the root; the PostToolUse hook runs `<pm> run lint <file>` and
+  `<pm> run typecheck` in the **nearest** `package.json` that declares them, and picks `<pm>`
+  from the lockfile in **that** directory (`hooks/scripts/lint-touched-file.sh`,
+  `package_manager`). A workspace package has no lockfile of its own, so inside one the hook
+  runs `npm run lint <file>`: the package scripts must work under npm (plain binaries, no
+  `pnpm`-only syntax); `pnpm` is chosen only at the root, where `pnpm-lock.yaml` lives.
+  *Measured* (npm 11.12.1): `npm run lint <file>` runs fine in a package with `workspace:*` deps.
 - **Every workspace package declares its own `lint` and `typecheck`** (and `test` where it has
   tests). *Measured:* when a package declares neither, the hook walks up to the root and runs
   `pnpm run lint /abs/path/file.tsx`, which becomes `turbo run lint /abs/path/file.tsx` and fails
