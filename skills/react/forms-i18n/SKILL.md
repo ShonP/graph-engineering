@@ -170,6 +170,9 @@ The DOM-walk test (*measured*: passes on a clean form, and reports `["Click here
 literal is added) - one per rendered state, in the component's Vitest file:
 
 ```ts
+import type { i18n as I18n } from 'i18next';
+import type { ZodType } from 'zod';
+
 // catalogue values become matchers; {{vars}} match anything
 export function catalogueMatchers(i18n: I18n, lng = 'en'): RegExp[] {
   const out: RegExp[] = [];
@@ -191,11 +194,24 @@ export function literalsNotInCatalogue(root: Element, matchers: RegExp[]): strin
   }
   return found;
 }
+// every message a schema emits, from inputs that break each rule; with the customError
+// fallback set an unkeyed rule yields its key, and an English sentence fails i18n.exists
+export function schemaKeys(schema: ZodType, invalid: unknown[]): string[] {
+  return invalid.flatMap((input) => {
+    const r = schema.safeParse(input);
+    if (r.success) throw new Error(`schemaKeys: input breaks no rule: ${JSON.stringify(input)}`);
+    return r.error.issues.map((i) => i.message);
+  });
+}
 // in each state's test:
 expect(literalsNotInCatalogue(container, catalogueMatchers(i18n))).toEqual([]);
-// and for each schema:
-expect(schemaKeys.filter((k) => !i18n.exists(k))).toEqual([]);
+// and for each schema, one input per rule:
+expect(schemaKeys(HelloForm, [{}, { name: ' ' }]).filter((k) => !i18n.exists(k))).toEqual([]);
 ```
+
+*Measured* (tsc 5.9.3 `--strict`, zod 4.6.5, i18next 26.4.2): the block typechecks; `schemaKeys`
+returns `['common:form.invalid', 'hello:form.name.required']` for a one-rule form, and reports
+`'Invalid input: expected number, received undefined'` when the `customError` fallback is unset.
 
 It cannot tell a hard-coded `"Retry"` from `t('common:retry')` when the two strings are equal;
 the typed keys and review cover that case.
