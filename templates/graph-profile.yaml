@@ -191,10 +191,30 @@ api:
 routing:
   # ux-evidence rides on every UI-bearing extension: the implementer captures,
   # the reviewer checks, qa verifies against the running system.
+  #
+  # tailwind and forms-i18n ride on every TS/TSX file, not only on the rows
+  # below: a component's class list and its copy live in the .tsx, and a glob
+  # cannot tell a form or a styled component from any other file. The union is
+  # cheaper than the rows a component file would miss.
   "**/*.{ts,tsx}":
-    impl: [react-rules, tanstack-query-rules, tanstack-router, frontend-rules, ux-evidence]
+    impl: [react-rules, tanstack-query-rules, tanstack-router, frontend-rules, ux-evidence, tailwind, forms-i18n]
     review: [react-rules, tanstack-query-rules, frontend-rules, ux-evidence]
     qa: [ux-evidence]
+  # Tailwind v4: every stylesheet - the @theme preset (e.g. packages/config/
+  # tailwind.css in the house layout) and each app's entry CSS that imports it.
+  "**/*.css":
+    impl: [tailwind]
+    review: [tailwind]
+  # Forms and i18n: the catalogues, and form components named as such.
+  "{**/{i18n,locales}/**,**/*.{form,forms}.tsx}":
+    impl: [forms-i18n]
+    review: [forms-i18n]
+  # Turborepo + pnpm workspaces: the root pipeline and any package-level
+  # turbo.json (`extends: ["//"]`), the workspace list, and every package
+  # manifest (scripts, packageManager, workspace: deps).
+  "{**/turbo.json,pnpm-workspace.yaml,**/package.json}":
+    impl: [turborepo]
+    review: [turborepo]
   "**/*.swift":
     impl: [swiftui-pro, ux-evidence]
     review: [swiftui-pro, ux-evidence]
