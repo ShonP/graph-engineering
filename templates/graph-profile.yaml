@@ -198,7 +198,7 @@ routing:
   # cheaper than the rows a component file would miss.
   "**/*.{ts,tsx}":
     impl: [react-rules, tanstack-query-rules, tanstack-router, frontend-rules, ux-evidence, tailwind, forms-i18n]
-    review: [react-rules, tanstack-query-rules, frontend-rules, ux-evidence]
+    review: [react-rules, tanstack-query-rules, frontend-rules, ux-evidence, tailwind, forms-i18n]
     qa: [ux-evidence]
   # Tailwind v4: every stylesheet - the @theme preset (e.g. packages/config/
   # tailwind.css in the house layout) and each app's entry CSS that imports it.

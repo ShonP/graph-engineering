@@ -14,8 +14,10 @@ Use for React + Tailwind frontend work.
 - Simple, sleek Apple-style design.
 - Tailwind CSS for all styling.
 - No inline styles, no `sx` prop, no CSS-in-JS.
-- Use `dark:` variants for dark mode.
-- Never hardcode colors; use design tokens/theme via Tailwind config.
+- Colour and dark mode follow the `tailwind` skill: never hardcode a colour; every colour is a
+  semantic token declared in the `@theme` preset (Tailwind v4, CSS-first; no `tailwind.config.js`).
+  Tokens flip light/dark themselves, so components do not write `dark:` for colour; `dark:` is only
+  for non-colour differences.
 - Use logical properties: `ms-`, `me-`, `ps-`, `pe`; never left/right.
 - Use `FC` for components.
 - Remove unused imports and variables.
@@ -40,7 +42,8 @@ Component/
 - `react-hook-form` for forms.
 - `@tanstack/react-query` for data fetching.
 - TanStack Router for routing.
-- `react-i18next` for i18n; update only `en.json` unless explicitly asked.
+- `react-i18next` for i18n; catalogues and their paths follow the `forms-i18n` skill
+  (`i18n/<ns>.<lng>.json`); update only the `en` catalogues unless explicitly asked.
 - `lucide-react` for icons.
 - `axios`; use `instance.ts`.
 
