@@ -36,6 +36,8 @@ bad/literals.ts:6: oklch(0.7 0.1 200)
 bad/literals.ts:7: color-mix(in oklab, var(--color-bg) 50%, black)
 bad/Svg.tsx:2: fill="red"
 bad/Svg.tsx:3: stroke="white"
+bad/Svg.tsx:4: fill={'red'}
+bad/Svg.tsx:5: stopColor='blue'
 bad/Tokens.tsx:2: bg-(--color-brand)
 bad/Tokens.tsx:2: bg-[var(--color-brand)]
 bad/Tokens.tsx:3: var(--color-brand)
