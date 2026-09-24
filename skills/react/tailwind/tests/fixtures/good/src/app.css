@@ -3,5 +3,6 @@
   color: var(--color-fg);
   border-collapse: collapse;
   transition-property: color, border-color;
-  @apply bg-bg text-fg border-border;
+  @apply bg-bg text-fg border-border border-b;
+  background: url(red.png);
 }

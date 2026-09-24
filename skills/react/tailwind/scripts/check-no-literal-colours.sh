@@ -15,8 +15,9 @@
 #
 # Paths are arguments, never a word-split variable: zsh does not split
 # `$SRC`, and a check fed one path named "apps packages" must fail, not pass.
-# The rules live in check-no-literal-colours.mjs beside this file (node is a
-# given in any repo that runs Tailwind).
+# The rules live in check-no-literal-colours.mjs beside this file. Needs
+# Node >= 20 (Tailwind 4's floor) - node is a given in any repo that runs
+# Tailwind.
 set -euo pipefail
 command -v node >/dev/null 2>&1 || { echo "check-no-literal-colours: node is required" >&2; exit 2; }
 exec node "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/check-no-literal-colours.mjs" "$@"

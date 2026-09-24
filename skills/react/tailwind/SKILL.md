@@ -153,13 +153,17 @@ export const cn = (...inputs: ClassValue[]) => twMerge(clsx(inputs));
 
 ## Verify
 
-`scripts/check-no-literal-colours.sh` in this skill's directory (bash; node does the parsing).
-The preset is the first argument and the only exemption; its `--color-*` declarations are the
-token list, so a class naming anything else - a palette colour, `text-white`, a leftover shadcn
-`bg-primary` - is reported. Paths are separate arguments: zsh does not word-split `$SRC`, and
-the script exits 2 on a missing path, a preset with no token, or nothing to scan, so a mis-split
-list fails instead of passing on nothing. Tested by `tests/test_check_no_literal_colours.sh`
-against good and bad fixtures (run by the plugin's `scripts/check-skill-scripts.sh`).
+`scripts/check-no-literal-colours.sh` in this skill's directory (bash; node does the parsing;
+needs **Node >= 20**, Tailwind 4's own floor). The preset is the first argument and the only
+exemption; its `--color-*` declarations are the token list, so a class naming anything else - a
+palette colour, `text-white`, a leftover shadcn `bg-primary` - is reported. A `var(--color-X)`,
+`bg-(--color-X)` or `bg-[var(--color-X)]` naming a `--color-*` variable the preset never
+declares is reported the same way; other token namespaces (`--text-*`, `--shadow-*`) and a
+`var()` with a fallback argument are not checked by this rule. Paths are separate arguments: zsh
+does not word-split `$SRC`, and the script exits 2 on a missing path, a preset with no token, or
+nothing to scan, so a mis-split list fails instead of passing on nothing. Tested by
+`tests/test_check_no_literal_colours.sh` against good and bad fixtures (run by the plugin's
+`scripts/check-skill-scripts.sh`).
 
 ```bash
 # No literal colour outside the preset: hex, functional and named colours, arbitrary colour

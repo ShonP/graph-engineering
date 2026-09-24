@@ -15,6 +15,12 @@ export const Button = ({ className }: { className?: string }) => (
     <p className="text-shadow-sm drop-shadow-lg inset-shadow-xs decoration-wavy fill-none stroke-2 text-inherit border-current" />
     <p className="text-wrap text-ellipsis border-spacing-2 border-separate border-solid ring-inset" style={{ width: 4 }} />
     <p style={{ borderColor: 'var(--color-border)' }} className="transition-[color,border-color]" />
+    <p className="border-b border-l-4 border-r border-y border-s border-e-2 border-t-[3px]" />
+    <p style={{ backgroundImage: 'url(https://ex.com/red.png)' }} />
+    <svg fill="currentColor" aria-hidden="true">
+      <path stroke="none" />
+      <path fill="var(--color-fg)" />
+    </svg>
     <TextInput />
   </div>
 );
