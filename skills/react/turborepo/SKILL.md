@@ -82,13 +82,20 @@ The house `turbo.json`:
   "remoteCache": { "enabled": false },
   "tasks": {
     "build":     { "dependsOn": ["^build"], "outputs": ["dist/**"] },
-    "lint":      { "outputs": [] },
+    "transit":   { "dependsOn": ["^transit"] },
+    "lint":      { "dependsOn": ["transit"], "outputs": [] },
     "typecheck": { "dependsOn": ["^build"], "outputs": [] },
     "test":      { "dependsOn": ["^build"], "outputs": [] },
     "e2e":       { "dependsOn": ["build"], "cache": false }
   }
 }
 ```
+
+`lint` has no build edge, so without the `transit` node a change to a dependency's lint config
+(`@forge/config`'s eslint rules) never enters the consumer's cache key and `pnpm lint` replays a
+stale pass. *Measured* on forge-frontend (turbo 2.11.3): a rule added to `packages/config` gave
+`hello-web:lint: cache hit` and exit 0 before, `cache miss` and exit 1 after
+(https://turborepo.dev/docs/crafting-your-repository/configuring-tasks, "Transit Nodes").
 
 ### Remote cache: off, and said so
 
