@@ -28,6 +28,10 @@ command -v python3 >/dev/null 2>&1 || {
   exit 1
 }
 
+# Unit cases use the same supported runtime as production hooks.
+. "$HOOKS_DIR/scripts/python-runtime.sh"
+ge_python_runtime || exit 1
+
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/ge-hook-tests.XXXXXX")" || exit 1
 # Canonicalise: on macOS $TMPDIR is a symlink, and the hooks canonicalise the
 # paths they are handed, so the fixture paths have to match what they resolve to.
@@ -131,7 +135,7 @@ run_hook_no_project_dir() {
 }
 
 event_json() { # event_json <event> [key=value ...]
-  python3 "$TESTS_DIR/make-input.py" "$@"
+  "$GE_PYTHON" "$TESTS_DIR/make-input.py" "$@"
 }
 
 post_json() { event_json PostToolUse "file_path=$1"; }
@@ -147,13 +151,13 @@ for script in "$LINT" "$STOP" "$HANDOFF"; do
     check "executable: $(basename "$script")" 0 1
   fi
 done
-python3 -m json.tool "$HOOKS_DIR/hooks.json" >/dev/null 2>&1
+"$GE_PYTHON" -m json.tool "$HOOKS_DIR/hooks.json" >/dev/null 2>&1
 check "hooks.json parses as JSON" 0 $?
 for script in "$LINT" "$STOP" "$HANDOFF"; do
   bash -n "$script" 2>/dev/null
   check "parses as bash: $(basename "$script")" 0 $?
 done
-python3 -c 'import ast, sys; ast.parse(open(sys.argv[1]).read(), sys.argv[1])' \
+"$GE_PYTHON" -c 'import ast, sys; ast.parse(open(sys.argv[1]).read(), sys.argv[1])' \
   "$HOOKS_DIR/scripts/resolve_touched_project.py" 2>/dev/null
 check "resolve_touched_project.py parses" 0 $?
 

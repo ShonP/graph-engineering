@@ -152,3 +152,25 @@ not, so the JSON is checked here with `python3 -m json.tool`.
 - https://code.claude.com/docs/en/plugins-reference "Plugins reference - Claude Code Docs"
 - https://docs.astral.sh/uv/concepts/projects/run/ "Running commands | uv"
 - https://taskfile.dev/reference/cli/ "Command Line Interface Reference | Task"
+
+## Explicit project checks and linked worktrees
+
+Hooks require Python 3.11+ (`tomllib`). They use a compatible Python on PATH or
+an already installed uv interpreter; they do not download one during a hook.
+An unavailable supported interpreter fails visibly instead of skipping checks.
+
+For Make-based projects or a custom test gate, commit `.claude/graph-checks.json`:
+
+```json
+{"version": 1, "test": {"argv": ["make", "check"], "timeout_seconds": 600}}
+```
+
+The Stop hook executes that argv directly in the candidate root. Missing runners,
+invalid configuration, timeout or nonzero exit block completion. Choose a command
+that itself rejects zero tests and skipped required cases. Without this file,
+existing script discovery remains available; no discovered script is not QA proof.
+Linked Git worktrees resolve through their common Git directory, including nested
+worktrees. A different repository in a Stop event fails with a binding error.
+Post-edit lint remains informational; Stop gates and graph receipts provide the
+completion checks. Run the regressions with `bash hooks/tests/run-tests.sh` and
+`python3 hooks/tests/test_configured_checks.py`.

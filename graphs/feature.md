@@ -21,13 +21,14 @@ leaked past each gate into proposed rules.
 ## node: goal
 agent: planner
 in: the owner's stated goal
-out: .graph/<run>/goal.md (with the research questions for the four nodes below, and the `ui: yes|no - <reason>` line that decides whether `design` runs)
+out: .graph/<run>/goal.md (with bounded research questions for applicable nodes, a `product-discovery: yes|no - <reason>` line, and the `ui: yes|no - <reason>` line that decides whether `design` runs)
 gate: no
 next: research-ux, research-tech, research-competitor, research-impact
 
 ## node: research-ux
 agent: researcher
 mode: ux
+when: ui
 in: .graph/<run>/goal.md
 out: .graph/<run>/research/ux.md
 gate: no
@@ -44,6 +45,7 @@ next: plan
 ## node: research-competitor
 agent: researcher
 mode: competitor
+when: product-discovery
 in: .graph/<run>/goal.md
 out: .graph/<run>/research/competitor.md
 gate: no
@@ -60,7 +62,7 @@ next: plan
 ## node: design
 agent: ux-designer
 when: ui
-in: .graph/<run>/goal.md, .graph/<run>/research/ux.md, .graph/<run>/research/competitor.md, the running app (the profile's `runtime`)
+in: .graph/<run>/goal.md, research/ux.md and research/competitor.md when their nodes ran (otherwise their recorded skip reason and any accepted prior-art evidence), the running app (the profile's `runtime`)
 out: .graph/<run>/design/experience.md with its as-is/ and to-be/ images, at the size `ux-journey`'s scale rule picks (copy change: acceptance rows only; new element: capture, placement, render, rows; new flow: everything), ending in UI acceptance rows
 gate: no
 next: plan
@@ -68,7 +70,7 @@ next: plan
 ## node: plan
 agent: planner
 in: .graph/<run>/goal.md, .graph/<run>/research/*.md, the experience spec from `design` when it ran
-out: .graph/<run>/plan.md (an `## Experience` section embedding the design's placement decisions, to-be renders and state table when `design` ran; every task stamped with its `definition-of-done` rows and, for UI tasks, the spec's UI acceptance rows; must-fix and in-budget fix-in-PR items as tasks), .graph/<run>/followups.md (the map's follow-ups), .graph/<run>/research/prior-art.md
+out: .graph/<run>/plan.json (validated contracts, dependencies, witnesses and acceptance cases), .graph/<run>/plan.md (an `## Experience` section embedding the design's placement decisions, to-be renders and state table when `design` ran; every task stamped with its `definition-of-done` rows and, for UI tasks, the spec's UI acceptance rows; must-fix and in-budget fix-in-PR items as tasks), .graph/<run>/followups.md (the map's follow-ups), .graph/<run>/research/prior-art.md
 gate: yes
 next: implement
 
