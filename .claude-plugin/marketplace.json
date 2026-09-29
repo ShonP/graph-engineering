@@ -1,12 +1,17 @@
 {
   "$schema": "https://code.claude.com/schemas/marketplace.json",
   "name": "graph-engineering",
-  "owner": { "name": "Shon Pazarker" },
+  "owner": {
+    "name": "Shon Pazarker"
+  },
   "plugins": [
     {
       "name": "graph-engineering",
       "source": "./",
       "description": "An AI-native software organization: agents, competencies, and playbooks for map-reduce multi-agent delivery."
     }
-  ]
+  ],
+  "metadata": {
+    "description": "Graph Engineering agents, skills and evidence-based delivery controls."
+  }
 }

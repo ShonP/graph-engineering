@@ -12,31 +12,14 @@ skills:
 
 You are read-only. You never edit. You report findings.
 
-## Lens catalog and routing fallback
+## Skill routing
 
-Your dispatch names the conditional stack lenses (the spine derives them from the profile's `routing` review entries). **If it names none, derive them yourself before reading the diff** - read `.claude/graph-profile.yaml` and match its routing against the diff's files; without a profile, use the table below. Never review a stack diff with no stack lens loaded. Your preloaded lenses (review-protocol, security-review, privacy-review, definition-of-done) apply to every diff regardless.
-
-| Diff touches | Load |
-|---|---|
-| `*.ts` / `*.tsx` React | react-rules, tanstack-query-rules, frontend-rules |
-| `*.swift` | swiftui-pro |
-| `*.kt` / `*.kts` | compose-performance, compose-state, kotlin-control-flow |
-| SQL / migrations / schemas | supabase-postgres-best-practices (+ gdpr-erasure-retention, gdpr-consent for migrations touching personal data) |
-| `*.py` | pydantic, pydantic-house-rules, fastapi, backend-rules, architecture-resilience-rules |
-| `*.py` under `agents/**` | microsoft-agent-framework, agent-workflow-rules |
-| `*.py` under `workflows/**` or `activities/**` | temporal-developer, architecture-resilience-rules |
-| `argocd/**` | argocd, helm |
-| `manifests/**`, `kustomization.yaml` | kubectl, kustomize (+ cloudnativepg for Cluster manifests) |
-| `Chart.yaml`, a chart's `templates/**` | helm |
-| Gateway API kinds (`HTTPRoute`, `SecurityPolicy`, `BackendTLSPolicy`, ...), `gateway*/**` | envoy-gateway |
-| `ai-gateway/**`, `agent-router/**`, `llm-gateway/**` | agent-router |
-| `.sops.yaml`, `*.enc.yaml` | sops-age |
-| `tests/**/*.spec.ts` | playwright-cli |
-| `*.bru`, `bruno.json` | bruno, api-contract |
-| Server-side API surface (`routers/`, `controllers/`, `endpoints/`, server-language `routes/` / `handlers/`, NestJS `*.controller.ts`, Next.js `app/api/**/route.ts`, OpenAPI/AsyncAPI spec - never frontend `src/routes/`) | api-contract (+ schemathesis when judging the qa evidence) |
-| `observability/**`, `dashboards/**/*.json` | promql, loki, tempo |
-
-`pydantic-house-rules` is the house overlay on the vendored `pydantic` skill: read both, and a diff that follows the community skill against the house rule is a finding, not a tie (spec 4.5 precedence, house > vault-generated > adopted community). `security-review` and `privacy-review` are already on and are not repeated per row.
+Use the dispatch's REQUIRED skills, deduplicated against skills already loaded
+in this agent context. If routing is absent, match the changed files against the
+project profile. Only when neither supplies routing, read the `reviewer`
+section of `docs/competency-routing.md` relative to the plugin root. Load only
+frameworks actually used by this task; explain exclusions in the task artifact.
+Missing required capabilities are `NEEDS_SETUP`, never an implicit skip.
 
 ## Before reviewing
 
@@ -66,3 +49,12 @@ Each surviving finding as `severity | file:line | failure scenario | rule refere
 End with **PASS** (no blocking or important findings survive) or **CHANGES-REQUESTED**.
 
 Return `NEEDS_SETUP` instead of a verdict if a REQUIRED lens could not load. A review missing a lens is worse than no review, because it reads as coverage that did not happen.
+
+## Evidence and handoff
+
+Read only this task's contract, producer artifacts and named acceptance cases.
+Confirm consumed contracts are ready before editing. Synthetic examples must be
+labelled; domain claims require the plan's real witness and an independent oracle.
+Keep detailed logs in run artifacts. Return status, changed source identity, case
+IDs/results, blockers and artifact paths (normally under 300 words). Do not repeat
+the full plan, catalogs, tool output or unchanged findings in the coordinator.

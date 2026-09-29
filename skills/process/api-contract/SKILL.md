@@ -30,6 +30,22 @@ success and 422 unless the route declares `responses=`. A repo with no schema
 gets one in the first API task that touches it; without it Schemathesis has
 nothing to generate from and the API loses its second layer.
 
+Success responses need meaningful schemas for their actual body, including nested
+fields, enums and nullability. Declare the actual error envelope/status and
+media type (SSE is `text/event-stream`, not JSON). Commit a reproducible schema
+snapshot and representative wire fixtures; CI must fail on drift. Consumers
+validate structural types and values against that pinned artifact, never silently
+skip because a sibling checkout is absent.
+
+## Named acceptance cases
+
+Use stable case IDs in request names and reports, tied to the plan's cases. A case
+records setup, input, expected values, oracle and cleanup. Cover invalid input,
+empty output, cancellation/retry and composed failures where applicable. Derive
+expected values from the contract or a verified real witness, not the helper
+being tested. Label fake activities and synthetic data so a passing isolated
+suite cannot be mistaken for a real scanner or production test.
+
 ## What counts as an API change
 
 - a new, removed or renamed endpoint, method or path parameter
@@ -49,7 +65,7 @@ Per endpoint touched, in its own folder so it runs alone (`bru run <folder>`):
 | Case | Assert |
 | --- | --- |
 | Happy path | status, and the **values** that matter (`jsonBody` / `jsonSchema`), not just 200 |
-| Auth | unauthenticated -> 401; wrong principal / tenant -> 403 or 404 (never another tenant's data) |
+| Auth | exercise the actual authentication/authorization boundary; protected routes reject missing credentials and the wrong principal/tenant; deliberately public routes state why auth cases are N/A |
 | Validation | one malformed or missing required field -> 4xx with the documented error envelope |
 | Edge | the case the criteria name: empty list, pagination end, idempotent retry, conflict |
 | Non-leak | a field that must NOT appear (internal ids, debug info, PII) is absent |
@@ -96,8 +112,9 @@ One `--env-var` per token name in the profile's `runtime.env`: an unbound
 for a reason that is not a code defect. The report path is absolute because bru
 runs from the collection directory.
 
-Exit code is the gate (0 pass, 1 any failed assertion). Read the output; a run
-that prints no assertions asserted nothing.
+Require both a successful exit code and a complete report with nonzero requests
+and assertions, all required case IDs, and zero failed/skipped required cases.
+A setup failure, missing binary, empty suite or missing report is BLOCKED/FAIL.
 
 Then Schemathesis, per `schemathesis`: the gate checks
 (`not_a_server_error,response_schema_conformance`) as pass/fail, then the full
@@ -113,7 +130,7 @@ writes included.
 | planner | every task touching an API surface gets the criteria "Bruno suite under `api.collection` covers the cases in `api-contract`, runs green against `runtime`" and "Schemathesis gate checks pass against `runtime`" |
 | implementer | keeps the schema current, writes the requests with the code, test-first where it can (the request goes red before the handler exists); runs the Bruno folder and the Schemathesis gate locally before `DONE`, and lists both commands and results in the report |
 | reviewer | API diff with no collection change and no stated reason = **Blocking** (stated house rule); an endpoint whose returned statuses are missing from the schema, a request asserting only status, or a missing auth case = Important |
-| qa | runs the touched Bruno folders, then the whole collection, then Schemathesis (gate, then drift report-only) against the running stack; a failed request or gate check is a `FAILED` row with the report path and seed; drift goes to `.graph/<run>/qa-findings.json` as Important findings |
+| qa | runs one complete required Bruno suite (use a touched subset during iteration, without repeating it unnecessarily), then Schemathesis (gate, then drift report-only) against the running stack; a failed request or gate check is a `FAILED` row with the report path and seed; drift goes to `.graph/<run>/qa-findings.json` as Important findings |
 
 ## Anti-patterns
 
