@@ -20,6 +20,7 @@ uv run scripts/graph-control.py status [--line] [--root /absolute/repo] [--sessi
 uv run scripts/graph-control.py depth --root /absolute/candidate --base <rev> --profile /absolute/repo/.claude/graph-profile.yaml [--plan /absolute/run/plan.json]
 uv run scripts/graph-control.py findings /absolute/run/review-1.md [/absolute/run/review-2.md ...] [--counts]
 uv run scripts/graph-control.py waves /absolute/run/plan.json [--max-width 4]
+uv run scripts/graph-control.py validate-briefs /absolute/run
 uv run scripts/graph-control.py host-check --root /absolute/repo [--min-free-gb 20] [--profile /absolute/repo/.claude/graph-profile.yaml]
 ```
 
@@ -27,9 +28,9 @@ uv run scripts/graph-control.py host-check --root /absolute/repo [--min-free-gb 
 
 `fingerprint` hashes canonical JSON (sorted keys, compact separators). File hash fields instead use SHA-256 of the exact file bytes. `snapshot` prints `source` suitable for a candidate. Put mutable run artifacts outside candidate source roots, or in a deliberately ignored run directory; otherwise adding a receipt correctly changes the dirty source fingerprint. Record source identity **after** implementation and before checks. After changing source, update the manifest and rerun affected checks; do not relabel old receipts. `record-receipt` and `verify` rerun read-only preflight from the manifest's bound profile/playbook paths. A changed plan, profile or graph invalidates the candidate contract.
 
-## Plan schema (version 1)
+## Plan schema (versions 1 and 2)
 
-All listed fields are required. Unknown/duplicate keys and duplicate IDs are rejected. Arrays below may be empty unless the example/comment says otherwise.
+`schema_version` is 1 or 2; any other value is rejected. Version 2 is version 1 plus the optional success signals below. All fields in this example are required in both versions. Unknown/duplicate keys and duplicate IDs are rejected. Arrays below may be empty unless the example/comment says otherwise.
 
 ```json
 {
@@ -58,6 +59,39 @@ All listed fields are required. Unknown/duplicate keys and duplicate IDs are rej
 Every case has an owning task. Every task has at least one case and writable path. Stateful tasks need a case with at least two named transition events/states. Real-world claims set `requires_real: true`; synthetic witnesses cannot satisfy them. Witness kinds are exactly `real` or `synthetic`. A reviewer must verify the witness's **truth and relevance**: the parser cannot discover that a supposedly real Solr fixture was invented, or that a range belongs to another product.
 
 Contract producers are unique. A consumed contract's producer must be an ancestor dependency; all consumed fields must exist. External contracts must already exist and have evidence in the case/research artifacts. Dependencies reject cycles/unknown tasks. Unordered tasks cannot claim overlapping writable paths. Glob overlap uses a conservative static-prefix check: ambiguous ownership must be narrowed or serialized. Paths are repo-qualified relative paths, without `..`.
+
+### Success signals (version 2)
+
+A version 2 plan may add two optional top-level keys (shown alone below; the rest of the plan is as above); a version 1 plan carrying either is rejected, so adding signals means bumping `schema_version` to 2. Every other file this tool reads (run.json, receipt stores, event state, attempts) still requires `schema_version` 1.
+
+```json
+{
+  "schema_version": 2,
+  "success_signals": [{
+    "goal": "checkout errors stay rare", "source": "prometheus",
+    "command": ["promtool", "query", "instant", "http://prometheus:9090", "sum(rate(checkout_errors_total[1d]))"],
+    "success_condition": "value <= 0.01", "window_days": 7
+  }]
+}
+```
+
+- `goal`: nonempty text, the outcome in the user's terms.
+- `source`: exactly `prometheus`, `sentry`, `sql-readonly` or `command`.
+- `command`: a nonempty argv array of nonempty strings (repeated flags are fine). It must return one aggregate number; row-level queries are a planner and reviewer rule, which this parser cannot detect.
+- `success_condition`: the grammar below.
+- `window_days`: an integer from 1 to 90.
+- `success_signals: []` is valid only with a nonempty `success_signals_reason` (internal, refactor and infra work usually has no user-facing signal). The reason is rejected next to a nonempty list, or without the list, because it only explains an empty one. Omitting both keys is also valid.
+
+`success_condition` is a deterministic grammar, matched against the whole string:
+
+```
+condition := "value" SP op SP rhs
+op        := "<" | "<=" | ">" | ">=" | "=="
+rhs       := number | "baseline" SP "*" SP number [ SP "+" SP number ]
+number    := [ "-" ] digits [ "." digits ]
+```
+
+`SP` is exactly one space, `digits` are ASCII 0-9, and nothing may precede or follow. `value` is the command's result; `baseline` is the value the measuring step recorded before the change shipped. Accepted: `value <= 0.01`, `value >= baseline * 1.1 + 5`, `value < baseline * 2 + -0.5`. Rejected: `value < foo`, `x > 1`, `value != 1`, `value<=1`, `value >= 1.1 * baseline`, `value > 1e3`. graph_control validates and stores signals; it never runs a signal's command.
 
 ## Run schema (version 1)
 
@@ -211,7 +245,7 @@ The Stop hook (`hooks/scripts/configured_check.py test`) memoizes the verdict of
 
 `graph-control check <root> --reuse` reads `<root>/.claude/graph-checks.json`, computes the same key and returns `{"status":"PASS","verdict":"pass|fail|timeout","observed_at":"...","exit_code":0}`. It never executes anything. A tree with no stored verdict returns BLOCKED `no memo for the current tree`; a missing config, a config with no test block or a malformed `test.argv`, a root that is not the Git worktree root, and a set `GRAPH_CHECKS_NO_MEMO` are BLOCKED with the reason. `--reuse` is required: graph-control never runs project commands, so replay is the only mode. The memo is a speed cache, not merge evidence: the merge gate still proves checks with receipts (`record-receipt`, `verify`).
 
-## doctor, status, depth, findings, waves, host-check
+## doctor, status, depth, findings, waves, validate-briefs, host-check
 
 Read-only plug-in commands; like every control, none executes project commands.
 
@@ -220,6 +254,7 @@ Read-only plug-in commands; like every control, none executes project commands.
 - `depth --root <candidate> --base <rev> --profile <profile.yaml> [--plan <plan.json>]` picks the review depth for a diff and returns `{depth: lint|single|panel, changed_lines, files, risk_rows, reasons, untracked_excluded}`. A `risk:` row matches on a path glob or on a keyword found, spelled exactly (case-sensitive), in an added line; a row with neither is a placeholder and matches nothing, except `outside-the-run`: with `--plan`, it matches when a changed path is in no task's `writable_paths` (repo-relative globs). `lint` is prose by file type only (`*.md`, `*.markdown`, `*.rst`, `*.adoc`, and README, CHANGELOG, LICENSE and similar named files, bare or `.txt`), never by directory: `docs/conf.py`, `requirements.txt` and `CMakeLists.txt` are code, and MDX is not prose.
 - `findings <files...> [--counts]` reads reviewer finding files; an absent file is BLOCKED.
 - `waves <plan.json> [--max-width N]` returns `{waves: [[task ids]], max_width}`: the plan's topological levels from `depends_on` (`Plan.levels()`, the same loop `validate` uses), with tasks in plan order within a level. A level wider than `N` splits into consecutive sub-waves, still in plan order, so a diamond (A; B and C depend on A; D on both) gives `[[A],[B,C],[D]]`, and five independent tasks at `--max-width 2` give `[[1,2],[3,4],[5]]`. The default 4 is the engine's sub-cap on concurrent opus agents; `N` must be a positive integer (argparse exit 2 otherwise). Tasks in one wave never claim overlapping `writable_paths`, because validation rejects overlaps between unordered tasks. The plan is fully validated first, so an invalid plan is BLOCKED with the `validate-plan` message.
+- `validate-briefs <run-dir>` returns `{briefs: N}` when every task in `<run-dir>/plan.json` has a brief at `<run-dir>/tasks/<id>.md` of at most 300 lines, with at most 35% of its lines in fenced code blocks (fence lines included). Otherwise it is BLOCKED, naming every failing task in plan order with the file and the limit, for example `T2: tasks/T2.md has 8 of 20 lines fenced (limit 35%)`; a missing or blank brief, and a task id that is not a plain file name under `tasks/`, are BLOCKED the same way. Fences follow CommonMark: up to three spaces of indent, then three or more backticks or tildes; the closing fence uses the same character, is at least as long and has nothing after it; an unclosed fence runs to the end of the file. The plan is fully validated first, so an invalid plan is BLOCKED with the `validate-plan` message.
 - `host-check --root <repo> [--min-free-gb 20] [--profile <profile.yaml>]` returns host findings before a run fans out: free disk against the minimum, load average against the core count, `core.bare` of the root's Git config, how many commits the checkout is behind the upstream default branch (local refs only, never a fetch), and docker reachability, checked only when the profile's `runtime` mentions docker or compose. Only free disk below `--min-free-gb` is BLOCKED; every other finding is advisory and the command still returns PASS.
 
 ## Regression suite
@@ -228,4 +263,4 @@ Read-only plug-in commands; like every control, none executes project commands.
 uv run --python 3.12 --with PyYAML==6.0.2 python -m unittest discover -s tests/graph_control -v
 ```
 
-Fixtures cover the command-module registry, guard-agent policy semantics, plan levels and wave splitting, the check memo (key identity, cap, corrupt store, stdlib-only import) and `check --reuse`, the audited FE3→FE4 missing edge, unavailable planned count, synthetic-as-real evidence, composed workflow transitions, missing QA graph/runtime, missing models/skills, lint-only false gates, exact source/dirty/runtime freshness, log drift, zero/skipped cases, later failures, repair limits, event coalescing, and a public CLI record→verify→wrong-candidate failure sequence. Semantic witness truth and meaningful oracle quality remain model-review/evaluation cases rather than parser claims.
+Fixtures cover the command-module registry, guard-agent policy semantics, plan levels and wave splitting, plan schema v2 success signals and the condition grammar, brief size and fenced-share limits, the check memo (key identity, cap, corrupt store, stdlib-only import) and `check --reuse`, the audited FE3→FE4 missing edge, unavailable planned count, synthetic-as-real evidence, composed workflow transitions, missing QA graph/runtime, missing models/skills, lint-only false gates, exact source/dirty/runtime freshness, log drift, zero/skipped cases, later failures, repair limits, event coalescing, and a public CLI record→verify→wrong-candidate failure sequence. Semantic witness truth and meaningful oracle quality remain model-review/evaluation cases rather than parser claims.

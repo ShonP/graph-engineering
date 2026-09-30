@@ -94,5 +94,7 @@ def load(path: Path) -> Any:
     return json.loads(path.read_text(), object_pairs_hook=no_duplicates, parse_constant=invalid_number)
 
 
-def version(value: Any) -> None:
-    require(type(value) is int and value == 1, "schema_version must be 1")
+def version(value: Any, allowed: frozenset[int] = frozenset({1})) -> int:
+    require(type(value) is int and value in allowed,
+            f"schema_version must be {' or '.join(str(item) for item in sorted(allowed))}")
+    return value

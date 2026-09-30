@@ -1,10 +1,39 @@
-"""Task contracts: dependency reachability, witnesses, ownership and cases."""
+"""Task contracts: dependency reachability, witnesses, ownership, cases and success signals."""
 
 import re
 from dataclasses import dataclass
 from typing import Any
 
 from .common import array, boolean, choice, obj, require, strings, text, unique, version
+
+NUMBER = r"-?[0-9]+(?:\.[0-9]+)?"
+CONDITION = re.compile(rf"value (<=|>=|==|<|>) (?:({NUMBER})|baseline \* ({NUMBER})(?: \+ ({NUMBER}))?)")
+SOURCES = {"prometheus", "sentry", "sql-readonly", "command"}
+SIGNAL_KEYS = {"success_signals", "success_signals_reason"}
+
+
+@dataclass(frozen=True)
+class Signal:
+    """A post-merge outcome the plan promises to watch. Stored as data; graph_control never runs it."""
+
+    goal: str
+    source: str
+    command: tuple[str, ...]
+    success_condition: str
+    window_days: int
+
+    @classmethod
+    def parse(cls, value: Any) -> "Signal":
+        row = obj(value, "goal source command success_condition window_days")
+        command = tuple(text(item) for item in array(row["command"]))
+        require(bool(command), "success signal command must be a nonempty argv")
+        condition = row["success_condition"]
+        require(isinstance(condition, str) and CONDITION.fullmatch(condition) is not None,
+                f"success_condition must be 'value <op> <number>' or "
+                f"'value <op> baseline * <number> [+ <number>]', got {condition!r}")
+        days = row["window_days"]
+        require(type(days) is int and 1 <= days <= 90, "window_days must be an integer 1-90")
+        return cls(text(row["goal"]), choice(row["source"], SOURCES), command, condition, days)
 
 
 @dataclass(frozen=True)
@@ -72,14 +101,24 @@ class Plan:
     cases: tuple[Case, ...]
     tasks: tuple[Task, ...]
     external_contracts: tuple[Contract, ...]
+    success_signals: tuple[Signal, ...] = ()
+    success_signals_reason: str | None = None
 
     @classmethod
     def parse(cls, value: Any) -> "Plan":
-        row = obj(value, "schema_version cases tasks external_contracts")
-        version(row["schema_version"])
+        row = obj(value, "schema_version cases tasks external_contracts", " ".join(sorted(SIGNAL_KEYS)))
+        schema = version(row["schema_version"], frozenset({1, 2}))
+        require(schema == 2 or not row.keys() & SIGNAL_KEYS,
+                "success_signals and success_signals_reason need schema_version 2")
+        signals = tuple(Signal.parse(x) for x in array(row.get("success_signals", [])))
+        empty = "success_signals" in row and not signals
+        reason = text(row["success_signals_reason"]) if "success_signals_reason" in row else None
+        require(not empty or reason is not None, "an empty success_signals list needs a success_signals_reason")
+        require(reason is None or empty, "success_signals_reason only explains an empty success_signals list")
         result = cls(tuple(Case.parse(x) for x in array(row["cases"])),
                      tuple(Task.parse(x) for x in array(row["tasks"])),
-                     tuple(Contract.parse(x) for x in array(row["external_contracts"])))
+                     tuple(Contract.parse(x) for x in array(row["external_contracts"])),
+                     signals, reason)
         result.validate()
         return result
 

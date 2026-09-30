@@ -96,5 +96,94 @@ class PlanTests(unittest.TestCase):
             Plan.parse(data)
 
 
+SIGNAL = {"goal": "checkout errors stay rare", "source": "prometheus",
+          "command": ["promtool", "query", "instant", "http://prometheus:9090", "sum(rate(errors[1d]))"],
+          "success_condition": "value <= 0.01", "window_days": 7}
+
+
+def v2(**extra):
+    """A SYNTHETIC schema v2 plan: the v1 fixture plus the given top-level keys."""
+    return {**plan_data(), "schema_version": 2, **extra}
+
+
+class SuccessSignalTests(unittest.TestCase):
+    def test_v1_parses_without_signals(self):  # AC-W4-SS-01
+        plan = Plan.parse(plan_data())
+        self.assertEqual((plan.success_signals, plan.success_signals_reason), ((), None))
+
+    def test_v1_rejects_signal_keys(self):  # AC-W4-SS-01
+        for extra in ({"success_signals": [SIGNAL]}, {"success_signals": []},
+                      {"success_signals_reason": "internal refactor"}):
+            with self.subTest(extra=extra), self.assertRaisesRegex(Invalid, "schema_version 2"):
+                Plan.parse({**plan_data(), **extra})
+
+    def test_v2_without_signals_parses(self):
+        self.assertEqual(Plan.parse(v2()).success_signals, ())
+
+    def test_v2_valid_signals_parse(self):  # AC-W4-SS-02
+        second = {**SIGNAL, "source": "sql-readonly", "command": ["psql", "-c", "select count(*) from orders"],
+                  "success_condition": "value >= baseline * 1.1 + 5", "window_days": 90}
+        plan = Plan.parse(v2(success_signals=[SIGNAL, second]))
+        self.assertEqual([(s.source, s.window_days) for s in plan.success_signals],
+                         [("prometheus", 7), ("sql-readonly", 90)])
+        self.assertEqual(plan.success_signals[1].command, ("psql", "-c", "select count(*) from orders"))
+
+    def test_empty_signals_need_a_reason(self):  # AC-W4-SS-02
+        with self.assertRaisesRegex(Invalid, "success_signals_reason"):
+            Plan.parse(v2(success_signals=[]))
+        with self.assertRaises(Invalid):
+            Plan.parse(v2(success_signals=[], success_signals_reason=" "))
+        plan = Plan.parse(v2(success_signals=[], success_signals_reason="internal refactor, no user signal"))
+        self.assertEqual(plan.success_signals_reason, "internal refactor, no user signal")
+
+    def test_reason_only_explains_an_empty_list(self):
+        for extra in ({"success_signals_reason": "why"},
+                      {"success_signals": [SIGNAL], "success_signals_reason": "why"}):
+            with self.subTest(extra=extra), self.assertRaisesRegex(Invalid, "success_signals_reason"):
+                Plan.parse(v2(**extra))
+
+    def test_bad_signal_fields_rejected(self):  # AC-W4-SS-02
+        for change in ({"source": "datadog"}, {"success_condition": "value < foo"}, {"window_days": 0},
+                       {"window_days": 91}, {"window_days": True}, {"window_days": 7.0}, {"goal": ""},
+                       {"command": []}, {"command": "promtool query"}, {"command": ["promtool", 1]},
+                       {"command": ["promtool", ""]}):
+            with self.subTest(change=change), self.assertRaises(Invalid):
+                Plan.parse(v2(success_signals=[{**SIGNAL, **change}]))
+
+    def test_signal_fields_are_exact(self):
+        missing = {key: value for key, value in SIGNAL.items() if key != "window_days"}
+        for signal in (missing, {**SIGNAL, "query": "rows"}):
+            with self.subTest(signal=signal), self.assertRaisesRegex(Invalid, "fields"):
+                Plan.parse(v2(success_signals=[signal]))
+
+    def test_argv_may_repeat_a_flag(self):
+        command = ["curl", "-H", "a: 1", "-H", "b: 2", "https://sentry.example.invalid/api"]
+        Plan.parse(v2(success_signals=[{**SIGNAL, "source": "sentry", "command": command}]))
+
+    def test_condition_grammar(self):  # AC-W4-SS-03
+        accepted = ["value <= 0.01", "value >= baseline * 1.1 + 5", "value < 3", "value > -1",
+                    "value == 0", "value >= baseline * 0.95", "value < baseline * 2 + -0.5"]
+        rejected = ["value < foo", "x > 1", "value != 1", "value => 1", "value <= 0.01 ", " value <= 1",
+                    "value<=1", "value >= baseline", "value >= 1.1 * baseline", "value >= baseline * 1.1 - 5",
+                    "value > 1e3", "value > .5", "value > 1 and value < 2", "", "VALUE > 1"]
+        for condition in accepted:
+            with self.subTest(accepted=condition):
+                Plan.parse(v2(success_signals=[{**SIGNAL, "success_condition": condition}]))
+        for condition in rejected:
+            with self.subTest(rejected=condition), self.assertRaises(Invalid):
+                Plan.parse(v2(success_signals=[{**SIGNAL, "success_condition": condition}]))
+
+    def test_unknown_plan_versions_rejected(self):
+        for value in (0, 3, "2", True, 2.0):
+            with self.subTest(value=value), self.assertRaisesRegex(Invalid, "schema_version must be 1 or 2"):
+                Plan.parse({**plan_data(), "schema_version": value})
+
+    def test_v2_keeps_plan_validation(self):
+        data = v2(success_signals=[SIGNAL])
+        data["tasks"][0]["depends_on"] = ["T1"]
+        with self.assertRaisesRegex(Invalid, "cyclic or unknown"):
+            Plan.parse(data)
+
+
 if __name__ == "__main__":
     unittest.main()
