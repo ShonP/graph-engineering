@@ -1,0 +1,46 @@
+# after: branch ge-t-w4-digest-status, synthetic session fixture plus synthetic run artifacts, full status
+$ python3 -m graph_control.status
+graph-engineering status · session syntheti · out 48k
+RUNNING (3)
+  0192f3ab:review          reviewer(opus)               12m!
+  0192f3ab:implement       implementer(opus)            2m
+  0192f3ab:qa              qa(sonnet)                   0m
+DONE since last look (2)
+  0192f3ac: T1 at a1b2c3d4
+  0192f3ac: T2 at b2c3d4e5
+NEEDS YOU (2)
+  0192f3ab: Merge now or wait for qa? Default: wait, reversible
+  0192f3ab: Keep the old flag one more release? Default: yes
+NEXT (1)
+  0192f3ac: wave 2/3: T3
+COST
+  type                                 requests      out  cache reads cache writes
+  main                                        2      18k          20k          21k
+  graph-engineering:implementer               3      13k          30k          66k
+  graph-engineering:reviewer                  1       8k            0          40k
+  graph-engineering:researcher                1       5k            0          25k
+  graph-engineering:implementer-simple        1       4k            0          20k
+  graph-engineering:qa                        0        0            0            0
+
+$ python3 -m graph_control.status   # second look
+graph-engineering status · session syntheti · out 48k
+RUNNING (3)
+  0192f3ab:review          reviewer(opus)               12m!
+  0192f3ab:implement       implementer(opus)            2m
+  0192f3ab:qa              qa(sonnet)                   0m
+DONE since last look (0)
+  none
+NEEDS YOU (2)
+  0192f3ab: Merge now or wait for qa? Default: wait, reversible
+  0192f3ab: Keep the old flag one more release? Default: yes
+NEXT (1)
+  0192f3ac: wave 2/3: T3
+COST
+  type                                 requests      out  cache reads cache writes
+  main                                        2      18k          20k          21k
+  graph-engineering:implementer               3      13k          30k          66k
+  graph-engineering:reviewer                  1       8k            0          40k
+  graph-engineering:researcher                1       5k            0          25k
+  graph-engineering:implementer-simple        1       4k            0          20k
+  graph-engineering:qa                        0        0            0            0
+

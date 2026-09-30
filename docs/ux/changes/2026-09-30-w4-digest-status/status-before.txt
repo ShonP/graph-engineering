@@ -1,0 +1,19 @@
+# before: base ge-next eb22099, synthetic session fixture, full status
+$ python3 -m graph_control.status
+graph-engineering status · session syntheti · out 48k
+RUNNING (3)
+  0192f3ab:review          reviewer(opus)               12m!
+  0192f3ab:implement       implementer(opus)            2m
+  0192f3ab:qa              qa(sonnet)                   0m
+NEEDS YOU (2)
+  0192f3ab: Merge now or wait for qa? Default: wait, reversible
+  0192f3ab: Keep the old flag one more release? Default: yes
+COST
+  type                                 requests      out  cache reads cache writes
+  main                                        2      18k          20k          21k
+  graph-engineering:implementer               3      13k          30k          66k
+  graph-engineering:reviewer                  1       8k            0          40k
+  graph-engineering:researcher                1       5k            0          25k
+  graph-engineering:implementer-simple        1       4k            0          20k
+  graph-engineering:qa                        0        0            0            0
+

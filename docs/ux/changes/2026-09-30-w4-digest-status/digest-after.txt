@@ -1,0 +1,38 @@
+# after: branch ge-t-w4-digest-status, SYNTHETIC git fixtures from tests/graph_control/test_digest.py
+$ graph-control digest --root <repo> --base <base> --plan <plan>
+## Change digest: 41678dbc..working tree
+4 files changed, +7 -1 (tracked changes; untracked files excluded)
+
+### T1
+- `app/stage/new.py` +3 -0
+- `app/stage/run.py` +2 -1
+
+### T2
+- `docs/guide.md` +1 -0
+
+### unplanned
+- `tools/x.sh` +1 -0
+
+$ graph-control digest --root <repo> --base <base> --profile <profile>
+## Change digest: 8b661ee0..working tree
+15 files changed, +343 -0 (tracked changes; untracked files excluded)
+
+### Size
+- counted: 13 files, +133 -0
+- excluded by digest.exclude: 2 files, +210 -0
+
+### New public surfaces (2)
+- `api/routers/users.py`
+- `svc/handlers/user.go`
+
+### Hotspots: 90-day churn x changed lines
+- `src/f1.py` 61 x 10 = 610
+- `src/f2.py` 50 x 10 = 500
+- `src/f3.py` 40 x 10 = 400
+- `src/f4.py` 30 x 10 = 300
+- `src/f5.py` 20 x 10 = 200
+
+### UX evidence (2)
+- `docs/ux/changes/t1/after.png`
+- `docs/ux/changes/t1/before.png`
+
