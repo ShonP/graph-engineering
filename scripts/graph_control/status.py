@@ -1,10 +1,10 @@
 """Zero-token status: live subagents, open decisions and token cost of one Claude Code session.
 
-    PYTHONPATH=<plugin>/scripts python3 -m graph_control.status [--line] [--root DIR]
+    PYTHONPATH=<plugin>/scripts python3 -m graph_control.status [--line] [--root DIR] [--session ID]
 
-Stdlib only (no uv start). Session: the newest `*.jsonl` in `<config>/projects/<slug of root>/`,
-config $CLAUDE_CONFIG_DIR or ~/.claude, root --root or the cwd; keys and the live rule follow the
-witness in tests/graph_control/fixtures/sessions/README.md. Never writes transcripts, never prints
+Stdlib only (no uv start). Session: `--session`, else (with --line) the status-line JSON on stdin,
+else the newest `*.jsonl` of the project (session.py); root --root or the cwd. Keys and the live rule
+follow the witness in tests/graph_control/fixtures/sessions/README.md. Never writes transcripts, never prints
 prompt or response text. The view is cached 5 s in $TMPDIR with per-file byte offsets, so a
 refresh parses only the rows appended since the last one.
 """
@@ -19,23 +19,13 @@ import tempfile
 import time
 from pathlib import Path
 
+from .session import locate, read_hint, session_id
+
 LIVE, STALLED, TTL = 15 * 60, 10 * 60, 5.0
 LINE_MAX, LINES_MAX, VERSION = 120, 40, "v1"
 RUN = re.compile(r"([0-9A-Za-z]{8}):(\S+)")
 FAMILY = re.compile(r"claude-([a-z]+)")
 USAGE = ("output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")
-
-
-def session_of(root: Path) -> Path | None:
-    """`<project>/<session id>` of the newest top-level transcript; a dir only once agents exist."""
-    config = Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude")
-    project = config / "projects" / re.sub(r"[^A-Za-z0-9]", "-", str(root))
-    try:
-        mains = [(entry.stat().st_mtime, entry.path) for entry in os.scandir(project)
-                 if entry.name.endswith(".jsonl") and entry.is_file()]
-    except OSError:
-        return None
-    return Path(max(mains)[1]).with_suffix("") if mains else None
 
 
 def scan(path: Path, size: int, entry: dict | None) -> dict:
@@ -121,9 +111,9 @@ def cache_path(session: Path) -> Path:
     return Path(os.environ.get("TMPDIR") or tempfile.gettempdir()) / f"graph-engineering-status-{digest}.json"
 
 
-def snapshot(root: Path, now: float) -> dict | None:
-    """The session's view, from the cache when under 5 s old; None when the root has no session."""
-    session = session_of(root)
+def snapshot(root: Path, now: float, session: str | None = None, hint: dict | None = None) -> dict | None:
+    """The session's view, from the cache when under 5 s old; None when there is no session to show."""
+    session = locate(root, session, hint)
     if session is None:
         return None
     target = cache_path(session)
@@ -227,11 +217,21 @@ def render_full(view: dict | None, root: Path) -> str:
 def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--line", action="store_true", help="one status-line row; empty when nothing is live")
     parser.add_argument("--root", type=Path, help="project dir the session started in (default: the cwd)")
+    parser.add_argument("--session", type=_session_arg, help="session id to read (default: the status-line "
+                        "stdin with --line, else the newest session of --root)")
 
 
-def render(line: bool, root: Path | None, now: float | None = None) -> str:
+def _session_arg(value: str) -> str:
+    try:
+        return session_id(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(str(error)) from None
+
+
+def render(line: bool, root: Path | None, now: float | None = None, session: str | None = None,
+           hint: dict | None = None) -> str:
     root = (root or Path.cwd()).resolve()
-    view = snapshot(root, time.time() if now is None else now)
+    view = snapshot(root, time.time() if now is None else now, session, hint)
     text = render_line(view) if line else render_full(view, root)
     return text + "\n" if text else ""
 
@@ -240,7 +240,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n", 1)[0])
     add_arguments(parser)
     args = parser.parse_args(argv)
-    sys.stdout.write(render(args.line, args.root))
+    hint = read_hint(sys.stdin) if args.line and args.session is None else None
+    sys.stdout.write(render(args.line, args.root, session=args.session, hint=hint))
     return 0
 
 

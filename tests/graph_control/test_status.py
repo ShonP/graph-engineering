@@ -61,10 +61,19 @@ class Workspace:
             stamp = now - minutes * 60
             os.utime(self.project / relative, (stamp, stamp))
 
-    def run(self, *args: str) -> subprocess.CompletedProcess:
+    def run(self, *args: str, stdin: str = "") -> subprocess.CompletedProcess:
+        """Stdin is what a status line gets from the host; empty by default, never the runner's own."""
         env = {**os.environ, **self.env, "PYTHONPATH": str(SCRIPTS)}
-        return subprocess.run([sys.executable, "-m", "graph_control.status", *args],
+        return subprocess.run([sys.executable, "-m", "graph_control.status", *args], input=stdin,
                               cwd=self.repo, env=env, capture_output=True, text=True, check=False)
+
+    def newer_session(self) -> Path:
+        """A second session started later in the same checkout: the newest transcript, no agents."""
+        newer = self.project / "newer-session.jsonl"
+        newer.write_text(json.dumps({"type": "user", "timestamp": "2026-09-30T12:00:00Z"}) + "\n")
+        stamp = time.time() + 60
+        os.utime(newer, (stamp, stamp))
+        return newer
 
 
 class StatusLineTests(unittest.TestCase):
@@ -135,9 +144,72 @@ class FullStatusTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             space = Workspace(tmp)
             out = io.StringIO()
-            with mock.patch.dict(os.environ, space.env), contextlib.redirect_stdout(out):
+            with mock.patch.dict(os.environ, space.env), mock.patch.object(sys, "stdin", io.StringIO("")), \
+                    contextlib.redirect_stdout(out):
                 code = cli.main(["status", "--line", "--root", str(space.repo)], modules=[status_command])
         self.assertEqual((code, out.getvalue()), (0, EXPECTED_LINE + "\n"))
+
+
+class SessionSelectionTests(unittest.TestCase):
+    """Two sessions in one checkout: each status line reads its own, never whichever wrote last."""
+
+    def test_without_a_hint_the_newest_session_is_read(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            space = Workspace(tmp)
+            space.newer_session()
+            result = space.run("--line")
+        self.assertEqual((result.returncode, result.stdout), (0, ""))
+
+    def test_session_flag_reads_that_session(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            space = Workspace(tmp)
+            space.newer_session()
+            result = space.run("--line", "--session", "synthetic-session")
+        self.assertEqual((result.returncode, result.stdout), (0, EXPECTED_LINE + "\n"), result.stderr)
+
+    def test_status_line_stdin_names_the_session(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            space = Workspace(tmp)
+            space.newer_session()
+            transcript = str(space.project / "synthetic-session.jsonl")
+            by_path = space.run("--line", stdin=json.dumps({"session_id": "newer-session", "transcript_path": transcript,
+                                                            "model": {"display_name": "Opus"}}))
+            by_id = space.run("--line", stdin=json.dumps({"session_id": "synthetic-session", "cwd": str(space.repo)}))
+        self.assertEqual(by_path.stdout, EXPECTED_LINE + "\n", by_path.stderr)
+        self.assertEqual(by_id.stdout, EXPECTED_LINE + "\n", by_id.stderr)
+
+    def test_a_named_session_that_is_missing_never_falls_back_to_the_newest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            space = Workspace(tmp)
+            bare = space.run("--line")
+            flag = space.run("--line", "--session", "no-such-session")
+            outside = space.run("--line", stdin=json.dumps({"transcript_path": str(Path(tmp) / "elsewhere.jsonl")}))
+            junk = space.run("--line", stdin="not json")
+        self.assertEqual(bare.stdout, EXPECTED_LINE + "\n")
+        self.assertEqual([flag.stdout, outside.stdout], ["", ""])
+        self.assertEqual((junk.returncode, junk.stdout), (0, EXPECTED_LINE + "\n"), "unreadable stdin is no hint")
+
+    def test_a_session_id_that_is_a_path_is_a_usage_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            space = Workspace(tmp)
+            flag = space.run("--line", "--session", "../synthetic-session")
+            hint = space.run("--line", stdin=json.dumps({"session_id": "../../synthetic-session"}))
+        self.assertEqual(flag.returncode, 2)
+        self.assertEqual((hint.returncode, hint.stdout), (0, ""))
+
+    def test_command_module_reads_the_session_flag_and_stdin(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            space = Workspace(tmp)
+            space.newer_session()
+            outputs = []
+            for argv, stdin in ((["--session", "synthetic-session"], ""),
+                                ([], json.dumps({"session_id": "synthetic-session"}))):
+                out = io.StringIO()
+                with mock.patch.dict(os.environ, space.env), mock.patch.object(sys, "stdin", io.StringIO(stdin)), \
+                        contextlib.redirect_stdout(out):
+                    code = cli.main(["status", "--line", "--root", str(space.repo), *argv], modules=[status_command])
+                outputs.append((code, out.getvalue()))
+        self.assertEqual(outputs, [(0, EXPECTED_LINE + "\n")] * 2)
 
 
 class PrivacyAndCacheTests(unittest.TestCase):
