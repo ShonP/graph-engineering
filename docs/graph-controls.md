@@ -14,6 +14,11 @@ uv run scripts/graph-control.py verify /absolute/run/run.json --store /absolute/
 uv run scripts/graph-control.py validate-attempts /absolute/run/attempts.json
 uv run scripts/graph-control.py event /absolute/run/event.json --state /absolute/run/events.json
 uv run scripts/graph-control.py guard-agent --profile /absolute/repo/.claude/graph-profile.yaml --root /absolute/repo < hook-input.json
+uv run scripts/graph-control.py check /absolute/candidate --reuse
+uv run scripts/graph-control.py doctor --root /absolute/repo [--quick]
+uv run scripts/graph-control.py status [--line] [--root /absolute/repo]
+uv run scripts/graph-control.py depth --root /absolute/candidate --base <rev> --profile /absolute/repo/.claude/graph-profile.yaml
+uv run scripts/graph-control.py findings /absolute/run/review-1.md [/absolute/run/review-2.md ...] [--counts]
 ```
 
 `preflight --readiness-only` is for the stage before implementation/runtime startup: it checks configuration, plan, tools, models and baseline source, but does not require the runtime observation file yet. Its `phase: readiness` result cannot authorize completion. Use a planned runtime artifact path and placeholder fingerprint until the runner reports actual identity, then refresh the candidate manifest. Recording and verification never accept readiness-only mode.
@@ -188,10 +193,32 @@ Observability: an override appends one line to `<root>/.graph/ledger.md`, creati
 
 Fail-open, on purpose: a broken policy must never block every dispatch in a repo. An unreadable payload or profile (missing, invalid YAML, duplicate keys through `preflight.read_profile`) gives no decision; a ledger write failure warns on stderr and keeps the decision. The wrapper drains stdin and exits 0 with no output when `CLAUDE_PROJECT_DIR` is unset, the profile is missing, it has no top-level `policy:` line (checked with `grep`, so such repos never start uv), `uv` is not on PATH, or the helper exits nonzero. The cost is that a broken profile silently disables enforcement; `preflight` still rejects that profile when a run starts. Rollback: delete the `policy:` block, which makes the hook a no-op, or revert. Claim: subagent type and model are enforced; delegation itself is only guided.
 
+## check --reuse and the check memo
+
+The Stop hook (`hooks/scripts/configured_check.py test`) memoizes the verdict of the `test` block of `.claude/graph-checks.json` by tree, so a Stop on an unchanged tree never reruns the suite. `scripts/graph_control/memo.py` owns the store; it is stdlib only because the hook imports it without PyYAML.
+
+- **Key**: SHA-256 of canonical JSON `{root, revision, dirty_sha256, argv, config_sha256}`. The first three come from `snapshot(root)` (revision plus the dirty-tree hash, which covers staged, unstaged and untracked non-ignored files); `argv` is `test.argv`; `config_sha256` hashes the exact `graph-checks.json` bytes, so any config edit (argv, timeout, precheck) is a new key. Git-ignored files (`node_modules`, `.venv`, build output) are not in the key.
+- **Store**: `<git common dir>/graph-engineering/checks-state.json`, `{"schema_version":1,"entries":{<key>:<verdict>}}`, at most 200 entries (the oldest `observed_at` is dropped). It sits outside every worktree, so writing it never changes the dirty hash it is keyed by, and linked worktrees share one file (the key includes the root). Writes take the same POSIX lock and atomic replace as the receipt store. A missing, corrupt or foreign file reads as empty, and an entry that fails validation never replays.
+- **Verdict**: `{status: pass|fail|timeout, exit_code: int|null, observed_at: <UTC ISO>, tail: <= 4000 chars, argv: [...]}`; `pass` has exit 0, `fail` a nonzero exit, `timeout` a null exit.
+- **Hook behavior**: the key is computed before the precheck. A hit replays without running anything, precheck included: `pass` exits 0 silently; `fail` exits 2 with the stored tail and `(replayed: tree unchanged since <observed_at>)`; `timeout` exits 0 with `tests not verified (timed out at <observed_at>; tree unchanged)`. A miss runs as before and stores pass, fail or timeout, but only when the key after the run equals the key before it: a tree that moved while the suite ran (an edit, a suite that writes non-ignored files) is not stored. A precheck failure and a missing or unstartable runner are never stored. A non-Git root or any snapshot or memo error means no memo, and the suite runs normally.
+- **Stale by environment**: a failure caused by something outside the tree (dependencies installed afterwards, a service that was down) replays until the tree changes. Configure a `precheck` for environment readiness, since a precheck failure is never recorded; the replayed failure message names the memo file to delete for a one-off rerun.
+- **Kill switch and rollback**: any nonempty `GRAPH_CHECKS_NO_MEMO` (for example `GRAPH_CHECKS_NO_MEMO=1` in the environment Claude Code runs hooks with) disables lookup and store in the hook and makes `check --reuse` BLOCKED, so every Stop runs the suite. Deleting `checks-state.json` clears the memo; reverting the change removes it. A replay is observable by its `replayed` or `tree unchanged` text.
+
+`graph-control check <root> --reuse` reads `<root>/.claude/graph-checks.json`, computes the same key and returns `{"status":"PASS","verdict":"pass|fail|timeout","observed_at":"...","exit_code":0}`. It never executes anything. A tree with no stored verdict returns BLOCKED `no memo for the current tree`; a missing config, a config with no test block or a malformed `test.argv`, a root that is not the Git worktree root, and a set `GRAPH_CHECKS_NO_MEMO` are BLOCKED with the reason. `--reuse` is required: graph-control never runs project commands, so replay is the only mode. The memo is a speed cache, not merge evidence: the merge gate still proves checks with receipts (`record-receipt`, `verify`).
+
+## doctor, status, depth, findings
+
+Read-only plug-in commands; like every control, none executes project commands.
+
+- `doctor --root <repo> [--quick]` inspects the repo's Graph Engineering setup and returns findings.
+- `status [--line] [--root <repo>]` reports run status; `--line` is the one-line form for a status line. Stdlib only, so it also runs as `python3 -m graph_control.status` with `PYTHONPATH=<plugin>/scripts`, without uv or PyYAML.
+- `depth --root <candidate> --base <rev> --profile <profile.yaml>` picks the review depth for a diff and returns `{depth: lint|single|panel, changed_lines, files, risk_rows, reasons, untracked_excluded}`.
+- `findings <files...> [--counts]` reads reviewer finding files; an absent file is BLOCKED.
+
 ## Regression suite
 
 ```
 uv run --python 3.12 --with PyYAML==6.0.2 python -m unittest discover -s tests/graph_control -v
 ```
 
-Fixtures cover the command-module registry, guard-agent policy semantics, the audited FE3→FE4 missing edge, unavailable planned count, synthetic-as-real evidence, composed workflow transitions, missing QA graph/runtime, missing models/skills, lint-only false gates, exact source/dirty/runtime freshness, log drift, zero/skipped cases, later failures, repair limits, event coalescing, and a public CLI record→verify→wrong-candidate failure sequence. Semantic witness truth and meaningful oracle quality remain model-review/evaluation cases rather than parser claims.
+Fixtures cover the command-module registry, guard-agent policy semantics, the check memo (key identity, cap, corrupt store, stdlib-only import) and `check --reuse`, the audited FE3→FE4 missing edge, unavailable planned count, synthetic-as-real evidence, composed workflow transitions, missing QA graph/runtime, missing models/skills, lint-only false gates, exact source/dirty/runtime freshness, log drift, zero/skipped cases, later failures, repair limits, event coalescing, and a public CLI record→verify→wrong-candidate failure sequence. Semantic witness truth and meaningful oracle quality remain model-review/evaluation cases rather than parser claims.

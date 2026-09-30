@@ -8,7 +8,14 @@ Argv runs directly: no shell, cwd=root, its own session, output spooled to a
 temp file so a verbose suite never floods the model. A timeout kills the whole
 process group and reports "not verified" instead of blocking: a check that
 cannot finish is not evidence of a failure.
+
+The test verdict is memoized by tree (graph_control.memo): the same revision,
+dirty tree, argv and graph-checks.json bytes replay the stored pass, fail or
+timeout without running anything, precheck included. A verdict is stored only
+when the tree did not move while the suite ran; a precheck failure or a missing
+runner is never stored. GRAPH_CHECKS_NO_MEMO=1 disables lookup and store.
 """
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -19,9 +26,14 @@ import tempfile
 
 from checks_config import FILE, load
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts'))
+from graph_control import memo  # noqa: E402  stdlib only, like this hook
+
 CONFIG = '.claude/graph-checks.json'
 NOT_CONFIGURED = 77
 TAIL_BYTES = 4000
+# A snapshot or memo failure (not Git, unreadable tree, read-only .git) means no memo, never a failed check.
+MEMO_ERRORS = (ValueError, OSError, subprocess.SubprocessError)
 
 
 def run(argv: tuple[str, ...], root: Path, timeout: int) -> tuple[int, str]:
@@ -47,17 +59,63 @@ def tail(output: str, lines: int) -> str:
     return '\n'.join(output.rstrip().splitlines()[-lines:])[-TAIL_BYTES:]
 
 
+def tree_key(root: Path, argv: tuple[str, ...], config_sha256: str) -> str | None:
+    if memo.disabled():
+        return None
+    try:
+        return memo.memo_key(root, argv, config_sha256)
+    except MEMO_ERRORS:
+        return None
+
+
+def recall(root: Path, key: str | None) -> dict | None:
+    try:
+        return memo.lookup(root, key) if key else None
+    except MEMO_ERRORS:
+        return None
+
+
+def remember(root: Path, key: str | None, config_sha256: str, argv: tuple[str, ...],
+             status: str, code: int | None, output: str) -> None:
+    """Store only when the tree the suite saw is the tree the key names."""
+    if key is None or tree_key(root, argv, config_sha256) != key:
+        return
+    try:
+        memo.store(root, key, memo.verdict(status, code, output, argv))
+    except MEMO_ERRORS:
+        pass  # A memo that cannot be written costs one rerun, nothing else.
+
+
+def replay(root: Path, hit: dict) -> int:
+    at = hit['observed_at']
+    if hit['status'] == 'timeout':
+        print(f'tests not verified (timed out at {at}; tree unchanged)', file=sys.stderr)
+    if hit['status'] != 'fail':
+        return 0
+    print(f'Tests failed: {" ".join(hit["argv"])} in {root} (exit {hit["exit_code"]}) '
+          f'(replayed: tree unchanged since {at}). Fix them, then finish. This check runs once per prompt. '
+          f'Changed something outside the tree? Delete {memo.memo_path(root)} to rerun.\n{hit["tail"]}',
+          file=sys.stderr)
+    return 2
+
+
 def test(root: Path) -> int:
     path = root / CONFIG
     if not path.is_file():
         return NOT_CONFIGURED
     try:
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
         config = load(path)
     except (ValueError, OSError) as exc:
         print(f'{CONFIG} is invalid: {exc}. No checks ran; fix or delete it.', file=sys.stderr)
         return 2
     if config.test is None:
         return NOT_CONFIGURED
+    argv = config.test.argv
+    key = tree_key(root, argv, digest)
+    hit = recall(root, key)
+    if hit:
+        return replay(root, hit)
     if config.precheck:
         pre = config.precheck
         try:
@@ -69,16 +127,17 @@ def test(root: Path) -> int:
         if code:
             print(f'precheck {pre.argv[0]} failed (exit {code}): tests not verified{detail}', file=sys.stderr)
             return 0
-    argv = config.test.argv
     try:
         code, output = run(argv, root, config.test.timeout)
     except subprocess.TimeoutExpired:
+        remember(root, key, digest, argv, 'timeout', None, '')
         print(f'tests not verified: {argv[0]} did not finish within {config.test.timeout} s', file=sys.stderr)
         return 0
     except OSError as exc:
         reason = 'not found' if isinstance(exc, FileNotFoundError) else f'could not start ({exc.strerror})'
         print(f'Test runner {argv[0]} {reason} in {root}. Install it or fix {CONFIG}. No tests ran.', file=sys.stderr)
         return 2
+    remember(root, key, digest, argv, 'fail' if code else 'pass', code, tail(output, 20))
     if code == 0:
         return 0
     print(f'Tests failed: {" ".join(argv)} in {root} (exit {code}). Fix them, then finish. '
