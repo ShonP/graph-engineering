@@ -67,7 +67,9 @@ Memory files and earlier notes are claims (rung 5) until re-verified against the
 - **What evidence** is shown - code, numbers, a reproduction, or adjectives?
 - **Does it reproduce** in this repo, with these versions? If the claim is
   load-bearing for the design and you have not reproduced it, it is not yet
-  true: spike it. Dispatch `researcher` in spike mode, or run the smallest
+  true: spike it. Dispatch `graph-engineering:researcher-spike` (it runs
+  without CLAUDE.md, so the brief carries the profile path, the REQUIRED
+  skills, the rule packs and the project invariants), or run the smallest
   experiment that could kill the claim yourself.
 - **Never validate on one happy-path run.** A spike verdict is
   `VALIDATED`, `PARTIAL`, or `INVALIDATED`, and it names the edge case tried.

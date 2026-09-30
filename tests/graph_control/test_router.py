@@ -88,7 +88,12 @@ class RouterTests(unittest.TestCase):
             self.assertRegex(self.router, rf"- \*\*{name}\*\* - ")
 
     def test_spike_and_research_have_no_run_dir(self):
-        self.assertIn("`spike` mode", lane_block(self.router, "spike"))
+        spike = lane_block(self.router, "spike")
+        self.assertIn("`spike` mode", spike)
+        self.assertIn("`graph-engineering:researcher-spike`", spike)
+        self.assertNotIn("one `researcher` dispatch", spike)
+        for part in ("profile path", "REQUIRED skills", "rule packs", "project invariants"):
+            self.assertIn(part, spike)
         self.assertIn(".graph/research/<slug>.md", self.router)
         self.assertIn("exempt from `run.json` controls", self.router)
 

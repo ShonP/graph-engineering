@@ -130,5 +130,29 @@ class ResearcherPointsToSpike(unittest.TestCase):
         self.assertNotIn("omitClaudeMd", self.fm)
 
 
+class DispatchersRouteToTheSpikeAgent(unittest.TestCase):  # AC-W3-SP-03
+    """Every engine and skill that dispatches a spike names researcher-spike, not researcher."""
+
+    SOURCES = ("commands", "graphs", "skills")
+
+    def texts(self):
+        for top in self.SOURCES:
+            for path in sorted((ROOT / top).rglob("*.md")):
+                yield path, re.sub(r"\s+", " ", path.read_text(encoding="utf-8"))
+
+    def test_no_dispatcher_sends_a_spike_to_researcher(self):
+        stale = re.compile(r"`researcher`[^.]{0,30}\bspike\b")
+        for path, text in self.texts():
+            with self.subTest(path=path.relative_to(ROOT)):
+                self.assertIsNone(stale.search(text))
+
+    def test_prior_art_dispatches_the_spike_agent_with_its_brief(self):
+        text = dict(self.texts())[ROOT / "skills" / "process" / "prior-art" / "SKILL.md"]
+        (sentence,) = [s for s in text.split(". ") if "researcher-spike" in s]
+        self.assertIn("`graph-engineering:researcher-spike`", sentence)
+        for part in ("profile path", "REQUIRED skills", "rule packs", "project invariants"):
+            self.assertIn(part, text)
+
+
 if __name__ == "__main__":
     unittest.main()
