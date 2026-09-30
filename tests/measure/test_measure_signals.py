@@ -200,6 +200,22 @@ class MeasureTests(unittest.TestCase):
         self.assertEqual((code, fx.rows()), (0, {}))
         self.assertIn('merged:', out)
 
+    def test_baseline_mode_records_aggregates_as_of_deployed_at(self):
+        deployed = '2026-09-01T00:05:00Z'
+        at_deploy = py(f'import os; print(0.004 if os.environ["GRAPH_MEASURE_AT"] == "{deployed}" else 0.005)')
+        relative = 'value <= baseline * 1.5 + 0.001'
+        fx = self.fixture(signal(command=at_deploy, condition=relative),
+                          signal(goal='rows', command=py('print("user@example.invalid")')))
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self.assertEqual(ms.main([str(fx.run), '--baseline', '--now', deployed]), 0)
+        stored = (fx.run / 'post-deploy/baseline.json').read_text()
+        self.assertEqual(json.loads(stored), {'checkout error ratio': 0.004})
+        self.assertNotIn('example.invalid', stored + out.getvalue())
+        self.assertEqual((fx.rows(), fx.ledger()), ({}, []))
+        fx.measure()
+        self.assertEqual(fx.rows()['checkout error ratio'][:2], ['met', '0.005'])
+
     def test_cli_runs_as_a_script(self):
         fx = self.fixture(signal())
         done = subprocess.run([sys.executable, str(SCRIPT), str(fx.run), '--now', NOW],

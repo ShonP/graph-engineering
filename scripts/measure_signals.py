@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """Late success measures for a merged graph-engineering run. Stdlib only, no LLM.
 
-  measure_signals.py <run-dir> [--now ISO]     measure each signal whose window elapsed
-  measure_signals.py --due <repo> [--now ISO]  one line when measures are due; runs no command
+  measure_signals.py <run-dir> [--now ISO]           measure each signal whose window elapsed
+  measure_signals.py <run-dir> --baseline --now ISO  write post-deploy/baseline.json as of ISO
+  measure_signals.py --due <repo> [--now ISO]        one line when measures are due; runs no command
 
-A plan.json signal is measured once window_days have passed since the ledger's
-last `merged: <sha>`: its argv runs with no shell from the repo root, 60 s, and
-must print one aggregate (a number or JSON {"value": n}); anything else is
-rejected, never stored. Contract: skills/process/post-deploy-verification.
+A signal's argv runs with no shell from the repo root, 60 s, and must print one aggregate (a number
+or JSON {"value": n}); anything else is rejected, never stored. Contract: post-deploy-verification.
 """
 from __future__ import annotations
 
@@ -25,7 +24,6 @@ import subprocess
 import tempfile
 
 TIMEOUT_S = 60
-GIT_TIMEOUT_S = 10
 MAX_OUTPUT = 4096
 NUMBER = r'-?[0-9]+(?:\.[0-9]+)?'
 CONDITION = re.compile(
@@ -63,14 +61,13 @@ def shown(value: float | None) -> str:
 
 
 def load_json(path: Path) -> object:
-    try:
+    with contextlib.suppress(OSError, ValueError):
         return json.loads(path.read_text())
-    except (OSError, ValueError):
-        return None
+    return None
 
 
-def clean_env() -> dict[str, str]:  # a git hook exports GIT_DIR, which -C does not beat
-    return {key: value for key, value in os.environ.items() if key not in GIT_VARS}
+def env_for(**extra: str) -> dict[str, str]:  # minus GIT_DIR and co: a git hook exports them, -C does not win
+    return {**{key: value for key, value in os.environ.items() if key not in GIT_VARS}, **extra}
 
 
 def signals_of(run: Path) -> list:
@@ -81,10 +78,8 @@ def signals_of(run: Path) -> list:
 
 def condition_of(text: object) -> tuple | None:
     match = CONDITION.fullmatch(text) if isinstance(text, str) else None
-    if match is None:
-        return None
-    op, absolute, factor, offset = match.groups()
-    return op, None if absolute is None else float(absolute), float(factor or 1), float(offset or 0)
+    op, absolute, factor, offset = match.groups() if match else ('', None, None, None)
+    return (op, float(absolute) if absolute else None, float(factor or 1), float(offset or 0)) if match else None
 
 
 def valid(item: object) -> bool:
@@ -100,14 +95,11 @@ def merged_at(run: Path, repo: Path) -> datetime | None:
     """Commit time of the ledger's last `merged: <sha>`; this script's own lines never count."""
     try:
         lines = (run / 'ledger.md').read_text().splitlines()
-    except OSError:
-        return None
-    shas = [m.group(1) for line in lines if not OWN_LINE.match(line) for m in MERGED.finditer(line)]
-    if not shas:
-        return None
-    try:
+        shas = [m.group(1) for line in lines if not OWN_LINE.match(line) for m in MERGED.finditer(line)]
+        if not shas:
+            return None
         done = subprocess.run(['git', '-C', str(repo), 'show', '-s', '--format=%cI', shas[-1], '--'],
-                              capture_output=True, text=True, timeout=GIT_TIMEOUT_S, env=clean_env())
+                              capture_output=True, text=True, timeout=10, env=env_for())
         return instant(done.stdout) if done.returncode == 0 and done.stdout.strip() else None
     except (OSError, ValueError, subprocess.SubprocessError):
         return None
@@ -116,19 +108,15 @@ def merged_at(run: Path, repo: Path) -> datetime | None:
 def read_rows(path: Path) -> dict[str, str]:
     """measure.md rows by goal, in file order; rows start after the `| ---` separator."""
     try:
-        _, _, body = path.read_text().partition('\n| ---')
+        lines = path.read_text().partition('\n| ---')[2].splitlines()[1:]
     except OSError:
         return {}
-    lines = body.splitlines()[1:]
     return {line.strip().strip('|').split('|')[0].strip(): line for line in lines if line.startswith('| ')}
 
 
 def scalar(raw: bytes) -> float | None:
     """The one aggregate a command may print; None for rows, text, several lines or oversized output."""
-    try:
-        text = raw.decode().strip() if len(raw) <= MAX_OUTPUT else ''
-    except UnicodeDecodeError:
-        return None
+    text = raw.decode(errors='replace').strip() if len(raw) <= MAX_OUTPUT else ''
     if SCALAR.fullmatch(text):
         return float(text) if math.isfinite(float(text)) else None
     try:
@@ -169,20 +157,32 @@ def evaluate(item: dict, baseline: object, repo: Path, env: dict[str, str]) -> t
             return 'no data (no baseline)', None  # checked first: never run what cannot be judged
         target = base * factor + offset
     status, value = run_command(item['command'], repo, env)
-    if value is None:
-        return status, None
-    return ('met' if OPS[op](value, target) else 'not met'), value
+    return (status, None) if value is None else ('met' if OPS[op](value, target) else 'not met', value)
 
 
-def measure(run: Path, now: datetime) -> int:
+def record_baseline(run: Path, repo: Path, items: list, env: dict[str, str]) -> int:
+    """post-deploy/baseline.json {goal: value} as of GRAPH_MEASURE_AT; a goal with no clean aggregate stays out."""
+    values = {}
+    for item in filter(valid, items):
+        status, value = run_command(item['command'], repo, env)
+        values.update({} if value is None else {item['goal']: value})
+        print(f'baseline: {clean(item["goal"])}: {status or shown(value)}')
+    (run / 'post-deploy').mkdir(exist_ok=True)
+    (run / 'post-deploy' / 'baseline.json').write_text(json.dumps(values, indent=2) + '\n')
+    return 0
+
+
+def measure(run: Path, now: datetime, baseline_only: bool = False) -> int:
     repo, items = run.parent.parent, signals_of(run)
     merged = merged_at(run, repo) if items else None
     if merged is None:
         why = 'no `merged: <sha>` line in ledger.md that git resolves' if items else 'no success_signals in plan.json'
         print(f'measure: {why}; nothing measured')
         return 0
+    env = env_for(GRAPH_MERGED_AT=stamp(merged), GRAPH_MEASURE_AT=stamp(now))
+    if baseline_only:
+        return record_baseline(run, repo, items, env)
     baseline = load_json(run / 'post-deploy' / 'baseline.json')
-    env = {**clean_env(), 'GRAPH_MERGED_AT': stamp(merged), 'GRAPH_MEASURE_AT': stamp(now)}
     results = []
     for index, item in enumerate(items):
         goal = (clean(item.get('goal') or '') if isinstance(item, dict) else '') or f'signal {index + 1}'
@@ -223,8 +223,8 @@ def due(repo: Path, now: datetime) -> int:
         if count:
             found.append((clean(run.name), count))
     if found:
-        print(f'graph-engineering: {sum(n for _, n in found)} success measure(s) due ({", ".join(r for r, _ in found)}).'
-              f' Run: python3 {Path(__file__).resolve()} .graph/<run>')
+        print(f'graph-engineering: {sum(n for _, n in found)} success measure(s) due'
+              f' ({", ".join(r for r, _ in found)}). Run: python3 {Path(__file__).resolve()} .graph/<run>')
     return 0
 
 
@@ -232,18 +232,18 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Measure a merged run's success signals.")
     parser.add_argument('run_dir', nargs='?', help='<repo>/.graph/<run>')
     parser.add_argument('--due', metavar='REPO', help='list due measures under REPO/.graph; runs nothing')
-    parser.add_argument('--now', help='evaluation time, ISO 8601 (default: now)')
+    parser.add_argument('--baseline', action='store_true', help='write post-deploy/baseline.json as of --now')
+    parser.add_argument('--now', type=instant, help='evaluation time, ISO 8601 (default: now)')
     args = parser.parse_args(argv)
-    try:
-        now = instant(args.now) if args.now else datetime.now(timezone.utc)
-    except ValueError:
-        parser.error('--now must be ISO 8601')
+    now = args.now or datetime.now(timezone.utc)
     if args.due:
         return due(Path(args.due), now)
     run = Path(args.run_dir or '').resolve()
     if not args.run_dir or run.parent.name != '.graph' or not (run / 'plan.json').is_file():
         parser.error('<run-dir> must be <repo>/.graph/<run> holding a plan.json')
-    return measure(run, now)
+    if args.baseline and not args.now:
+        parser.error('--baseline needs --now <deployedAt>: a baseline taken later already holds the change')
+    return measure(run, now, args.baseline)
 
 
 if __name__ == '__main__':
