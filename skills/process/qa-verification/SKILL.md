@@ -87,11 +87,11 @@ notifications, CLI. A fix-loop re-run picks again from the rows it re-runs.
 | --- | --- |
 | a nonempty `runtime.command` | one `qa`: the harness owns the stack and every case in one process |
 | 2+ platforms (for example web and a mobile app), or ~8+ criteria and 3+ lanes | one `qa-lead` over at most 4 `qa` leaves |
-| 2 lanes | two `qa` leaves dispatched flat by the engine, in one message; the engine is their lead |
+| 2 lanes | one `qa-lead` over two `qa` leaves; the engine never owns a qa runtime |
 | 1 surface, or anything else | one `qa` |
 
-A leaf verifies on a stack it does not own. Its lead (the `qa-lead`, or the
-engine for 2 lanes) follows `agents/qa-lead.md`: it stands the runtime up once
+A leaf verifies on a stack it does not own. Its lead, the `qa-lead`,
+follows `agents/qa-lead.md`: it stands the runtime up once
 under the run's `GRAPH_RUN_ID`, dispatches every leaf in the foreground in one
 message with the line `leaf mode: the runtime is up and owned by the lead -
 never run up, seed or down`, merges their reports from disk and runs `down`

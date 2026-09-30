@@ -183,7 +183,7 @@ The full organization - eleven agents, engineering only:
 | `reviewer` | opus | reads the diff once through every lens it needs; as a panel leaf, reviews one slice and writes its findings to a file | no (read-only) |
 | `reviewer-lead` | opus | panel review of a diff over ~2,000 changed lines or ~120k tokens: at most 4 slices, one opus reviewer leaf each in one message, then merges, dedupes and reproduces every blocker into one `findings.json` | `findings.json` only |
 | `qa` | sonnet | acceptance criteria verified on a RUNNING system once per merge unit or wave, evidence per criterion; rows end `VERIFIED`, `FAILED` or `BLOCKED`, the verdict is `PASS`, `FAIL INCOMPLETE: <row ids>` or `INCOMPLETE: <row ids>`, and findings go to `qa-findings.json` | tests only |
-| `qa-lead` | sonnet | qa for a merge unit spanning 2+ platforms, or ~8+ criteria across 3+ lanes: stands the runtime up once, runs up to 4 `qa` leaves in parallel, merges their reports into `qa.md` and `qa-findings.json`, tears the runtime down | reports only |
+| `qa-lead` | sonnet | qa for a merge unit spanning 2 lanes, 2+ platforms, or ~8+ criteria across 3+ lanes: stands the runtime up once, runs up to 4 `qa` leaves in parallel, merges their reports into `qa.md` and `qa-findings.json`, tears the runtime down | reports only |
 | `retro` | sonnet | the `retro` node when a finding leaked past its gate: leak table and proposed rule diffs, never applied | `retro.md` only |
 
 The model column is the default tier in the agent's frontmatter. The profile's

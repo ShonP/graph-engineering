@@ -126,7 +126,15 @@ class Trigger(Case):  # AC-W3-QL-04
     def test_lead_trigger(self):
         self.has(read(SKILL_PATH), "## Lead and leaves")
         self.has(self.text, "2+ platforms", "~8+ criteria", "3+ lanes", "`qa-lead`", "2 lanes",
-                 "flat", "1 surface", "`runtime.command`", LEAF_LINE)
+                 "1 surface", "`runtime.command`", LEAF_LINE)
+
+    def test_every_multi_lane_leg_has_a_lead_agent(self):
+        # Two flat leaves under the engine raced on one GRAPH_RUN_ID's `down` and on qa.md (fix round 1).
+        (row,) = [line for line in read(SKILL_PATH).splitlines() if line.startswith("| 2 lanes")]
+        self.assertIn("`qa-lead`", row)
+        for text in (self.text, flat(read(LEAF_PATH)), flat(read(LEAD_PATH))):
+            self.assertNotIn("the engine is their lead", text)
+            self.assertNotIn("or the engine for", text)
 
 
 class Generic(unittest.TestCase):

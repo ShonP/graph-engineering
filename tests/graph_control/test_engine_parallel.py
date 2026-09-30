@@ -83,7 +83,7 @@ class EngineParallelTests(unittest.TestCase):
             "2+ platforms",
             "~8+ criteria",
             "3+ lanes",
-            "two `qa` leaves",
+            "2 lanes",
             "`reviewer-lead`",
             "~2,000 changed lines",
             "~120k diff tokens",
@@ -96,6 +96,14 @@ class EngineParallelTests(unittest.TestCase):
             "child ids",
             "report paths",
         ))
+
+    def test_ac_w3_ep_03_qa_lanes_always_have_a_lead_agent(self):
+        # The engine never owns a qa runtime: two flat leaves under the engine raced on `down`.
+        (leads,) = [line for line in self.steps[4].splitlines() if "**Leads.**" in line]
+        qa = leads.split("Review:")[0]
+        self.assertRegex(qa, r"2 lanes[^;.]*`qa-lead`")
+        self.assertNotIn("dispatched flat", qa)
+        self.assertNotIn("two `qa` leaves", qa)
 
     def test_ac_w3_ep_04_retries_and_429(self):
         self.assert_tokens(self.execution, (

@@ -121,7 +121,7 @@ commits.
   plus the log tail on failure. Exit 75 means still running; call again
   without argv to attach. The job survives the caller being killed.
 - `qa-lead` agent (sonnet, `maxTurns: 150`): when a merge unit's criteria span
-  2+ platforms, or ~8+ criteria across 3+ lanes, it stands the runtime up
+  2 lanes, 2+ platforms, or ~8+ criteria across 3+ lanes, it stands the runtime up
   once, runs up to 4 `qa` leaves in parallel (one message, foreground), merges
   their file reports into `qa.md` and `qa-findings.json`, and runs `down`
   last. `qa` gains a leaf mode and `qa-verification` documents the trigger.

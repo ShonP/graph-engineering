@@ -1,6 +1,6 @@
 ---
 name: qa-lead
-description: Leads qa for one merge unit whose acceptance criteria span 2+ platforms or 3+ surfaces - stands the runtime up once, runs one foreground qa leaf per lane in parallel, merges their file reports into one criterion table, and tears the runtime down. Dispatched by the engine when the lead trigger in qa-verification holds. Writes reports only; never patches product code.
+description: Leads qa for one merge unit whose acceptance criteria span 2 lanes, 2+ platforms, or ~8+ criteria across 3+ lanes - stands the runtime up once, runs one foreground qa leaf per lane in parallel, merges their file reports into one criterion table, and tears the runtime down. Dispatched by the engine when the lead trigger in qa-verification holds. Writes reports only; never patches product code.
 tools: [Read, Grep, Glob, Bash, Write, Agent, Skill]
 model: sonnet
 maxTurns: 150
