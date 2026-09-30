@@ -161,6 +161,16 @@ deploy:
   checks: []
   rollback: ""
 
+# The investigate lane's signal source: an aggregates-only command with masked
+# output that the investigate lane runs through the researcher's `signals` mode,
+# verbatim, from the repo root. It prints counts, rates and top items by count,
+# with pseudonymised ids in place of names, emails and raw user ids. Commit it
+# in this repo (a script over your analytics, error tracker or a read-only
+# database role) and give it one `privacy-review`. Empty: the investigate lane
+# reports BLOCKED naming this key.
+pulse:
+  command: ""
+
 # How qa proves an infra change (`infra-verification`). `cluster` is a
 # THROWAWAY cluster the run creates and deletes, with its own kubeconfig file -
 # never an existing cluster, never ~/.kube/config. Leave `cluster` empty for
@@ -639,6 +649,24 @@ integration: pr
 review:
   panel_lines: 2000
   seams: []
+
+# The change digest at the merge gate counts lines of code without these globs:
+# tests, stories and generated code are excluded from LOC, so the number tracks
+# the product change. Same glob dialect as `routing`, kept brace-free. The
+# defaults cover the common test layouts (JS/TS, Python, Go, JVM, Xcode,
+# Android); add this repo's own, such as a snapshot or fixtures directory.
+digest:
+  exclude:
+    - "**/*.test.*"
+    - "**/tests/**"
+    - "**/*.stories.*"
+    - "**/generated/**"
+    - "**/*.spec.*"
+    - "**/*_test.*"
+    - "**/test_*.*"
+    - "**/test/**"
+    - "**/*Tests/**"
+    - "**/androidTest/**"
 
 # `parity`: the name of the CI job that asserts local and CI environments match
 # (the same env vars, flags and build config). Empty when the repo has none.
