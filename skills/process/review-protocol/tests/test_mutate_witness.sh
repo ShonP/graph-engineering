@@ -109,8 +109,9 @@ fresh; hang_test
 pid=$!
 i=0; while [ ! -s "$WORK/hang.pid" ] && [ $i -lt 150 ]; do sleep 0.2; i=$((i + 1)); done
 if [ -s "$WORK/hang.pid" ]; then
-  kill -TERM "$pid"; wait "$pid"; code=$?
+  t0=$SECONDS; kill -TERM "$pid"; wait "$pid"; code=$?
   [ "$code" = 143 ] || note "exit $code after SIGTERM, expected 143"
+  [ $((SECONDS - t0)) -le 10 ] || note "took $((SECONDS - t0)) s to stop: the test's process group was not killed"
   ! kill -0 "$(cat "$WORK/hang.pid")" 2>/dev/null || note "the test process outlived the script"
 else
   kill -KILL "$pid" 2>/dev/null; note "the mutant test never started"
@@ -124,9 +125,10 @@ expect_code 2; expect_out "fails on the unmutated HEAD"; expect_no_receipt; unch
 verdict "baseline: a test red before mutation is refused, never a kill"
 
 # A hang past --timeout is a kill (exit 124), and the hung process is gone.
-fresh; hang_test
+fresh; hang_test; t0=$SECONDS
 mw --file guard.sh --lines 4-4 --find 'echo ok' --replace 'echo HANG' --timeout 2 --receipt "$RECEIPT" -- sh "$WORK/hang.sh" "$WORK/hang.pid"
 expect_code 0; expect_field killed true; expect_field test_exit 124
+[ $((SECONDS - t0)) -le 20 ] || note "took $((SECONDS - t0)) s: the timeout did not kill the test's process group"
 [ -s "$WORK/hang.pid" ] && ! kill -0 "$(cat "$WORK/hang.pid")" 2>/dev/null || note "the timed-out test process is still alive"
 unchanged; verdict "timeout: a hung mutant is killed with test_exit 124"
 
@@ -145,7 +147,17 @@ expect_code 0; expect_field killed true; unchanged
 [ "$(git -C "$WORK/other" worktree list --porcelain)" = "$other_before" ] || note "the GIT_DIR repo was touched"
 rm -rf "$WORK/other"; verdict "env: an inherited GIT_DIR is ignored"
 
-# Bad input is refused before a worktree exists.
+# A test that writes into the main tree voids the run: no receipt, exit 2.
+fresh
+mw --file guard.sh --lines 3-3 --find '-le 0' --replace '-lt 0' --receipt "$RECEIPT" \
+  -- sh -c 'grep -q -- "-lt 0" guard.sh && echo leak >> "$1/guard.sh"; sh test_guard.sh' _ "$REPO"
+expect_code 2; expect_out "main tree changed"; expect_no_receipt
+[ "$(git -C "$REPO" status --porcelain)" = " M guard.sh" ] || note "expected the leaked edit to stay visible"
+[ "$(git -C "$REPO" worktree list --porcelain)" = "$WT_BEFORE" ] || note "worktree list changed"
+[ -z "$(ls -A "$SCRATCH")" ] || note "left behind in TMPDIR: $(ls -A "$SCRATCH")"
+verdict "main tree: a test that edits the real tree is reported, never receipted"
+
+# Bad input is refused with exit 2 and leaves nothing behind.
 bad_input() { # bad_input <label> <args...>
   local label="$1"; shift; fresh; mw "$@"
   expect_code 2; expect_no_receipt; unchanged; verdict "input: $label"
