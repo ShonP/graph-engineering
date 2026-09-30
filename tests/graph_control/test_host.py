@@ -19,6 +19,7 @@ from unittest import mock
 import helpers  # noqa: F401  (puts scripts/ on sys.path)
 from graph_control import cli, host
 from graph_control.commands import iter_commands
+from graph_control.commands.host import floor
 
 GIT_VARS = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR")
 ENV = {key: value for key, value in os.environ.items() if key not in GIT_VARS}
@@ -53,7 +54,8 @@ class Fixture(unittest.TestCase):
         return subprocess.CompletedProcess(argv, self.docker, "", "")
 
     def check(self, *argv, root=None, profile=None, min_free_gb="0"):
-        args = ["host-check", "--root", str(root or self.repo), "--min-free-gb", min_free_gb, *argv]
+        floor = [] if min_free_gb is None else ["--min-free-gb", min_free_gb]
+        args = ["host-check", "--root", str(root or self.repo), *floor, *argv]
         if profile is not None:
             path = self.tmp / "graph-profile.yaml"
             path.write_text(profile)
@@ -93,7 +95,28 @@ class Disk(Fixture):
         self.assertNotIn("disk-low", self.found(result))
 
     def test_default_minimum_is_20_gb(self):
-        self.assertEqual(cli.parser().parse_args(["host-check", "--root", "."]).min_free_gb, 20)
+        self.assertEqual(floor(None, None), 20)
+        self.assertEqual(floor(None, {"runtime": {"none": "a CLI"}}), 20)
+
+    def test_the_profile_sets_the_floor_when_the_flag_is_absent(self):
+        code, result = self.check(min_free_gb=None, profile="host:\n  min_free_gb: 1000000000\n")
+        self.assertEqual((code, result["status"]), (1, "BLOCKED"))
+        self.assertIn("1000000000 GB", result["reason"])
+        self.assertEqual(self.check(min_free_gb=None, profile="host:\n  min_free_gb: 0\n")[0], 0)
+
+    def test_the_flag_overrides_the_profile_for_one_call(self):
+        self.assertEqual(self.check(min_free_gb="0", profile="host:\n  min_free_gb: 1000000000\n")[0], 0)
+
+    def test_an_invalid_profile_floor_is_blocked(self):
+        for value in ("-1", "'20'", "true", "[20]"):
+            with self.subTest(value=value):
+                code, result = self.check(min_free_gb=None, profile=f"host:\n  min_free_gb: {value}\n")
+                self.assertEqual((code, result["status"]), (1, "BLOCKED"))
+                self.assertIn("host.min_free_gb", result["reason"])
+
+    def test_disk_low_fix_names_the_profile_key(self):
+        fix = self.found(self.check(min_free_gb="1000000000")[1])["disk-low"]["fix"]
+        self.assertIn("host.min_free_gb", fix)
 
     def test_root_must_be_a_directory(self):
         code, result = self.check(root=self.tmp / "missing")

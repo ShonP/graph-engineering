@@ -14,7 +14,7 @@ Produces `.claude/graph-profile.yaml` from the plugin's `templates/graph-profile
 
 2. **Upgrade (`--upgrade`).** Bring the existing profile to the template's schema without regenerating it; the owner's values win.
    - Read `.claude/graph-profile.yaml` and `<plugin-root>/templates/graph-profile.yaml`.
-   - Add every block the template has and the profile is missing, in the template's position, with the template's comment and default; nested keys too (a `gates` without `owner_classes` gains it). For a missing block a detection step fills (`runtime`, `deploy`, `infra`, `api`, `bootstrap`, `lanes`: step 4), run that step for that block only; what it cannot find keeps the empty default and is listed as a gap.
+   - Add every block the template has and the profile is missing, in the template's position, with the template's comment and default; nested keys too (a `gates` without `owner_classes` gains it). For a missing block a detection step fills (`runtime`, `deploy`, `infra`, `api`, `bootstrap`, `lanes`, `host`: step 4), run that step for that block only; what it cannot find keeps the empty default and is listed as a gap.
    - Run step 3 and add the derived routing rows the profile lacks. Never delete a row: an existing row that routes a framework skill no manifest declares is listed in the summary for the owner to drop.
    - Never change a value the profile already sets, even where it differs from the template.
    - Remove the stale keys `content` and `gates.publication` (dropped in 0.12). Print each removed key with its old value, so nothing leaves silently.
@@ -77,6 +77,8 @@ Produces `.claude/graph-profile.yaml` from the plugin's `templates/graph-profile
    - `local_db` when the command that stands the stack up (`runtime.up`, or `runtime.command` when a harness owns setup) does not contain `${GRAPH_RUN_ID`: the stack is not isolated per run, so two runs would share one database. Never when `runtime.none` is set.
 
    No evidence, no lane: an empty `lanes` serializes nothing. Say in the approval summary why each proposed lane is there. Shown with the profile and written only on approval.
+
+   **Host floor.** Propose `host.min_free_gb`, the free-disk floor `graph-control host-check` holds before each implementation wave. 20 when the stack fills disks: the runtime uses docker or compose, a device build exists (a `*.xcodeproj`, a Gradle Android module), or any `lanes` entry was proposed. Otherwise 5, which covers a `runtime.none` library or CLI and a plain interpreted service. Say which evidence picked the value; shown with the profile and written only on approval.
 
 5. **Detect existing agents.** List `.claude/agents/*.md`. Where a local agent plainly covers a plugin role for a stack, propose it as a `localAgents` override (it runs instead of the plugin agent); where it adds a view beside the plugin agent (a visual reviewer beside the code reviewer), propose it under `localLanes`. This is the additive contract: the engine defers to what the repo already has and supplies only the legs it lacks.
 

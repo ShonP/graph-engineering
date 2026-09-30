@@ -77,6 +77,27 @@ class SchemaV2Tests(unittest.TestCase):
         self.assertIn("none", text)
         self.assertIn("full green", text)
 
+    def test_gates_document_only_what_the_engine_honours(self):
+        text = comment_before("gates:")
+        self.assertNotRegex(text, r"`owner` or `auto`")
+        self.assertIn("auto_classes", text)
+        self.assertIn("agent-control", text)
+        self.assertIn("--auto-merge", text)
+
+    def test_risk_comment_names_the_built_in_control_plane_row(self):
+        text = comment_before("risk:")
+        for token in ("agent-control", ".claude/**", "CLAUDE.md", "AGENTS.md", ".mcp.json", ".github/**",
+                      "instructionPaths", "reserved"):
+            with self.subTest(token=token):
+                self.assertIn(token, text)
+        self.assertNotIn("agent-control", [r["id"] for r in self.profile["risk"]])
+
+    def test_host_floor_is_a_profile_key(self):
+        self.assertEqual(self.profile["host"], {"min_free_gb": 20})
+        text = comment_before("host:")
+        self.assertIn("host-check", text)
+        self.assertIn("runtime.none", text)
+
     def test_new_blocks_ship_generic_defaults(self):
         p = self.profile
         self.assertEqual(p["integration"], "pr")

@@ -114,6 +114,12 @@ class GraphInitTests(unittest.TestCase):
         up = paragraph("**Upgrade")
         self.assertIn("`bootstrap`", up)
         self.assertIn("`lanes`", up)
+        self.assertIn("`host`", up)
+
+    def test_host_floor_is_proposed_from_the_stack(self):
+        section = paragraph("**Host floor.**")
+        for needle in ("host.min_free_gb", "host-check", "20", "runtime.none", "docker", "lanes", "approv"):
+            self.assertIn(needle, section, needle)
 
 
 if __name__ == "__main__":

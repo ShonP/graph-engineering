@@ -6,8 +6,10 @@ the result says so. Precedence, first match wins:
 
 1. panel  any `risk:` row matches (a changed path, or a keyword in an added line);
           with a plan, `outside-the-run` matches a changed path in no task's
-          `writable_paths` when the profile keeps that row
-2. lint   every changed path is prose and none matches `instructionPaths`; also
+          `writable_paths` when the profile keeps that row. The built-in
+          `agent-control` row (risk.control_row) always applies: the agent's
+          control plane and `instructionPaths`, so CLAUDE.md is never lint
+2. lint   every changed path is prose and no row matched; also
           an empty diff. Scripted checks only, no LLM. Prose is an extension
           (*.md, *.markdown, *.rst, *.adoc) or a named prose file (README,
           CHANGELOG, LICENSE and the like, bare or .txt); never a directory or
@@ -28,7 +30,7 @@ from typing import Any
 from .common import Invalid, array, integer, require, strings
 from .identity import git
 from .plan import Plan
-from .risk import Row, classify, load_rows, matcher
+from .risk import Row, classify, control_row, load_rows, matcher
 
 PROSE_NAMES = "README,CHANGELOG,CHANGES,HISTORY,NEWS,AUTHORS,CONTRIBUTORS,CONTRIBUTING,LICENSE,LICENCE,NOTICE,COPYING"
 PROSE = ("**/*.{md,markdown,rst,adoc}", f"**/{{{PROSE_NAMES}}}{{,.txt}}")
@@ -104,8 +106,8 @@ def _outside(paths: list[str], rows: tuple[Row, ...], plan: Any) -> list[str]:
 
 def decide(root: Path, base: str, profile: dict[str, Any], plan: Any = None) -> dict[str, Any]:
     panel_lines = integer(_mapping(profile.get("review"), "review").get("panel_lines", PANEL_LINES), 1)
-    instruction = matcher(strings(profile.get("instructionPaths", [])))
-    seams, rows = _seams(profile), load_rows(profile)
+    rows = (*load_rows(profile), control_row(strings(profile.get("instructionPaths", []))))
+    seams = _seams(profile)
     commit = _commit(root, base)
     lines, files, paths = _numstat(git(root, *DIFF, "--numstat", "-z", commit, "--"))
     risk_rows = classify(paths, _added(git(root, *DIFF, "--unified=0", commit, "--")), rows)
@@ -122,7 +124,7 @@ def decide(root: Path, base: str, profile: dict[str, Any], plan: Any = None) -> 
         shown = ", ".join(outside[:5]) + (f" and {len(outside) - 5} more" if len(outside) > 5 else "")
         plural = "path" if len(outside) == 1 else "paths"
         reasons.append(f"{OUTSIDE}: {len(outside)} changed {plural} in no task's writable_paths: {shown}")
-    if not reasons and all(prose.match(path) and not instruction.match(path) for path in paths):
+    if not reasons and all(prose.match(path) for path in paths):
         return result("lint", [LINT if paths else EMPTY])
     if lines > panel_lines:
         reasons.append(f"{lines} changed lines > review.panel_lines {panel_lines}")

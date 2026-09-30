@@ -223,6 +223,14 @@ bootstrap: []
 #   local_db    a `runtime` stack not isolated per GRAPH_RUN_ID (one database)
 lanes: {}
 
+# The free-disk floor `graph-control host-check` holds before each
+# implementation wave: below `min_free_gb` GB (10^9 bytes) on the run
+# worktree's volume the wave is BLOCKED and becomes a decision card. /graph-init
+# proposes it from the stack: 20 for container runtimes, device builds or
+# `lanes`, less (5 is plenty) for a `runtime.none` library or CLI.
+host:
+  min_free_gb: 20
+
 # House rule: every API change ships a Bruno suite in the same PR, and qa runs
 # it against `runtime`. Bruno sets no convention for where a collection lives,
 # so this is the house one. See `api-contract`.
@@ -586,6 +594,14 @@ policy:
 # match forces at least the `quick` lane. These lists are starting points kept
 # deliberately tight; tune them to this repo, since every extra keyword is a
 # false positive that costs an owner gate.
+#
+# One more row is built in, not listed here, and reserved: `agent-control`, the
+# agent's own control plane: .claude/** (at any depth), CLAUDE.md, AGENTS.md,
+# .mcp.json and .github/** anywhere they apply, plus every `instructionPaths`
+# glob above. A diff there rewrites the checks, hooks, permissions, gates and
+# prompts later runs obey, including this file, so `graph-control depth`
+# always reports it, it always waits for the owner, and no profile can drop or
+# redefine it (a row with that id is rejected).
 risk:
   - id: db-schema
     paths: ["**/migrations/**", "**/*.sql", "**/alembic/**"]
@@ -630,15 +646,18 @@ risk:
     paths: []
     keywords: []
 
-# Who approves. `plan` and `merge` are `owner` or `auto`. The class lists name
-# risk ids from the table above, plus `none`: a diff that matches no risk row.
+# Who approves. `plan` and `merge` take one value, `owner`: the plan gate always
+# stops, and the merge gate stops unless the class lists below open it. The
+# class lists name risk ids from the table above, plus `none`: a diff that
+# matches no risk row.
 #   owner_classes  a diff matching any of these always waits for the owner at
 #                  merge, whatever else is set.
 #   auto_classes   diffs whose every class is listed here merge on their own on
-#                  full green: the `--auto-merge` conditions in /graph-ship
-#                  (no blocking or important findings left, qa a full PASS).
-#                  `[none]` auto-merges diffs that touch no risk row. Empty
-#                  keeps every merge with `merge`.
+#                  full green: no blocking or important findings left, qa a
+#                  full PASS, `verify` passing. `[none]` auto-merges diffs that
+#                  touch no risk row. Empty keeps every merge with the owner.
+# `agent-control` (built in, see `risk:`) always waits for the owner, even
+# under `--auto-merge`; listing it anywhere changes nothing.
 gates:
   plan: owner   # also the design gate: the plan embeds the `design` node's spec
   merge: owner

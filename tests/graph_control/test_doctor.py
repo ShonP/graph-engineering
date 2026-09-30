@@ -120,6 +120,13 @@ CASES = {
                                            {("error", "gates-risk")}),
     "owner class names a missing risk id": (swap("owner_classes: [db-schema]", "owner_classes: [auth]"),
                                             {("error", "gates-risk")}),
+    "plan gate set to auto": (swap("plan: owner", "plan: auto"), {("warn", "gates-value")}),
+    "merge gate set to auto": (swap("merge: owner", "merge: auto"), {("warn", "gates-value")}),
+    "auto class lists agent-control": (swap("auto_classes: [none]", "auto_classes: [none, agent-control]"),
+                                       {("warn", "gates-control")}),
+    "risk table redefines agent-control": (swap('  db-schema: {paths: ["migrations/**"]}\n',
+                                                '  db-schema: {paths: ["migrations/**"]}\n  agent-control: {paths: []}\n'),
+                                           {("error", "risk-reserved")}),
     "routing names an unknown skill": (swap("review: [review-protocol]", "review: [review-protocol, no-such-skill]"),
                                        {("warn", "routing-skill")}),
     ".graph not ignored": (lambda f: (f.root / ".gitignore").write_text("node_modules/\n"), {("warn", "graph-not-ignored")}),
@@ -166,6 +173,18 @@ class Gates(unittest.TestCase):  # AC-W2-DR-03
         [finding] = diagnose(fixture.root, PLUGIN, quick=False)
         self.assertEqual((finding.level, finding.id), ("error", "gates-risk"))
         self.assertIn("spend", finding.message)
+
+    def test_agent_control_is_a_known_owner_class_without_a_risk_row(self):
+        fixture = Fixture(self)
+        fixture.profile(CLEAN.replace("owner_classes: [db-schema]", "owner_classes: [db-schema, agent-control]"))
+        self.assertEqual(diagnose(fixture.root, PLUGIN, quick=False), [])
+
+    def test_auto_gate_message_names_the_class_lists(self):
+        fixture = Fixture(self)
+        fixture.profile(CLEAN.replace("merge: owner", "merge: auto"))
+        [finding] = diagnose(fixture.root, PLUGIN, quick=False)
+        self.assertIn("gates.merge", finding.message)
+        self.assertIn("auto_classes", finding.fix)
 
     def test_none_is_accepted_without_any_risk_table(self):
         fixture = Fixture(self)

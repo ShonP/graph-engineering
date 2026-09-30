@@ -113,11 +113,26 @@ def _risk_ids(risk: Any) -> set[str]:
 
 
 def _gates(profile: dict[str, Any]) -> list[Finding]:
+    from .risk import CONTROL  # imports wcmatch; full mode only
+
+    findings = []
+    if CONTROL in _risk_ids(profile.get("risk")):
+        findings.append(Finding("error", "risk-reserved", f"the risk table defines `{CONTROL}`, a built-in reserved row",
+                                f"delete that row; `{CONTROL}` always covers .claude/**, CLAUDE.md, AGENTS.md, "
+                                ".mcp.json, .github/** and instructionPaths"))
     gates = profile.get("gates")
     if not isinstance(gates, dict):
-        return []
-    known = _risk_ids(profile.get("risk")) | {"none"}
-    findings = []
+        return findings
+    for key in ("plan", "merge"):
+        if gates.get(key, "owner") != "owner":
+            findings.append(Finding("warn", "gates-value", f"gates.{key} is {gates[key]!r}; the only value is owner, "
+                                    f"so the {key} gate still stops for the owner",
+                                    f"set gates.{key}: owner; merges open on their own only through gates.auto_classes"))
+    auto = gates.get("auto_classes")
+    if CONTROL in (auto if isinstance(auto, list) else [auto]):
+        findings.append(Finding("warn", "gates-control", f"gates.auto_classes lists `{CONTROL}`, which always waits "
+                                "for the owner", f"remove `{CONTROL}` from gates.auto_classes"))
+    known = _risk_ids(profile.get("risk")) | {"none", CONTROL}
     for key in CLASS_KEYS:
         value = gates.get(key)
         if value is None:
