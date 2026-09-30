@@ -32,9 +32,9 @@ leaves are dispatched.
   leaves do not anchor on each other and nothing private reaches a search query.
 - **Claims to disk.** Each leaf appends to `.graph/<run>/research/claims.jsonl`
   one JSON line per claim, `{claim, source, pub_date, rung, confidence}` (`rung`
-  on the `prior-art` ladder, `confidence` 0.0 to 1.0), every 5 claims, with a
-  shell `>>` append and never a rewrite: the leaves share the file, and a leaf
-  that dies mid-way still leaves what it found.
+  on the `prior-art` ladder, `confidence` high, medium or low), every 5 items
+  (sources read), with a shell `>>` append and never a rewrite: the leaves
+  share the file, and a leaf that dies mid-way still leaves what it found.
 - **Fetch blocklist.** Leaves never WebFetch login-walled domains (linkedin.com,
   x.com, twitter.com, facebook.com, instagram.com, tiktok.com): they return a
   login page, not the content. A claim that only such a page holds goes to the

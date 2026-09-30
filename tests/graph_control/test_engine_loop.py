@@ -139,6 +139,16 @@ class ResearchGraphTests(Tokens):
                                        "`{claim, source, pub_date, rung, confidence}`",
                                        "every 5", "`>>`"))
 
+    def test_claims_contract_matches_the_researcher_leaf(self):
+        # A leaf reads this brief and agents/researcher.md; one file shared by every leaf needs one domain.
+        leaf = flat((ROOT / "agents" / "researcher.md").read_text())
+        claims = flat(self.table.split("**Claims to disk.**", 1)[1].split("\n- **", 1)[0])
+        for token in ("`confidence` high, medium or low", "every 5 items (sources read)"):
+            with self.subTest(token=token):
+                self.assertIn(token, claims)
+                self.assertIn(token.replace("` high", "` is high"), leaf)
+        self.assertNotRegex(claims, r"0\.0|1\.0")
+
     def test_fetch_blocklist(self):
         self.assert_tokens(self.head, ("login-walled", "WebFetch", "linkedin.com", "x.com"))
 
