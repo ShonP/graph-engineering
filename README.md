@@ -210,8 +210,9 @@ concurrent opus writers, all dispatched in one message in the foreground.
 `graph-control host-check` runs before each wave (low disk blocks it). A wave
 with 2+ writers gives each task its own worktree, branched from the run branch
 head SHA and set up by the profile's `bootstrap:` commands; branches merge back
-in plan order and `scripts/worktree-gc.sh` removes merged, clean worktrees
-without forcing. A command on a resource the profile declares under `lanes:`
+in plan order and `scripts/worktree-gc.sh --apply --base <run branch> --prefix
+<run8>-` removes that run's merged, clean task worktrees without forcing
+(never another session's). A command on a resource the profile declares under `lanes:`
 (a device build, a shared database, a cluster) runs through
 `scripts/lane-run.sh <lane> --slots <n> -- <cmd>`, whose lock dies with the
 command. A suite longer than one tool call runs through

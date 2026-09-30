@@ -5,6 +5,9 @@ plus linked worktrees: merged-clean (its commit fast-forwarded into main),
 merged-dirty (merged, then an edit left in the tree) and unmerged (a commit
 main does not have). Git runs with GIT_DIR and friends scrubbed, as a hook
 running these tests from a linked worktree would otherwise leak its own repo.
+
+--apply is scoped to one run's branch prefix: unscoped, it would remove other
+sessions' freshly cut worktrees (review finding, wave 3 fix round 1).
 """
 
 import os
@@ -74,7 +77,7 @@ class DryRunAndApply(Fixture):
         self.assertTrue(self.branch_exists("merged-clean"))
 
     def test_apply_removes_it_and_deletes_its_branch_ac_w3_gc_01(self):
-        code, out, err = self.gc("--apply")
+        code, out, err = self.gc("--apply", "--prefix", "merged-")
         self.assertEqual(code, 0, err)
         self.assertEqual(out, [f"removed {self.clean} (merged-clean)", "deleted branch merged-clean"])
         self.assertFalse(self.clean.exists())
@@ -88,12 +91,21 @@ class DryRunAndApply(Fixture):
         self.assertIn(f"worktree {self.repo}\n", listed)
         self.assertEqual(self.gc()[1], [], "a second run finds nothing")
 
+    def test_apply_without_prefix_exits_2_and_removes_nothing(self):
+        code, out, err = self.gc("--apply")
+        self.assertEqual((code, out), (2, []))
+        self.assertIn("--prefix", err)
+        self.assertTrue(self.clean.is_dir())
+        self.assertTrue(self.branch_exists("merged-clean"))
+
     def test_branch_d_refusal_keeps_the_branch_and_exits_1(self):
         # Merged into --base but not into the current HEAD: `git branch -d` refuses and -D is never used.
         side = self.add("side")
         self.commit(side, "side.txt")
-        git(self.repo, "branch", "integration", "side")
-        code, out, err = self.gc("--apply", "--base", "integration")
+        tree = git(self.repo, "rev-parse", "side^{tree}").stdout.strip()
+        ahead = git(self.repo, "commit-tree", tree, "-p", "side", "-m", "integration").stdout.strip()
+        git(self.repo, "branch", "integration", ahead)
+        code, out, err = self.gc("--apply", "--base", "integration", "--prefix", "side")
         self.assertEqual(code, 1)
         self.assertIn(f"removed {side} (side)", out)
         self.assertNotIn("deleted branch side", out)
@@ -113,7 +125,8 @@ class Exclusions(Fixture):
     def test_locked_worktree_is_kept(self):
         git(self.repo, "worktree", "lock", str(self.clean))
         self.assertEqual(self.gc()[:2], (0, []), "a locked tree is never proposed")
-        self.assertEqual(self.gc("--apply")[:2], (0, []), "nor attempted, so apply reports no refusal")
+        self.assertEqual(self.gc("--apply", "--prefix", "merged-")[:2], (0, []),
+                         "nor attempted, so apply reports no refusal")
         self.assertTrue(self.clean.is_dir())
 
     def test_default_branch_worktree_is_kept(self):
@@ -124,7 +137,7 @@ class Exclusions(Fixture):
         self.assertTrue(default.is_dir())
 
     def test_detached_worktree_is_listed_as_detached(self):
-        detached = self.add("detached", options=["--detach"])
+        detached = self.add("detached", options=["--detach"], commit="merged-clean")
         self.assertIn(f"would remove {detached} (detached)", self.gc()[1])
 
     def test_inherited_git_dir_is_ignored(self):
@@ -152,12 +165,65 @@ class Base(Fixture):
     def test_usage_error_exits_2(self):
         self.assertEqual(self.gc("--force")[0], 2)
         self.assertEqual(self.gc("--base")[0], 2)
+        self.assertEqual(self.gc("--prefix")[0], 2)
+        self.assertEqual(self.gc("--apply", "--prefix", "")[0], 2)
 
     def test_outside_a_repository_exits_2(self):
         outside = self.tmp / "plain"
         outside.mkdir()
         env = dict(ENV, GIT_CEILING_DIRECTORIES=str(self.tmp))
         self.assertEqual(self.gc(cwd=outside, env=env)[0], 2)
+
+
+class Scope(Fixture):
+    """A run's own task worktrees go; other sessions' worktrees never do."""
+
+    def test_worktree_at_the_base_tip_is_kept(self):
+        # Another session just cut and bootstrapped it: no commits of its own, so nothing is merged.
+        fresh = self.add("runB")
+        (fresh / "node_modules").mkdir()
+        self.assertEqual(self.gc()[1], [f"would remove {self.clean} (merged-clean)"])
+        self.assertEqual(self.gc("--apply", "--prefix", "runB")[:2], (0, []))
+        self.assertTrue(fresh.is_dir())
+        self.assertTrue(self.branch_exists("runB"))
+
+    def test_prefix_keeps_other_runs_merged_worktrees(self):
+        ours, theirs = self.add("aaaa1111-t1"), self.add("bbbb2222-t1")
+        self.commit(ours, "ours.txt")
+        self.commit(theirs, "theirs.txt")
+        git(self.repo, "merge", "-q", "--no-ff", "--no-edit", "aaaa1111-t1", "bbbb2222-t1")
+        code, out, err = self.gc("--apply", "--prefix", "aaaa1111-")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out, [f"removed {ours} (aaaa1111-t1)", "deleted branch aaaa1111-t1"])
+        self.assertTrue(theirs.is_dir())
+        self.assertTrue(self.clean.is_dir(), "a merged worktree outside the prefix stays")
+
+    def test_prefix_never_matches_a_detached_worktree(self):
+        detached = self.add("detached", options=["--detach"], commit="merged-clean")
+        self.assertIn(f"would remove {detached} (detached)", self.gc()[1])
+        self.assertEqual(self.gc("--prefix", "d")[:2], (0, []))
+
+    def test_task_branches_merged_into_a_run_branch(self):
+        # The engine's shape: task worktrees cut from the run branch head, merged back
+        # into the run branch (not main) with --no-ff, the gc run from the run worktree.
+        run = self.add("run1")
+        head = git(run, "rev-parse", "HEAD").stdout.strip()
+        tasks = [self.add(f"run1-t{n}", options=["-b", f"run1-t{n}"], commit=head) for n in (1, 2)]
+        for n, tree in enumerate(tasks, 1):
+            self.commit(tree, f"t{n}.txt")
+            git(run, "merge", "-q", "--no-ff", "--no-edit", f"run1-t{n}")
+        other = self.add("runB")  # a concurrent session's fresh worktree
+        self.assertEqual(self.gc(cwd=run)[1], [f"would remove {self.clean} (merged-clean)"],
+                         "against main, the run's task worktrees are not merged yet")
+        code, out, err = self.gc("--apply", "--base", "run1", "--prefix", "run1-", cwd=run)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out, [f"removed {tasks[0]} (run1-t1)", "deleted branch run1-t1",
+                               f"removed {tasks[1]} (run1-t2)", "deleted branch run1-t2"])
+        for tree in tasks:
+            self.assertFalse(tree.exists())
+        for kept in (run, other, self.clean, self.repo):
+            self.assertTrue(kept.is_dir(), kept)
+        self.assertTrue(self.branch_exists("run1"))
 
 
 if __name__ == "__main__":

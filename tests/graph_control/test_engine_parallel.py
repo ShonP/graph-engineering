@@ -39,9 +39,21 @@ class EngineParallelTests(unittest.TestCase):
             "BLOCKED",
             "plan order",
             "decision card",
-            "scripts/worktree-gc.sh --apply",
+            "git merge --no-ff",
+            "scripts/worktree-gc.sh --apply --base <run branch> --prefix <run8>-",
         ))
         self.assertIn("keeps the run worktree", self.steps[2])
+
+    def test_ac_w3_ep_01_gc_is_always_scoped_to_the_run(self):
+        # Unscoped, --apply removes other sessions' freshly cut worktrees (fix round 1, blocking).
+        calls = re.findall(r"worktree-gc\.sh[^`]*", self.text)
+        self.assertTrue(calls)
+        for call in calls:
+            with self.subTest(call=call):
+                if "--apply" in call:
+                    self.assertIn("--prefix <run8>-", call)
+                    self.assertIn("--base <run branch>", call)
+        self.assertNotIn("At run end, run", self.steps[2])
 
     def test_ac_w3_ep_01_host_isolation_is_never_offered(self):
         self.assertIsNone(re.search(r"isolation\W{0,3}worktree", self.text))

@@ -1,36 +1,47 @@
 #!/usr/bin/env bash
 # Remove linked worktrees whose work is already merged:
-#   worktree-gc.sh [--apply] [--base <ref>]
+#   worktree-gc.sh [--base <ref>] [--prefix <p>]             dry run
+#   worktree-gc.sh --apply --prefix <p> [--base <ref>]      remove
 #
 # A candidate is a linked worktree (never the main one, never the one holding
 # the current directory, never a locked or bare one, never one on the base's
-# own branch) whose HEAD is an ancestor of <base> and whose
-# `git status --porcelain --untracked-files=normal` is empty. <base> defaults
-# to origin/HEAD, then the local default branch (init.defaultBranch, main,
-# master). A squash-merged branch is not an ancestor, so it is kept: the gc
-# only removes what git itself can prove merged.
+# own branch) whose HEAD is an ancestor of <base> but not its tip, and whose
+# `git status --porcelain --untracked-files=normal` is empty. A HEAD at the
+# base tip has no commits of its own (a branch another session just cut), so
+# nothing about it is merged. <base> defaults to origin/HEAD, then the local
+# default branch (init.defaultBranch, main, master). A squash-merged branch is
+# not an ancestor, so it is kept: the gc only removes what git can prove merged.
+# --prefix <p> keeps only worktrees on a branch starting with <p> (never a
+# detached one): the engine passes its run's `<run8>-` from the run worktree
+# with `--base <run branch>`, so it removes its own merged task worktrees and
+# never another session's.
 #
 # Dry run (default) prints `would remove <path> (<branch>)` per candidate.
-# --apply runs `git worktree remove <path>` (never --force, so git refuses
-# anything dirty; ignored files such as build output go with the tree), then
+# --apply needs --prefix: other sessions' worktrees share the repo, so the
+# unscoped mode is a dry run for the owner to read. It runs
+# `git worktree remove <path>` (never --force, so git refuses anything dirty;
+# ignored files such as build output go with the tree), then
 # `git branch -d <branch>` (never -D), then `git worktree prune`.
 # Exit: 0 done, 1 a remove or branch delete was refused (reported, the rest
 # continue), 2 usage, no repository or an unknown base.
 set -uo pipefail
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR
 
-usage() { echo "usage: worktree-gc.sh [--apply] [--base <ref>]" >&2; exit 2; }
+usage() { echo "usage: worktree-gc.sh [--apply --prefix <p>] [--base <ref>] [--prefix <p>]" >&2; exit 2; }
 die() { echo "worktree-gc: $1" >&2; exit 2; }
 
-apply=0 base=""
+apply=0 base="" prefix="" scoped=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --apply) apply=1 ;;
     --base) [ $# -ge 2 ] || usage; base="$2"; shift ;;
+    --prefix) [ $# -ge 2 ] && [ -n "$2" ] || usage; prefix="$2" scoped=1; shift ;;
     *) usage ;;
   esac
   shift
 done
+[ "$apply" -eq 0 ] || [ "$scoped" -eq 1 ] \
+  || die "--apply needs --prefix <run8>- (other sessions' worktrees share this repo); without it the gc is a dry run"
 
 git rev-parse --git-dir >/dev/null 2>&1 || die "not inside a git repository"
 if [ -z "$base" ]; then
@@ -53,6 +64,8 @@ consider() { # consider <path> <head> <branch> <skip>
   local path="$1" head="$2" branch="$3" real label
   [ "$4" -eq 0 ] && [ -n "$head" ] || return 0
   [ -n "$branch" ] && [ "$branch" = "$protected" ] && return 0
+  [ "$scoped" -eq 0 ] || case "$branch" in "$prefix"*) ;; *) return 0 ;; esac
+  [ "$head" != "$base_sha" ] || return 0
   real="$(cd "$path" 2>/dev/null && pwd -P)" || return 0
   [ "$real" != "$here" ] || return 0
   git merge-base --is-ancestor "$head" "$base_sha" 2>/dev/null || return 0
