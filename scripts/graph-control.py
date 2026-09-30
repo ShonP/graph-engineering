@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["PyYAML==6.0.2"]
+# dependencies = ["PyYAML==6.0.2", "wcmatch==11.0.1"]
 # ///
 """Pinned entry point for deterministic Graph Engineering controls."""
 
