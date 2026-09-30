@@ -64,3 +64,4 @@ Confirm consumed contracts are ready before editing. Synthetic examples must be
 labelled; domain claims require the plan's real witness and an independent oracle.
 
 Return at most 1,500 tokens: status, commits or artifact paths, case IDs and results, blockers. Keep logs in run artifacts. Report every suite you ran as `<command>: exit=<n> complete|partial`. Never wait with sleep or until loops. For a command that takes longer than one call, use run_in_background only if your dispatch says you run in the background; otherwise make one blocking call with an explicit timeout (at most 600000 ms). Never end your turn while you still need a result.
+For a suite longer than one call, use `<plugin root>/hooks/scripts/wait-run.sh --log <absolute path> -- <argv>` with a Bash timeout above its 270 s block; exit 75 means still running, so call it again without a command to attach.
