@@ -124,6 +124,64 @@ class ConfiguredChecks(unittest.TestCase):
         context = self.edit(self.root, candidate / 'a.py')
         self.assertIn('wt-finding', context)
 
+    # A monorepo: Claude Code sets CLAUDE_PROJECT_DIR to the launch directory, often a package.
+    def package(self, name='pkg'):
+        pkg = self.root / name
+        pkg.mkdir(exist_ok=True)
+        return pkg
+
+    def stop_from(self, cwd, project_dir):
+        return self.hook('test-before-stop.sh', {'cwd': str(cwd), 'stop_hook_active': False}, project_dir)
+
+    def test_subdirectory_project_dir_runs_its_own_config(self):
+        pkg = self.package()
+        self.configure(pkg, ['sh', '-c', 'pwd -P > ran-here; echo pkg-failed >&2; exit 1'])
+        result = self.stop_from(pkg, pkg)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn('pkg-failed', result.stderr)
+        self.assertIn(f' in {pkg} (exit 1)', result.stderr)
+        self.assertEqual((pkg / 'ran-here').read_text().strip(), str(pkg))
+
+    def test_nearest_config_to_the_cwd_wins(self):
+        pkg = self.package()
+        self.configure(self.root, ['sh', '-c', 'touch root-marker'])
+        self.configure(pkg, ['sh', '-c', 'touch pkg-marker'])
+        self.assertEqual(self.stop_from(pkg, self.root).returncode, 0)
+        self.assertEqual(((pkg / 'pkg-marker').exists(), (self.root / 'root-marker').exists()), (True, False))
+        (pkg / 'pkg-marker').unlink()
+        self.assertEqual(self.stop_from(self.root, self.root).returncode, 0)
+        self.assertEqual(((pkg / 'pkg-marker').exists(), (self.root / 'root-marker').exists()), (False, True))
+
+    def test_subdirectory_project_dir_maps_into_a_linked_worktree(self):
+        pkg = self.package()
+        (pkg / 'keep').write_text('kept\n')
+        self.git('add', 'pkg/keep')
+        self.git('commit', '-qm', 'pkg')
+        candidate = self.root.parent / 'candidate'
+        self.git('worktree', 'add', '-qb', 'candidate', str(candidate))
+        self.configure(pkg, ['sh', '-c', 'touch main-pkg-marker'])
+        self.configure(candidate / 'pkg', ['sh', '-c', 'echo wt-pkg-failed >&2; exit 1'])
+        result = self.stop_from(candidate, pkg)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn('wt-pkg-failed', result.stderr)
+        self.assertFalse((pkg / 'main-pkg-marker').exists())
+
+    def test_a_config_above_the_bound_root_never_runs(self):
+        workspace = self.root.parent
+        self.configure(workspace, ['sh', '-c', 'touch workspace-marker'])
+        result = self.stop_from(self.root, workspace)
+        self.assertEqual((result.returncode, result.stderr), (0, ''))
+        self.assertFalse((workspace / 'workspace-marker').exists())
+
+    def test_lint_uses_the_config_nearest_the_file(self):
+        pkg = self.package()
+        (pkg / 'src').mkdir()
+        self.configure(pkg, None, lint={'argv': ['sh', '-c', 'echo "at=$(pwd -P) file=$1"; exit 1', 'lint', '{file}'],
+                                        'extensions': ['.py']})
+        context = self.edit(pkg, pkg / 'src' / 'a.py')
+        self.assertTrue(context.startswith('Lint on src/a.py reported problems (exit 1).'), context)
+        self.assertIn(f'at={pkg} file=src/a.py', context)
+
     def fake_old_python(self):
         binaries = self.root.parent / 'old-python'
         binaries.mkdir(exist_ok=True)

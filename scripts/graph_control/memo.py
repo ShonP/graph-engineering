@@ -38,10 +38,19 @@ def memo_path(root: Path) -> Path:
 
 
 def memo_key(root: Path, argv: Iterable[str], config_sha256: str) -> str:
-    """SHA-256 of the candidate identity (revision, dirty tree incl. untracked), argv and config."""
-    source = snapshot(Path(root), "candidate")
-    return fingerprint({"root": source.root, "revision": source.revision, "dirty_sha256": source.dirty_sha256,
-                        "argv": list(argv), "config_sha256": config_sha256})
+    """SHA-256 of the candidate identity (revision, dirty tree incl. untracked), argv and config.
+
+    `root` is the directory holding the config: the worktree root, or a package inside it. The tree
+    identity is always the whole worktree's; a package adds its path, so two packages with identical
+    configs never share a verdict, and a root-level key is unchanged."""
+    directory = Path(root).resolve(strict=True)
+    top = Path(os.fsdecode(git(directory, "rev-parse", "--show-toplevel")).strip()).resolve()
+    source = snapshot(top, "candidate")
+    key = {"root": source.root, "revision": source.revision, "dirty_sha256": source.dirty_sha256,
+           "argv": list(argv), "config_sha256": config_sha256}
+    if directory != top:
+        key["dir"] = directory.relative_to(top).as_posix()
+    return fingerprint(key)
 
 
 def checked(value: Any) -> dict[str, Any]:

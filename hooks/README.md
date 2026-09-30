@@ -34,8 +34,8 @@ The Stop and lint hooks do nothing until the repo commits this file. The shape:
 - `version`: `1`.
 - `test`, `precheck` and `lint` blocks, each optional. A block takes `argv` (a
   list, spawned directly with no shell) and `timeout_seconds`.
-- `lint.argv` has exactly one `{file}` element, replaced with the repo-relative
-  path of the edited file. `lint.extensions` is required: only files with a
+- `lint.argv` has exactly one `{file}` element, replaced with the edited file's
+  path relative to the config's directory (the repo root, or a package). `lint.extensions` is required: only files with a
   listed extension are linted.
 - Timeouts are at most 600 for `test`, 120 for `lint` and 60 for `precheck`.
 - `precheck` is a cheap gate for what the test needs (a daemon, a database) so a
@@ -46,11 +46,18 @@ A complete example is at `templates/graph-checks.json`; copy it to
 
 **Without the file, both hooks do nothing. This breaks 0.14 autodetect (removed in 0.15).**
 
-Where the hooks look: in the directory of the edited file (lint) or of the
-session's working directory and `CLAUDE_PROJECT_DIR` (Stop), and in every parent
-of it. A nested repo in a multi-repo workspace and a linked worktree therefore use
-their own file. When no file is found the hook exits in bash before starting
-Python, so a repo that never opted in is never told that Python 3.11+ is missing.
+Where the hooks look: first the hook binds a root, the repository (or linked
+worktree) being worked on. Then the nearest `.claude/graph-checks.json` wins,
+walking up from the edited file's directory (lint) or from the session's working
+directory, then `CLAUDE_PROJECT_DIR` (Stop), and never above that root. The
+command runs from the directory holding `.claude/`. So a package in a monorepo
+keeps its own file even when Claude Code was launched inside it
+(`CLAUDE_PROJECT_DIR` is the launch directory), a nested repo in a multi-repo
+workspace and a linked worktree use their own, and a package directory maps
+into the linked worktree Claude is working in. A package's file is also a
+package's memo: its verdict is keyed by its path as well as the tree. When no
+file is found the hook exits in bash before starting Python, so a repo that
+never opted in is never told that Python 3.11+ is missing.
 
 Removed in 0.15: the `uv run test` and `package.json` script lookups and the Taskfile lookup.
 A repo that relied on them has to add the file to keep the Stop gate and the lint.

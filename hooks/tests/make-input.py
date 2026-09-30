@@ -4,7 +4,7 @@ Usage: make-input.py <EventName> [key=value ...]
 
 Keys: file_path=, tool_name= (PostToolUse); stop_hook_active=true|false and
 background=running|completed|none (Stop); source= (SessionStart); prompt_id=
-(any event). The common fields come from "Common input fields"; the
+and cwd= (any event; cwd defaults to /). The common fields come from "Common input fields"; the
 event-specific fields from "PostToolUse input", "Stop input" and "SessionStart
 input" (https://code.claude.com/docs/en/hooks). The background_tasks entry
 carries only the fields the Stop hook reads: id, type, status, description.
@@ -34,8 +34,9 @@ def background_tasks(state):
 
 def build(event, options):
     payload = dict(COMMON, hook_event_name=event)
-    if "prompt_id" in options:
-        payload["prompt_id"] = options["prompt_id"]
+    for key in ("prompt_id", "cwd"):
+        if key in options:
+            payload[key] = options[key]
 
     if event == "PostToolUse":
         file_path = options.get("file_path")

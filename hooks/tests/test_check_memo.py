@@ -104,6 +104,24 @@ class CheckMemo(unittest.TestCase):
         self.stop()
         self.assertEqual(self.runs(), 3)
 
+    def test_package_configs_memoize_under_their_own_keys(self):
+        """Two packages with byte-identical configs never replay each other's verdict."""
+        packages = [self.root / 'a', self.root / 'b']
+        for package in packages:
+            package.mkdir()
+            self.configure('exit 0', root=package)
+
+        def stop_in(package):
+            return subprocess.run(['bash', str(HOOKS / 'test-before-stop.sh')],
+                                  input=json.dumps({'cwd': str(package), 'stop_hook_active': False}),
+                                  env=self.env(CLAUDE_PROJECT_DIR=str(package)), capture_output=True, text=True,
+                                  timeout=20)
+        counts = []
+        for package in (*packages, *packages):
+            self.assertEqual(stop_in(package).returncode, 0)
+            counts.append(self.runs())
+        self.assertEqual(counts, [1, 2, 2, 2])
+
     def test_a_non_git_root_runs_without_a_memo(self):  # AC-W2-MM-04
         plain = self.root.parent / 'plain'
         plain.mkdir()

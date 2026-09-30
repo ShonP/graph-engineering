@@ -85,6 +85,21 @@ class CheckReuse(unittest.TestCase):
                     path.write_text(text)
                 self.assertEqual(invoke(str(self.root), "--reuse")[:1], (1,))
 
+    def test_a_package_config_replays_from_its_own_directory(self):
+        """A monorepo package's config: the hook and check --reuse compute the same key from that directory."""
+        package = self.root / "pkg"
+        (package / ".claude").mkdir(parents=True)
+        (package / ".claude/graph-checks.json").write_text(
+            (self.root / ".claude/graph-checks.json").read_text())
+        env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+        ran = subprocess.run([sys.executable, str(HOOK), "test", str(self.root), str(package)], env=env,
+                             capture_output=True, text=True, timeout=20)
+        self.assertEqual(ran.returncode, 2, ran.stderr)
+        self.assertIn(f" in {package} (exit 4)", ran.stderr)
+        code, result = invoke(str(package), "--reuse")
+        self.assertEqual((code, result["verdict"]), (0, "fail"), result)
+        self.assertEqual(invoke(str(self.root), "--reuse")[1]["reason"], "no memo for the current tree")
+
     def test_a_non_git_root_is_blocked(self):
         plain = Path(self.temp.name) / "plain"
         (plain / ".claude").mkdir(parents=True)

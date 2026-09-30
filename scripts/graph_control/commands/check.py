@@ -18,7 +18,8 @@ CONFIG = ".claude/graph-checks.json"
 
 
 def add_arguments(parser: ArgumentParser) -> None:
-    parser.add_argument("root", type=Path, help="Git worktree root holding .claude/graph-checks.json")
+    parser.add_argument("root", type=Path,
+                        help="the directory holding .claude/graph-checks.json: a Git worktree root or a package in it")
     parser.add_argument("--reuse", action="store_true", required=True,
                         help="read the tree-keyed memo; the only mode, since graph-control runs no project commands")
 

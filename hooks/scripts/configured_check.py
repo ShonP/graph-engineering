@@ -1,10 +1,15 @@
 """Run the checks a repository opted into in .claude/graph-checks.json.
 
-  configured_check.py test <root>          0 pass or not verified, 2 fail or broken opt-in,
-                                           77 no config or no test block
-  configured_check.py lint <root> <file>   0 always; PostToolUse context JSON on stdout
+  configured_check.py test <root> [<dir>...]  0 pass or not verified, 2 fail or broken opt-in,
+                                             77 no config or no test block
+  configured_check.py lint <root> <file>     0 always; PostToolUse context JSON on stdout
 
-Argv runs directly: no shell, cwd=root, its own session, output spooled to a
+The config is the .claude/graph-checks.json nearest the start (each <dir> in
+order, then <root>; for lint, the file's directory), walking up to <root> and
+never above it (project_root.checks_dir): a monorepo package keeps its own.
+Its directory is the check's cwd and the base of lint's relative {file}.
+
+Argv runs directly: no shell, its own session, output spooled to a
 temp file so a verbose suite never floods the model. A timeout kills the whole
 process group and reports "not verified" instead of blocking: a check that
 cannot finish is not evidence of a failure.
@@ -25,6 +30,7 @@ import sys
 import tempfile
 
 from checks_config import FILE, load
+from project_root import checks_dir
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts'))
 from graph_control import memo  # noqa: E402  stdlib only, like this hook
@@ -99,10 +105,11 @@ def replay(root: Path, hit: dict) -> int:
     return 2
 
 
-def test(root: Path) -> int:
-    path = root / CONFIG
-    if not path.is_file():
+def test(bound: Path, starts: list[Path]) -> int:
+    root = checks_dir(bound, starts, CONFIG)
+    if root is None:
         return NOT_CONFIGURED
+    path = root / CONFIG
     try:
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
         config = load(path)
@@ -164,10 +171,10 @@ def context(text: str) -> int:
     return 0
 
 
-def lint(root: Path, file: str) -> int:
-    path = root / CONFIG
+def lint(bound: Path, file: str) -> int:
+    root = checks_dir(bound, [Path(file).parent], CONFIG) if os.path.isabs(file) else None
     try:
-        check = load(path).lint if path.is_file() else None
+        check = load(root / CONFIG).lint if root else None
     except (ValueError, OSError):
         return 0  # The Stop hook reports a broken config; an edit is no place for it.
     relative = inside(root, file) if check else None
@@ -190,14 +197,14 @@ def lint(root: Path, file: str) -> int:
 
 
 def main(argv: list[str]) -> int:
-    if len(argv) == 3 and argv[1] == 'test':
-        return test(Path(argv[2]).resolve())
+    if len(argv) >= 3 and argv[1] == 'test':
+        return test(Path(argv[2]).resolve(), [Path(a) for a in argv[3:] if os.path.isabs(a)])
     if len(argv) == 4 and argv[1] == 'lint':
         try:
             return lint(Path(argv[2]).resolve(), argv[3])
         except OSError:
             return 0
-    print('usage: configured_check.py test <root> | lint <root> <file>', file=sys.stderr)
+    print('usage: configured_check.py test <root> [<dir>...] | lint <root> <file>', file=sys.stderr)
     return 2
 
 

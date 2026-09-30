@@ -123,3 +123,20 @@ reset_markers
 set_fail py
 set_fail node
 set_fail taskfile
+
+# A monorepo: Claude Code sets CLAUDE_PROJECT_DIR to the launch directory, here
+# a package below the git toplevel. The package's own config runs, from the
+# package directory, and a config above the bound root never does.
+MONO="$WORK/mono"
+mkdir -p "$MONO/pkg"
+env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE git -C "$MONO" init -q
+write_config "$MONO/pkg" '{"version":1,"test":{"argv":["sh","-c","pwd -P > RAN_TEST; exit 1"]}}'
+reset_markers
+run_hook "$STOP" "$MONO/pkg" "$(stop_json false "cwd=$MONO/pkg")"
+check "package CLAUDE_PROJECT_DIR, failing package test -> exit 2" 2 "$RC"
+row "Stop" "package project dir in a monorepo" "$RC"
+check "package test ran from the package directory" "$MONO/pkg" "$(cat "$MONO/pkg/RAN_TEST" 2>/dev/null)"
+case "$ERR" in
+"Tests failed: sh -c pwd -P > RAN_TEST; exit 1 in $MONO/pkg (exit 1)."*) check "the reason names the package" yes yes ;;
+*) check "the reason names the package" yes "no: $ERR" ;;
+esac

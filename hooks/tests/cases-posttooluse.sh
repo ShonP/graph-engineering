@@ -139,3 +139,21 @@ clear_config "$FIX/py"
 rm -rf "$FIX/py/src/a b" "$FIX/py/src/dir.py" "$FIX/py/src/link.py" "$FIX/py/NOTES.md"
 set_fail py
 set_fail node
+
+# A monorepo: CLAUDE_PROJECT_DIR is a package below the git toplevel. The
+# config nearest the edited file lints it, from that config's directory, with
+# {file} relative to it.
+MONO_LINT="$WORK/mono-lint"
+mkdir -p "$MONO_LINT/pkg/src"
+env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE git -C "$MONO_LINT" init -q
+printf 'x = 1\n' >"$MONO_LINT/pkg/src/a.py"
+write_config "$MONO_LINT/pkg" \
+  '{"version":1,"lint":{"argv":["sh","-c","echo \"at=$(pwd -P) file=$1\"; exit 1","lint","{file}"],"extensions":[".py"]}}'
+run_hook "$LINT" "$MONO_LINT/pkg" "$(post_json "$MONO_LINT/pkg/src/a.py")"
+check "package CLAUDE_PROJECT_DIR, package lint -> exit 0" 0 "$RC"
+row "PostToolUse" "package project dir in a monorepo" "$RC"
+case "$OUT" in
+*"Lint on src/a.py reported problems (exit 1)."*"at=$MONO_LINT/pkg file=src/a.py"*)
+  check "package lint ran from the package on its relative path" yes yes ;;
+*) check "package lint ran from the package on its relative path" yes "no: $OUT" ;;
+esac

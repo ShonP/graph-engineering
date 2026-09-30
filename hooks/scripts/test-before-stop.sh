@@ -16,7 +16,9 @@
 #   - background_tasks entries with status "running" mean work is still in
 #     flight; the tree is not final, so the check waits for a later Stop.
 #   - The input cwd is the tree being worked on; project_root.py binds a linked
-#     worktree of $CLAUDE_PROJECT_DIR to itself.
+#     worktree of $CLAUDE_PROJECT_DIR to itself. Inside that root, the
+#     graph-checks.json nearest the cwd (then the project dir) is the one that
+#     runs, from its own directory: a monorepo package keeps its own checks.
 # configured_check.py owns the run, the timeout ("not verified", exit 0) and
 # every message.
 
@@ -38,9 +40,10 @@ esac
 # shellcheck source=opt-in.sh
 . "$SCRIPT_DIR/opt-in.sh"
 STATUS=0
+CWD=
 ge_input_path "$HOOK_INPUT" cwd || STATUS=$?
 case $STATUS in
-  0) ge_opted_in "" "$PROJECT_DIR" "$GE_INPUT_PATH" || exit 0 ;;
+  0) CWD="$GE_INPUT_PATH"; ge_opted_in "" "$PROJECT_DIR" "$CWD" || exit 0 ;;
   2) ;; # an escaped cwd: Python decodes it and decides
   *) ge_opted_in "" "$PROJECT_DIR" || exit 0 ;;
 esac
@@ -68,7 +71,8 @@ else
   ROOT="$(root 2>/dev/null)" || exit 0
 fi
 
+# The config nearest the cwd, then the project dir, wins; never one above ROOT.
 STATUS=0
-"$GE_PYTHON" "$SCRIPT_DIR/configured_check.py" test "$ROOT" || STATUS=$?
+"$GE_PYTHON" "$SCRIPT_DIR/configured_check.py" test "$ROOT" ${CWD:+"$CWD"} "$PROJECT_DIR" || STATUS=$?
 [ "$STATUS" -eq 77 ] && exit 0
 exit "$STATUS"
