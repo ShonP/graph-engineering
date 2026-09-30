@@ -4,10 +4,13 @@ import argparse
 import json
 import subprocess
 import sys
+from collections.abc import Iterable
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
+from types import ModuleType
 
+from .commands import Output, iter_commands
 from .common import Invalid, fingerprint, load
 from .identity import snapshot
 from .plan import Plan
@@ -17,7 +20,7 @@ from .run import Run
 from .state import event, record, store_items, validate_attempts
 
 
-def parser() -> argparse.ArgumentParser:
+def parser(modules: Iterable[ModuleType] | None = None) -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(description=__doc__)
     commands = root.add_subparsers(dest="command", required=True)
     for name in ("validate-plan", "validate-attempts", "fingerprint"):
@@ -39,14 +42,26 @@ def parser() -> argparse.ArgumentParser:
     evt = commands.add_parser("event")
     evt.add_argument("artifact", type=Path)
     evt.add_argument("--state", required=True, type=Path)
+    for module in iter_commands() if modules is None else modules:
+        if module.NAME in commands.choices:
+            raise ValueError(f"command module {module.NAME} collides with an existing subcommand")
+        command = commands.add_parser(module.NAME, help=module.HELP)
+        module.add_arguments(command)
+        command.set_defaults(graph_command=module)
     return root
 
 
-def main() -> int:
-    args = parser().parse_args()
+def main(argv: list[str] | None = None, modules: Iterable[ModuleType] | None = None) -> int:
+    args = parser(modules).parse_args(argv)
     now = datetime.now(timezone.utc)
     try:
-        if args.command == "validate-plan":
+        plugin = getattr(args, "graph_command", None)
+        if plugin is not None:
+            result = plugin.run(args)
+            if isinstance(result, Output):
+                sys.stdout.write(result.text)
+                return result.exit_code
+        elif args.command == "validate-plan":
             plan = Plan.parse(load(args.artifact))
             result = {"tasks": len(plan.tasks), "cases": len(plan.cases)}
         elif args.command == "validate-attempts":
