@@ -16,7 +16,9 @@ are held to. It runs only when the goal has a user-facing surface (`when:
 ui`), and its owner approval is the plan gate: the plan embeds the design, so
 one stop covers both. After the merge gate,
 `post-deploy` checks the change where it was deployed and `retro` turns what
-leaked past each gate into proposed rules.
+leaked past each gate into proposed rules. The engine renders the merge
+exhibit itself and writes a one-line retro when nothing leaked; neither is a
+dispatch.
 
 ## node: goal
 agent: planner
@@ -103,9 +105,9 @@ gate: no
 next: merge
 
 ## node: merge
-agent: planner
+agent: engine
 in: the reviewed diff, the gate verdict, .graph/<run>/followups.md
-out: .graph/<run>/ledger.md
+out: .graph/<run>/merge.md (the exhibit the engine renders per graph-ship step 5, also the PR body), .graph/<run>/ledger.md
 gate: yes
 next: post-deploy
 
@@ -118,9 +120,8 @@ gate: no
 next: retro
 
 ## node: retro
-agent: planner
-skills: [retro]
+agent: retro
 in: the whole run directory
-out: .graph/<run>/retro.md (leaks, classes, proposed rule changes as diffs - never applied)
+out: .graph/<run>/retro.md (leaks, classes, proposed rule changes as diffs - never applied; the engine writes the one-line fast-path version itself when nothing leaked, per graph-ship step 10)
 gate: no
 next: END
