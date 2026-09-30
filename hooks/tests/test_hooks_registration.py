@@ -51,7 +51,7 @@ class RegistrationContract(unittest.TestCase):
     def test_pretooluse_guards(self):
         groups = load()["PreToolUse"]
         self.assertEqual([g["matcher"] for g in groups], ["Bash", "Agent|Task"])
-        ifs = ["Bash(git push*)", "Bash(git remote*)", "Bash(rm *)", "Bash(docker *)"]
+        ifs = ["Bash(git *)", "Bash(rm *)", "Bash(docker *)"]
         self.assertEqual(
             groups[0]["hooks"],
             [handler("guard-destructive.sh", timeout=10, **{"if": i}) for i in ifs],

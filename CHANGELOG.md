@@ -65,9 +65,10 @@ commits.
   "not verified" instead of blocking. Script autodetection (`pyproject.toml`,
   `package.json`, `Taskfile.yml`) and the whole-project typecheck on every edit
   are removed.
-- hooks: `hooks.json` registers async lint, the four-handler destructive-command
-  guard, the Agent|Task policy guard, an `asyncRewake` Stop gate, and
-  SessionStart limited to `startup|clear|compact`. `hooks/README.md` documents
+- hooks: `hooks.json` registers async lint, the three-handler destructive-command
+  guard (`Bash(git *)`, so `git -C <dir> push -f` is reached), the Agent|Task
+  policy guard, an `asyncRewake` Stop gate, and SessionStart limited to
+  `startup|clear|compact`. `hooks/README.md` documents
   the opt-in `.claude/graph-checks.json` contract and states that 0.15 breaks
   0.14 autodetect.
 - Roster runs on opus/sonnet only (planner moves from fable to opus), with

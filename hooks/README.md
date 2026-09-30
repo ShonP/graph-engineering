@@ -1,7 +1,7 @@
 # Plugin hooks
 
 Five scripts ship with `graph-engineering`, registered in `hooks/hooks.json` as
-eight handlers. They are generic: nothing in them names a repo, a stack or a
+seven handlers. They are generic: nothing in them names a repo, a stack or a
 package manager. What to run is declared by the project in
 `.claude/graph-checks.json`; how agents are tiered is declared in the project's
 `.claude/graph-profile.yaml`.
@@ -9,7 +9,7 @@ package manager. What to run is declared by the project in
 | Event, matcher | Script | Mode | What it does |
 | --- | --- | --- | --- |
 | `PostToolUse`, `Edit\|Write` | `scripts/lint-touched-file.sh` | `async`, timeout 130 | Runs the configured lint on the file Claude just wrote and hands findings back on the next turn. Exit `0` always: it informs, it never blocks |
-| `PreToolUse`, `Bash` | `scripts/guard-destructive.sh` | sync, timeout 10, four handlers gated by `if` | Asks before a destructive command, with evidence. Never denies |
+| `PreToolUse`, `Bash` | `scripts/guard-destructive.sh` | sync, timeout 10, three handlers gated by `if` | Asks before a destructive command, with evidence. Never denies |
 | `PreToolUse`, `Agent\|Task` | `scripts/guard-agent.sh` | sync, timeout 15 | Enforces the profile's `policy:` block on subagent calls |
 | `Stop`, no matcher | `scripts/test-before-stop.sh` | `asyncRewake`, timeout 620 | Runs the configured test after the turn ends and wakes Claude only when it fails |
 | `SessionStart`, `startup\|clear\|compact` | `scripts/print-handoff.sh` | sync, timeout 15 | Prints the head of `docs/HANDOFF.md` into the new context. Exit `0` always |
@@ -21,7 +21,7 @@ lean on:
 
 | Feature | Floor | Used by |
 | --- | --- | --- |
-| `if` on a hook handler | 2.1.85 | the four `guard-destructive.sh` handlers |
+| `if` on a hook handler | 2.1.85 | the three `guard-destructive.sh` handlers |
 | `if` evaluated inside compound commands (`a && b`, `$(...)`) | 2.1.89 | the same handlers, so `npm test && git push` still matches |
 | `background_tasks` in the Stop input | 2.1.145 | the Stop hook's skip while background work runs |
 
@@ -98,10 +98,14 @@ human or the harness decides. It asks for:
 - A recursive `rm` of `/`, `$HOME`, a repository root, a `.git` path or the Docker
   data directories.
 
-Registration is four handlers, one per `if`: `Bash(git push*)`, `Bash(git remote*)`,
-`Bash(rm *)` and `Bash(docker *)`. Spike e found that `if` holds exactly one
-permission rule; a pipe, a brace or a list inside it matches nothing. A command
-that matches none of the four never spawns the script. Because `if` is
+Registration is three handlers, one per `if`: `Bash(git *)`, `Bash(rm *)` and
+`Bash(docker *)`. The git rule is the whole tool, not `git push*`, because git
+takes global options before the subcommand: `git -C <worktree> push -f` is how
+worktree flows force-push, and `git -c k=v` and `git --no-pager` shift it the
+same way. Spike e found that `if` holds exactly one permission rule; a pipe, a
+brace or a list inside it matches nothing. A command that matches none of the
+three never spawns the script, and a git command that never says `push` or
+`remote` stops at the script's bash `case`. Because `if` is
 best-effort (Claude Code runs the hook when it cannot parse the command), the
 script re-checks the command itself. For a hard stop, put the fixed string in
 `permissions.deny`; a hook is the wrong tool for an absolute rule.

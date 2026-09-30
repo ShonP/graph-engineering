@@ -7,9 +7,11 @@ JSON object with permissionDecision "ask" and the rule's reason, or no output.
 
     python3 -m unittest discover -s hooks/tests -p 'test_guard_destructive.py' -v
 """
+import fnmatch
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -86,10 +88,10 @@ class GuardDestructive(unittest.TestCase):
         self.assertTrue(text.startswith(PREFIX) and text.endswith(SUFFIX), text)
         return text[len(PREFIX):-len(SUFFIX)]
 
-    def test_ac01_positives_ask_with_rule_reason(self):
+    def positives(self):
         home, repo, docker = str(self.home), str(self.repo), os.path.realpath('/var/lib/docker')
         force = 'force push without --force-with-lease to '
-        cases = [
+        return [
             ('git remote remove origin', None, 'removes git remote origin ('),
             ('git remote rm up', None, 'removes git remote up ('),
             ('cd repo && git push --force origin main', self.root, force + 'origin main'),
@@ -107,8 +109,17 @@ class GuardDestructive(unittest.TestCase):
             (f'rm -rf {repo}', self.root, f'recursive delete of {repo} (repository root)'),
             ('rm -fr /var/lib/docker', None, f'recursive delete of {docker} (Docker data directory)'),
             ('rm -rf ~/*', None, f'recursive delete of {home}/* (everything in the home directory)'),
+            # git global options before the subcommand: how worktree flows run git.
+            (f'git -C {repo} push -f', self.root, force + 'origin main'),
+            ('git -c x=y push --force', None, force),
+            ('git --no-pager push --force origin main', None, force + 'origin main'),
+            (f'git -C {repo} remote remove origin', self.root, 'removes git remote origin ('),
+            ('docker -H unix:///x volume prune', None, 'deletes Docker volumes (3 present)'),
+            ('echo `rm -rf ~`', None, f'recursive delete of {home} (home directory)'),
         ]
-        for command, cwd, expected in cases:
+
+    def test_ac01_positives_ask_with_rule_reason(self):
+        for command, cwd, expected in self.positives():
             with self.subTest(command=command):
                 self.assertTrue(self.reason(command, cwd=cwd).startswith(expected))
 
@@ -118,6 +129,7 @@ class GuardDestructive(unittest.TestCase):
             'git remote -v', 'git remote add x https://e.invalid/x.git', 'rm -rf node_modules',
             'rm -rf dist build', 'rm file.txt', 'rm -rf build/*', 'docker volume ls', 'docker ps', 'docker system prune -f',
             'docker compose -p ge-x down -v', "echo 'rm -rf /'", "git commit -m 'rm -rf /'",
+            "git commit -m 'push the remote fix'", 'git -C repo status', "echo '`rm -rf /`'",
             "cat > notes.txt <<'EOF'\nplease confirm it's fine to rm stuff\nEOF",
         ]:
             with self.subTest(command=command):
@@ -183,8 +195,28 @@ class GuardDestructive(unittest.TestCase):
 
     def test_ac06_unparseable_asks_and_malformed_json_is_silent(self):
         self.assertEqual(self.reason('rm -rf "/'), PARSE)
+        self.assertEqual(self.reason('git -C repo push -f "x'), PARSE)
         self.assertEqual(self.run_guard(None, raw='{"tool_input": {"command": "rm -rf /"'), '')
         self.assertEqual(self.run_guard(None, raw='["rm -rf /"]'), '')
+
+    def test_registered_if_rules_reach_every_positive(self):
+        """Each AC-01 positive must reach the script through a hooks.json `if` rule.
+
+        EMULATION, not Claude Code: spike e (2.1.285) found that `if` checks every
+        subcommand of `&&`, `||`, `;` and `|`, strips leading VAR=value prefixes and
+        also checks the commands inside `$()` and backticks. A permission rule
+        `Bash(prefix*)` is a glob on the whole subcommand.
+        """
+        groups = json.loads((GUARD.parents[1] / 'hooks.json').read_text())['hooks']['PreToolUse']
+        rules = [h['if'][len('Bash('):-1] for g in groups for h in g['hooks']
+                 if h['command'].endswith('/guard-destructive.sh')]
+        for command, _cwd, _expected in self.positives():
+            with self.subTest(command=command):
+                subs = re.split(r'&&|\|\||[;|\n]', command)
+                subs += [a or b for a, b in re.findall(r'`([^`]*)`|\$\(([^()]*)\)', command)]
+                subs = [re.sub(r'^(?:[A-Za-z_]\w*=\S*\s+)*', '', s.strip()) for s in subs]
+                self.assertTrue(any(fnmatch.fnmatchcase(s, r) for s in subs for r in rules),
+                                f'no if rule in {rules} reaches {command!r}')
 
     def test_no_python_runtime_fails_open(self):
         empty = self.root / 'empty-bin'

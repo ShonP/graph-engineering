@@ -15,16 +15,20 @@
 #   evidence script re-parses tool_input.command itself.
 #
 # Fast path: a pure-bash `case` on the raw input. No match means exit 0 with no
-# output and no process spawned. `$(</dev/stdin)` drains stdin without exec'ing
-# cat (measured 2026-09-30, bash 3.2: 2.9 ms small, 4.9 ms on a 60 KB payload,
-# against 16 ms for `read -d ''`, which reads a pipe a byte at a time).
+# output and no process spawned. The words are matched apart, not as `git push`,
+# because git and docker take global options before the subcommand
+# (`git -C <worktree> push -f`, `docker -H <host> volume prune`); for the same
+# reason the git handler's `if` is `Bash(git *)`. `$(</dev/stdin)` drains stdin
+# without exec'ing cat (measured 2026-09-30, bash 3.2: 2.9 ms small, 4.9 ms on a
+# 60 KB payload, against 16 ms for `read -d ''`, which reads a pipe a byte at a
+# time).
 #
 # Slow path: destructive_evidence.py, stdlib only, run with the interpreter
 # python-runtime.sh selects. No interpreter means fail-open: exit 0, no prompt.
 
 input="$(</dev/stdin)"
 case "$input" in
-  *'git push'* | *'git remote'* | *'rm '* | *'docker volume'* | *'docker system'*) ;;
+  *git*push* | *git*remote* | *'rm '* | *docker*volume* | *docker*system*) ;;
   *) exit 0 ;;
 esac
 

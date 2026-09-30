@@ -15,8 +15,10 @@ import subprocess
 import sys
 
 PARSE_REASON = 'could not parse this command; it matches a destructive pattern'
-TRIGGER = re.compile(r'(?:^|[\s;&|(`/])(?:git\s+(?:push|remote)|rm\s|docker\s+(?:volume|system))')
-PUNCT = ';&|()<>'
+# Global options may sit between the tool and its subcommand: git -C <dir> push.
+TRIGGER = re.compile(r'(?:^|[\s;&|(`/])(?:git\s(?:[^;&|`\n]*\s)?(?:push|remote)\b|rm\s'
+                     r'|docker\s(?:[^;&|`\n]*\s)?(?:volume|system)\b)')
+PUNCT = ';&|()<>`'
 ASSIGN = re.compile(r'[A-Za-z_][A-Za-z0-9_]*=')
 HEREDOC = re.compile(r'(?<!<)<<(?!<)(-?)[ \t]*([\'"]?)([A-Za-z_][\w.-]*)\2')
 USERINFO = re.compile(r'(https?://)[^/@\s]+@')
@@ -77,8 +79,9 @@ def flatten(cmd):
 
 
 def split(cmd):
-    """Segments on && || ; | & ( ) and newlines, each shlex-split. A redirection also
-    ends a segment; its target then reads as a command name, which no rule matches."""
+    """Segments on && || ; | & ( ), backticks and newlines, each shlex-split. A
+    redirection also ends a segment; its target then reads as a command name,
+    which no rule matches."""
     lex = shlex.shlex(flatten(cmd), posix=True, punctuation_chars=PUNCT)
     lex.whitespace_split, lex.commenters = True, ''
     segs, seg = [], []
