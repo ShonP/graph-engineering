@@ -83,19 +83,29 @@ class Plan:
         result.validate()
         return result
 
+    def levels(self) -> list[list[str]]:
+        """Topological levels from depends_on; tasks keep plan order within a level."""
+        pending = unique(self.tasks)
+        placed: set[str] = set()
+        result: list[list[str]] = []
+        while pending:
+            ready = [key for key, task in pending.items() if set(task.depends_on) <= placed]
+            require(bool(ready), "cyclic or unknown task dependency")
+            result.append(ready)
+            placed.update(ready)
+            for key in ready:
+                del pending[key]
+        return result
+
     def validate(self) -> None:
         cases, tasks = unique(self.cases), unique(self.tasks)
         require(bool(cases) and bool(tasks), "plan needs cases and tasks")
         parents: dict[str, set[str]] = {}
-        pending = dict(tasks)
-        while pending:
-            ready = [task for task in pending.values() if set(task.depends_on) <= parents.keys()]
-            require(bool(ready), "cyclic or unknown task dependency")
-            for task in ready:
-                parents[task.id] = set(task.depends_on)
-                for dependency in task.depends_on:
-                    parents[task.id].update(parents[dependency])
-                del pending[task.id]
+        for level in self.levels():
+            for key in level:
+                parents[key] = set(tasks[key].depends_on)
+                for dependency in tasks[key].depends_on:
+                    parents[key].update(parents[dependency])
         providers = {key: (None, contract) for key, contract in unique(self.external_contracts).items()}
         for task in self.tasks:
             for contract in task.produces:
