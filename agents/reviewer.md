@@ -54,6 +54,10 @@ Return at most 1,500 tokens: the `lenses:` line, one short title per blocking or
 
 Return `NEEDS_SETUP` instead of a verdict if a REQUIRED lens could not load. A review missing a lens is worse than no review, because it reads as coverage that did not happen.
 
+## Leaf mode
+
+A dispatch from `reviewer-lead` names a slice: a file list and an output path `.graph/<run>/review/<slice>.json`. Review only the slice: read any file for context, but report findings only on the slice's files, plus the whole-change artifacts (the PR body, the prior-art note) when the dispatch gives them to you. Apply every REQUIRED lens in the one read, as above. Write the findings file at the path the dispatch names, with `reviewed` set to the base and head it gives, and validate it as `## Report` says. Return only the `lenses:` line and `PASS|CHANGES-REQUESTED blocking=<n> important=<m> findings=<path>`: the lead reads your file, then merges, dedupes and refutes across slices. You do none of that.
+
 ## Evidence and handoff
 
 Read only this task's contract, producer artifacts and named acceptance cases.

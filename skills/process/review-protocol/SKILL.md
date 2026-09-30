@@ -161,6 +161,36 @@ review. A diff with code in it is never `lint`. Prose is decided by file type
 LICENSE), never by directory: a `conf.py` under `docs/`, a `requirements.txt`
 or an MDX page is code.
 
+## Panel
+
+Depth `panel` (a risk row, a `review.seams` seam, or more than
+`review.panel_lines` changed lines, per `graph-control depth`) is sized by the
+diff:
+
+- **Over ~2,000 changed lines or ~120k diff tokens** (`changed_lines` from
+  `graph-control depth`; tokens estimated as `git diff <base> | wc -c` over
+  4): the engine dispatches `reviewer-lead`. It slices the diff by plan task
+  or package into at most 4 slices and runs one `reviewer` leaf per slice, all
+  in one message, each on opus and each applying every REQUIRED lens in one
+  read. Leaves write `.graph/<run>/review/<slice>.json`; the lead merges them
+  into `findings.json`.
+- **Below that**: one `reviewer` whose dispatch carries an explicit lens list.
+  It reproduces every blocking finding before surfacing it.
+
+The lead merges the leaf files with two rules:
+
+- **Dedupe.** Two findings are one when they name the same `file`, their
+  `line`s are within 3, and they cite the same `rule`. Keep the higher
+  severity, then the higher confidence.
+- **Refute.** The lead reproduces every blocking finding itself with the
+  smallest targeted run and appends the command and its result to the
+  `scenario`; a missing artifact reproduces as the check that shows it absent.
+  A blocker that does not reproduce is dropped; one that shows less harm takes
+  that severity. The leaf files stay as the record of what was dropped.
+
+No per-lens leaves and no verifier leaves: each reads the same diff again. A
+re-review is sized by its fix-commit diff, so it is usually one reviewer.
+
 ## Do not
 
 Praise. Soften. Pad with observations to look thorough. Fix anything - you
