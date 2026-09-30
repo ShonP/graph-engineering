@@ -170,17 +170,20 @@ handler: [`hooks/README.md`](hooks/README.md).
 
 ## Roster
 
-The full organization - eight agents, engineering only:
+The full organization - eleven agents, engineering only:
 
 | Agent | Model | Job | Writes |
 |---|---|---|---|
 | `planner` | opus | spec, then task-decomposed plan with per-task sizing | specs only |
-| `researcher` | sonnet | one bounded question, five modes: ux / tech / competitor / impact (blast radius + adjacent-issue triage) / spike (strict turn budget) | reports only |
+| `researcher` | sonnet | one bounded question, five modes: ux / tech / competitor / impact (blast radius + adjacent-issue triage) / spike (dispatched as `researcher-spike`) | reports only |
+| `researcher-spike` | sonnet | one falsifiable spike under a hard turn budget, launched without CLAUDE.md; returns VALIDATED, PARTIAL or INVALIDATED naming the edge case tried | reports only |
 | `ux-designer` | opus | the `design` node: captures the running UI, decides placement, shows it in the best-suited available medium (live-app capture, Storybook, HTML, Claude artifact, Claude Design), writes the experience spec with UI acceptance rows; variant exploration scored against the house rubric | mockups only |
 | `implementer` | opus | one non-trivial task, test-first, with spine-named skills | yes |
 | `implementer-simple` | sonnet | one SMALL task (mechanical, 1-2 files); escalates instead of pushing through | yes |
-| `reviewer` | opus | reads the diff once through every lens it needs | no (read-only) |
+| `reviewer` | opus | reads the diff once through every lens it needs; as a panel leaf, reviews one slice and writes its findings to a file | no (read-only) |
+| `reviewer-lead` | opus | panel review of a diff over ~2,000 changed lines or ~120k tokens: at most 4 slices, one opus reviewer leaf each in one message, then merges, dedupes and reproduces every blocker into one `findings.json` | `findings.json` only |
 | `qa` | sonnet | acceptance criteria verified on a RUNNING system once per merge unit or wave, evidence per criterion; rows end `VERIFIED`, `FAILED` or `BLOCKED`, the verdict is `PASS`, `FAIL INCOMPLETE: <row ids>` or `INCOMPLETE: <row ids>`, and findings go to `qa-findings.json` | tests only |
+| `qa-lead` | sonnet | qa for a merge unit spanning 2+ platforms, or ~8+ criteria across 3+ lanes: stands the runtime up once, runs up to 4 `qa` leaves in parallel, merges their reports into `qa.md` and `qa-findings.json`, tears the runtime down | reports only |
 | `retro` | sonnet | the `retro` node when a finding leaked past its gate: leak table and proposed rule diffs, never applied | `retro.md` only |
 
 The model column is the default tier in the agent's frontmatter. The profile's
@@ -189,8 +192,9 @@ The model column is the default tier in the agent's frontmatter. The profile's
 rewrites any roster call to its role's tier. Never haiku, never fable, never
 `general-purpose`. Review never drops to a cheaper tier; the only move is up:
 fix round 3 escalates a small task from `implementer-simple` to `implementer`.
-`implementer` (200), `implementer-simple` (60), `qa` (250) and `retro` (40) carry
-a frontmatter `maxTurns` cap. Children return at most 1,500 tokens plus artifact
+`implementer` (200), `implementer-simple` (60), `qa` (250), `qa-lead` (150),
+`reviewer-lead` (120), `researcher-spike` (25) and `retro` (40) carry a
+frontmatter `maxTurns` cap. Children return at most 1,500 tokens plus artifact
 paths; the reviewer writes `findings.json` (schema v1 in `review-protocol`, a
 route on every finding) and ends with one `PASS|CHANGES-REQUESTED ... findings=<path>`
 verdict line. `graph-control depth` sets the review depth (`lint`, `single`
@@ -199,6 +203,25 @@ or `panel`) from the diff and the profile's risk rows.
 The engine picks the implementer by the task's `size` in the plan: `small` goes
 to `implementer-simple`, everything else to `implementer`. Every agent below its
 skill floor returns `NEEDS_SETUP` instead of improvising.
+
+**Parallelism and nesting.** The implement node runs `plan.json` in the waves
+`graph-control waves` prints: tasks at one dependency level, at most 4
+concurrent opus writers, all dispatched in one message in the foreground.
+`graph-control host-check` runs before each wave (low disk blocks it). A wave
+with 2+ writers gives each task its own worktree, branched from the run branch
+head SHA and set up by the profile's `bootstrap:` commands; branches merge back
+in plan order and `scripts/worktree-gc.sh` removes merged, clean worktrees
+without forcing. A command on a resource the profile declares under `lanes:`
+(a device build, a shared database, a cluster) runs through
+`scripts/lane-run.sh <lane> --slots <n> -- <cmd>`, whose lock dies with the
+command. A suite longer than one tool call runs through
+`hooks/scripts/wait-run.sh`, which blocks at most 270 s per call and never
+polls. Nesting stops at depth 2: only `qa-lead` and `reviewer-lead` have the
+Agent tool, the engine dispatches them at depth 1, and leaves never nest.
+`/graph-init` proposes `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=2` and
+`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS=8` for the repo's settings. Opt-in, for a
+long unattended run: keep the machine awake for the life of the session with
+`caffeinate -i -w <pid>` on macOS or `systemd-inhibit` on Linux.
 
 Still planned: board sync.
 

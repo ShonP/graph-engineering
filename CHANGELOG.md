@@ -97,6 +97,44 @@ commits.
   every exit, writes a JSON report, and runs an axe audit through
   playwright-cli. The plugin ships only this generic contract. Login and
   throwaway-user helpers live in the consumer repo.
+- `graph-control waves <plan.json> [--max-width N]` splits a plan into
+  dispatch waves by dependency level, keeps plan order inside each level and
+  splits a level wider than N (default 4) into consecutive sub-waves. The level
+  loop is now `Plan.levels()`, which plan validation reuses, so its error
+  messages are unchanged.
+- Host lanes: `scripts/lane-run.sh <lane> [--slots N] [--wait-seconds S] --
+  <argv>` serializes work that competes for one host resource (a build, a
+  shared database, a cluster) with fcntl slot locks held by the command itself,
+  so a killed job never leaves a stale lock; a busy lane exits 75.
+  `scripts/worktree-gc.sh [--apply] [--base <ref>]` removes merged, clean
+  linked worktrees and never forces. `graph-control host-check --root <repo>
+  [--min-free-gb 20] [--profile <profile>]` reports low disk (BLOCKED), high
+  load, a bare repo, a default branch behind its upstream (local refs only)
+  and a docker it cannot reach.
+- `hooks/scripts/wait-run.sh --log <absolute path> [--max-block S] [--
+  <argv>]`, a bounded blocking wait for suites longer than one tool call. It
+  starts argv detached, blocks up to 270 s per call (clamped to 590 s) and
+  prints one line, `wait-run: exit=<n>|running state=complete|partial ...`,
+  plus the log tail on failure. Exit 75 means still running; call again
+  without argv to attach. The job survives the caller being killed.
+- `qa-lead` agent (sonnet, `maxTurns: 150`): when a merge unit's criteria span
+  2+ platforms, or ~8+ criteria across 3+ lanes, it stands the runtime up
+  once, runs up to 4 `qa` leaves in parallel (one message, foreground), merges
+  their file reports into `qa.md` and `qa-findings.json`, and runs `down`
+  last. `qa` gains a leaf mode and `qa-verification` documents the trigger.
+- `reviewer-lead` agent (opus, `maxTurns: 120`) for panel review of large
+  diffs: it splits the diff into at most 4 slices, dispatches one opus
+  reviewer leaf per slice in one message, then merges, dedupes (same file,
+  lines within 3, same rule) and reproduces each blocker into one
+  `findings.json`. `reviewer` gains a leaf mode and `review-protocol` a Panel
+  section: the lead runs above ~2,000 changed lines or ~120k diff tokens;
+  below that one reviewer gets an explicit lens list and must reproduce every
+  blocker.
+- `researcher-spike` agent (sonnet, `maxTurns: 25`, `omitClaudeMd: true`) for
+  the researcher's spike mode: a dispatch contract that carries everything
+  since CLAUDE.md is omitted, VALIDATED/PARTIAL/INVALIDATED verdicts naming the
+  edge case tried, and a never-bypass-owner-guards rule. No token saving is
+  claimed until measured.
 
 ### Changed
 
@@ -182,6 +220,28 @@ commits.
   leaked, otherwise it dispatches the `retro` agent.
 - `docs/efficiency-implementation.md` item 3 (reduce repeated context and
   unconditional research) marked resolved.
+- **`/graph-ship` runs plan tasks in waves**: `graph-control waves` with at
+  most 4 concurrent opus writers, `host-check` before each wave, every task of a
+  wave dispatched in one message in the foreground, one repo gate per wave
+  (`check --reuse`, else the suite through `wait-run.sh`), and commands on a
+  declared lane wrapped by `lane-run.sh`. A wave with 2+ writers gives each
+  task its own worktree, branched from the run branch head SHA and bootstrapped
+  from the profile; branches merge back in plan order and `worktree-gc.sh`
+  cleans up at run end. Step 4 adds the qa-lead and reviewer-lead triggers
+  (leads at depth 1 only), transient-error retries (3 attempts, stop fan-out on
+  the first 429), and a token and wall-time estimate at the plan gate with
+  actuals at the merge gate.
+- Profile template gains `bootstrap: []` (commands run in each new task
+  worktree) and `lanes: {}` (serialized host resources). `policy.roles` adds
+  `reviewer-lead` (opus), `qa-lead` (sonnet) and `researcher-spike` (sonnet).
+  `/graph-init` proposes `bootstrap` from lockfiles (a Yarn 1 `yarn.lock` gets
+  `--frozen-lockfile`, since Yarn classic ignores `--immutable`) and `lanes`
+  only on evidence: an Xcode project, `infra.cluster`, or a runtime not
+  isolated per `GRAPH_RUN_ID`.
+- The `guard-agent` fallback tiers and its deny message include the three new
+  agents; a test pins them to the template's `policy.roles` and the `agents/`
+  directory. `docs/graph-controls.md` notes that `host-check`'s `docker info`
+  can reach a remote `DOCKER_HOST`.
 
 ## [0.14.0] - 2026-09-29
 
