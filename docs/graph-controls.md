@@ -212,7 +212,7 @@ Read-only plug-in commands; like every control, none executes project commands.
 
 - `doctor --root <repo> [--quick]` inspects the repo's Graph Engineering setup and returns findings.
 - `status [--line] [--root <repo>]` reports run status; `--line` is the one-line form for a status line. Stdlib only, so it also runs as `python3 -m graph_control.status` with `PYTHONPATH=<plugin>/scripts`, without uv or PyYAML.
-- `depth --root <candidate> --base <rev> --profile <profile.yaml>` picks the review depth for a diff and returns `{depth: lint|single|panel, changed_lines, files, risk_rows, reasons, untracked_excluded}`.
+- `depth --root <candidate> --base <rev> --profile <profile.yaml>` picks the review depth for a diff and returns `{depth: lint|single|panel, changed_lines, files, risk_rows, reasons, untracked_excluded}`. A `risk:` row matches on a path glob or on a keyword found, spelled exactly (case-sensitive), in an added line; a row with neither is a placeholder and matches nothing.
 - `findings <files...> [--counts]` reads reviewer finding files; an absent file is BLOCKED.
 
 ## Regression suite

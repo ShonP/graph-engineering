@@ -57,8 +57,83 @@ commits.
   any skipped test makes the run read `partial` instead of `complete`.
 - `retro` roster agent (sonnet, `maxTurns: 40`, preloads only
   `graph-engineering:retro`) for the retro node when something leaked.
+- `/graph-doctor` and `graph-control doctor --root <repo> [--quick]`: read-only
+  findings, each with a fix, for the profile's schema_version, removed keys,
+  runtime, `graph-checks.json`, policy tiers, gate risk ids, routing skills, the
+  `.graph` ignore line, and a plugin version that differs from the installed
+  one. A new SessionStart hook (`doctor-on-start.sh`, `startup` only, cached
+  per project in the git common dir, fail-open, timeout 5 s) prints at most 3
+  finding lines, or a `/graph-init` hint in a git repo that has a stack marker
+  and no profile.
+- `graph-control depth --root --base --profile` picks the review depth (`lint`,
+  `single` or `panel`) from `git diff` against the base, the profile's `risk:`
+  rows, `instructionPaths`, `review.panel_lines` and `review.seams`, and reports
+  the matched `risk_rows` the merge gate reads. The new `risk` module is the
+  one reader of the risk table: a row matches on a path glob, or on a keyword
+  that appears in an added line, spelled exactly (case-sensitive); a row with no
+  paths and no keywords is a placeholder that matches nothing. `wcmatch==11.0.1`
+  is now pinned in the entry point.
+- `graph-control findings <path>... [--counts]` validates `findings.json` and
+  `qa-findings.json` (schema v1: a route on every finding) and totals the open
+  findings; a missing file is BLOCKED (exit 1), never zero.
+- `graph-control status` and `python3 -m graph_control.status --line`: a status
+  line that costs no tokens and lists live subagents (type, model, idle age
+  with `!` past 10 min, grouped by `<run8>:<node>`), plus NEEDS YOU decision
+  cards and cost by agent type, cached for 5 s and parsed incrementally.
+  `session_usage.py` gains `--session`, `--role`, `--run` and per-role
+  `--medians`.
+- `graphs/quick.md`: the small-ask playbook for the router's `quick` lane.
+- qa harness contract (`qa-verification/references/harness-contract.md`) and
+  the tested `templates/qa-harness.sh` for a consumer's `runtime.command`. It
+  guards the run id and worktree root, keeps evidence per case, tears down on
+  every exit, writes a JSON report, and runs an axe audit through
+  playwright-cli. The plugin ships only this generic contract. Login and
+  throwaway-user helpers live in the consumer repo.
 
 ### Changed
+
+- **`/graph-ship` routes each ask by size and risk** into five lanes: `answer`,
+  `direct`, `quick`, `full` and `spike`. Any `risk:` row match forces at least
+  `quick`. It adds decision cards and merge gates by risk class:
+  `gates.auto_classes` auto-merges on full green only after the owner opts in,
+  and the template default `[]` keeps every merge with the owner. The profile's
+  `integration: pr | push-main` picks how approved work lands. Replies follow a
+  5-line contract, and the full report is written to
+  `.graph/<run>/run-report.md`, so it no longer overwrites the bug playbook's
+  `report.md`.
+- The SessionStart handoff hook prints the reply contract when a profile
+  exists, warns when `docs/HANDOFF.md` is over 150 lines, and stays silent on
+  resume, fork and `--agent` sessions.
+- **Profile schema v2**: the template adds `schema_version: 2` and one generic
+  `risk:` table of 10 rows (path globs plus literal keywords), shared by the
+  router, review depth and gates. It also adds `gates.owner_classes` and
+  `gates.auto_classes`, `integration`, `localLanes`, `instructionPaths`,
+  `review`, `ownerAccess` and `ci.parity`. `content` and `gates.publication` are
+  removed. `/graph-init --upgrade` edits an existing profile as text and writes
+  only after the owner approves the diff. Routing is derived from every
+  manifest through the template's dependency table. /graph-init also proposes
+  `.claude/graph-checks.json`, env pins and deny rules for `settings.json`, and
+  a `.gitignore` line.
+- The Stop hook reuses the test verdict when the tree has not changed. The
+  verdict is keyed on the git state (commit, uncommitted and untracked files),
+  the test argv and the bytes of `graph-checks.json`, and stored in
+  `<git common dir>/graph-engineering/checks-state.json`. A pass, fail or
+  timeout on the same tree is replayed without running the suite.
+  `graph-control check <root> --reuse` returns the stored verdict without
+  running anything. Any nonempty `GRAPH_CHECKS_NO_MEMO` turns the memo off.
+- Review findings are a validated `findings.json`, and qa writes
+  `qa-findings.json` in the same shape. `review-protocol` defines the routes
+  (`patch`, `bad_plan`, `intent_gap`, `defer`; nits are always `defer`), the
+  re-review input (the open findings plus the diff of the fix commits), the
+  round-3 escalation, and review depth set by `instructionPaths`. The reviewer
+  writes the file with Write.
+- qa verdicts are honest. Rows end `VERIFIED`, `FAILED` or `BLOCKED`, and any
+  other status reads as `BLOCKED`. The verdict is `PASS`, `FAIL INCOMPLETE` or
+  `INCOMPLETE`, and qa runs once per merge unit or wave. `definition-of-done`
+  gains Refactor, Outbound messaging and Host blast radius rows, plus
+  env-parity, clean-checkout and background-cost cells. `impact-map`'s
+  Contracts section covers outbound effects and predicate producers and
+  consumers. `prior-art` treats memory files as rung 5 claims.
 
 - **Breaking: Stop and PostToolUse hooks are opt-in** through
   `.claude/graph-checks.json` (`test`, `precheck`, `lint` with `{file}` and

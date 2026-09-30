@@ -24,7 +24,7 @@ The engine does not know what a feature is. It reads a playbook and runs the
 nodes it finds, which is why a bug workflow and an infra workflow are new
 markdown files rather than new branches in the engine.
 
-Three playbooks ship: `feature`, `bug` and `infra`. The feature playbook:
+Four playbooks ship: `feature`, `bug`, `infra` and `quick` (the small-ask lane). The feature playbook:
 
 ![feature playbook](docs/img/playbook.png)
 
@@ -106,25 +106,42 @@ Then restart the session to apply.
 
 ```
 /graph-init            # once per repo: writes .claude/graph-profile.yaml
-/graph-ship "<goal>"   # triage picks feature, bug or infra, then runs it
+/graph-init --upgrade  # moves an existing profile to schema v2; shows the diff first
+/graph-doctor          # read-only setup check, one fix per finding
+/graph-ship "<goal>"   # the router picks a lane and a playbook, then runs it
 /graph-ship "<goal>" --graph bug   # or name the playbook yourself
+/graph-ship "<goal>" --lane quick  # or the lane
 ```
 
-Triage writes its pick and the reason as the first line of the run's ledger;
-the owner sees it at the first gate.
+The router sizes each ask into one of five lanes: `answer` (no code), `direct`
+(one small diff, at most 2 files, one `implementer-simple`, no run dir),
+`quick` (`graphs/quick.md`, at most 5 files), `full` (the playbook the ask type
+picks) and `spike`. Any match against the profile's `risk:` table forces at
+least `quick`. The lane, the matched risk rows, the playbook and the reason are
+the first line of the run's ledger; the owner sees them at the first gate.
 
 | Playbook | Shape | For |
 |---|---|---|
 | `feature` | goal -> research ux / tech / competitor / impact -> design (UI goals: placement in the running app) -> **plan gate** -> implement -> review ∥ qa -> fix (≤3) -> **merge gate** -> post-deploy -> retro | new behaviour, chores, mixed app + infra |
 | `bug` | report -> reproduce (a **failing test**, by qa) -> diagnose (`systematic-debugging`) -> sibling search (same bug shape elsewhere, Semgrep) -> **plan gate** -> implement -> review ∥ qa -> fix -> **merge gate** -> post-deploy -> retro | existing behaviour that is wrong |
 | `infra` | goal -> research tech / impact -> **plan gate** -> implement -> review ∥ verify (render, validate CRDs too, rendered diff, apply to a throwaway cluster) -> fix -> **merge gate** -> post-deploy -> retro | Helm, kustomize, Argo CD, manifests, gateway and policy config |
+| `quick` | intake -> impact -> design (UI goals only) -> **plan gate** (goal and plan as one exhibit) -> implement -> review ∥ qa -> fix (≤3) -> **merge gate** -> post-deploy -> retro | a defined intent on at most 5 files, or any risk-row match on a small ask |
 
 `/graph-ship --resume <run-id>` picks a run back up from its ledger.
 `/graph-ship --auto-merge` relaxes only the merge gate, only for that run.
+A repo can opt risk classes into auto-merge on full green with
+`gates.auto_classes` (no blocking or important findings left, qa a full PASS,
+`verify` green, no class in `gates.owner_classes`); the template ships `[]`, so
+the owner merges everything until the repo opts in. `integration: pr |
+push-main` picks how approved work lands.
+
+`graph-control status --line` prints a status line that costs no tokens and
+lists the live subagents per `<run8>:<node>`, with model and idle age; plain
+`graph-control status` adds NEEDS YOU decision cards and cost by agent type.
 
 ## Hooks
 
-Installing this plugin registers five hooks. The two that run your repository's
+Installing this plugin registers six hooks. The two that run your repository's
 own commands (lint and test) are opt-in: they do nothing until the repo commits
 `.claude/graph-checks.json` (copy `templates/graph-checks.json` and edit the argv
 lists). Read this before enabling it on a repo you did not write.
@@ -134,8 +151,9 @@ lists). Read this before enabling it on a repo you did not write.
 | after every `Edit` or `Write`, async | `lint.argv` from `graph-checks.json` on the file just touched, only for a listed extension | nothing is blocked. Findings arrive on the next turn |
 | before a `Bash` command that pushes, removes a remote, runs `rm` or `docker` | the destructive-command guard (a bash filter; python only on a match) | Claude Code asks the owner, showing the evidence it gathered (force push without a lease, remote removal, Docker volume delete, recursive `rm` of a protected path). It never denies |
 | before an `Agent` call | the policy guard, only when the profile has a `policy:` block | `general-purpose` and `policy.never` models are denied; each role runs on its `policy.roles` tier; a `policy-override: <reason>` line in the prompt skips it and is logged |
-| after Claude stops, `asyncRewake` | `test.argv` from `graph-checks.json`, after an optional `precheck` | Claude is woken with the failure, at most once per prompt. A precheck failure or timeout reports "not verified" and does not wake it |
-| at session start (`startup`, `clear`, `compact`) | the first 40 lines of `docs/HANDOFF.md`, when that file exists | nothing |
+| after Claude stops, `asyncRewake` | `test.argv` from `graph-checks.json`, after an optional `precheck` | Claude is woken with the failure, at most once per prompt. A precheck failure or timeout reports "not verified" and does not wake it. An unchanged tree replays its stored verdict instead of rerunning; `GRAPH_CHECKS_NO_MEMO=1` turns that off |
+| at session start (`startup`, `clear`, `compact`) | the first 40 lines of `docs/HANDOFF.md`, when that file exists, and the reply contract when the repo has a profile; silent on resume, fork and `--agent` sessions | a warning line when `HANDOFF.md` is over 150 lines |
+| at session start (`startup` only, cached) | the doctor's quick checks | up to 3 finding lines, or a `/graph-init` hint in a git repo with a stack marker and no profile; silent when clean |
 
 **0.15 breaks 0.14 autodetect.** The `pyproject.toml`, `package.json` and
 `Taskfile.yml` script lookups are gone; a repo that relied on them adds
@@ -160,7 +178,7 @@ The full organization - eight agents, engineering only:
 | `implementer` | opus | one non-trivial task, test-first, with spine-named skills | yes |
 | `implementer-simple` | sonnet | one SMALL task (mechanical, 1-2 files); escalates instead of pushing through | yes |
 | `reviewer` | opus | reads the diff once through every lens it needs | no (read-only) |
-| `qa` | sonnet | acceptance criteria verified on a RUNNING system, evidence per criterion; any row not VERIFIED makes the verdict `INCOMPLETE: <row ids>` | tests only |
+| `qa` | sonnet | acceptance criteria verified on a RUNNING system once per merge unit or wave, evidence per criterion; rows end `VERIFIED`, `FAILED` or `BLOCKED`, the verdict is `PASS`, `FAIL INCOMPLETE: <row ids>` or `INCOMPLETE: <row ids>`, and findings go to `qa-findings.json` | tests only |
 | `retro` | sonnet | the `retro` node when a finding leaked past its gate: leak table and proposed rule diffs, never applied | `retro.md` only |
 
 The model column is the default tier in the agent's frontmatter. The profile's
@@ -171,14 +189,16 @@ rewrites any roster call to its role's tier. Never haiku, never fable, never
 fix round 3 escalates a small task from `implementer-simple` to `implementer`.
 `implementer` (200), `implementer-simple` (60), `qa` (250) and `retro` (40) carry
 a frontmatter `maxTurns` cap. Children return at most 1,500 tokens plus artifact
-paths; the reviewer ends with one `PASS|CHANGES-REQUESTED ... findings=<path>`
-verdict line.
+paths; the reviewer writes `findings.json` (schema v1 in `review-protocol`, a
+route on every finding) and ends with one `PASS|CHANGES-REQUESTED ... findings=<path>`
+verdict line. `graph-control depth` sets the review depth (`lint`, `single`
+or `panel`) from the diff and the profile's risk rows.
 
 The engine picks the implementer by the task's `size` in the plan: `small` goes
 to `implementer-simple`, everything else to `implementer`. Every agent below its
 skill floor returns `NEEDS_SETUP` instead of improvising.
 
-Still planned: board sync and `/graph-doctor`.
+Still planned: board sync.
 
 ## Competencies
 

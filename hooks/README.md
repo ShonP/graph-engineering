@@ -11,8 +11,8 @@ package manager. What to run is declared by the project in
 | `PostToolUse`, `Edit\|Write` | `scripts/lint-touched-file.sh` | `async`, timeout 130 | Runs the configured lint on the file Claude just wrote and hands findings back on the next turn. Exit `0` always: it informs, it never blocks |
 | `PreToolUse`, `Bash` | `scripts/guard-destructive.sh` | sync, timeout 10, three handlers gated by `if` | Asks before a destructive command, with evidence. Never denies |
 | `PreToolUse`, `Agent\|Task` | `scripts/guard-agent.sh` | sync, timeout 15 | Enforces the profile's `policy:` block on subagent calls |
-| `Stop`, no matcher | `scripts/test-before-stop.sh` | `asyncRewake`, timeout 620 | Runs the configured test after the turn ends and wakes Claude only when it fails |
-| `SessionStart`, `startup\|clear\|compact` | `scripts/print-handoff.sh` | sync, timeout 15 | Prints the head of `docs/HANDOFF.md` into the new context. Exit `0` always |
+| `Stop`, no matcher | `scripts/test-before-stop.sh` | `asyncRewake`, timeout 620 | Runs the configured test after the turn ends and wakes Claude only when it fails. On an unchanged tree it replays the stored verdict instead (`<git common dir>/graph-engineering/checks-state.json`); any nonempty `GRAPH_CHECKS_NO_MEMO` turns that off |
+| `SessionStart`, `startup\|clear\|compact` | `scripts/print-handoff.sh` | sync, timeout 15 | Prints the head of `docs/HANDOFF.md` into the new context, a warning when that file is over 150 lines, and the reply contract when the repo has a profile. Silent on resume, fork and `--agent` sessions. Exit `0` always |
 | `SessionStart`, `startup` | `scripts/doctor-on-start.sh` | sync, timeout 5 | Cached setup check: up to 3 lines of doctor findings, or a `/graph-init` hint. Silent when clean. Exit `0` always |
 
 ## Claude Code versions
