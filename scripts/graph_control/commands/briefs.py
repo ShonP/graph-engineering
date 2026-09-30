@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 NAME = "validate-briefs"
-HELP = "check each plan task's tasks/<id>.md: present, at most 300 lines, at most 35% fenced code"
+HELP = "check each plan task's tasks/<id>.md: present, at most 300 lines, at most 35 percent fenced code"
 MAX_LINES = 300
 MAX_FENCED_PERCENT = 35
 FENCE = re.compile(r" {0,3}(`{3,}|~{3,})(.*)")

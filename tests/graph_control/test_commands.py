@@ -104,5 +104,28 @@ class Dispatch(unittest.TestCase):
         self.assertEqual((result.returncode, result.stdout), (0, '{"cases": 1, "status": "PASS", "tasks": 1}\n'))
 
 
+class Help(unittest.TestCase):
+    """argparse %-formats every help string, so a bare % in a HELP or argument help crashes --help."""
+
+    def test_top_level_help_lists_every_command_module(self):
+        text = cli.parser().format_help()
+        for module in iter_commands():
+            with self.subTest(command=module.NAME):
+                self.assertIn(module.NAME, text)
+
+    def test_every_subcommand_help_renders(self):
+        commands = next(action for action in cli.parser()._actions if action.choices)
+        for name, sub in commands.choices.items():
+            with self.subTest(command=name):
+                self.assertIn("usage:", sub.format_help())
+
+    def test_entry_point_help_exits_zero(self):
+        for flag in ("--help", "-h"):
+            with self.subTest(flag=flag):
+                result = subprocess.run([sys.executable, str(CLI), flag], capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn("validate-briefs", result.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()
