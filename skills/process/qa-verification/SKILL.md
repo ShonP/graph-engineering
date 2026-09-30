@@ -77,6 +77,29 @@ Then one verdict line: `PASS` only when every required row is `VERIFIED`;
 `VERIFIED`. `infra-verification` adds `PASS (static-only)`, and
 `post-deploy-verification` keeps its own verdicts.
 
+## Lead and leaves
+
+The engine picks the shape of a qa leg from its criteria; the first row that
+matches wins. A lane is one surface a user reaches: web UI, API, mobile, data,
+notifications, CLI. A fix-loop re-run picks again from the rows it re-runs.
+
+| Criteria | Shape |
+| --- | --- |
+| a nonempty `runtime.command` | one `qa`: the harness owns the stack and every case in one process |
+| 2+ platforms (for example web and a mobile app), or ~8+ criteria and 3+ lanes | one `qa-lead` over at most 4 `qa` leaves |
+| 2 lanes | two `qa` leaves dispatched flat by the engine, in one message; the engine is their lead |
+| 1 surface, or anything else | one `qa` |
+
+A leaf verifies on a stack it does not own. Its lead (the `qa-lead`, or the
+engine for 2 lanes) follows `agents/qa-lead.md`: it stands the runtime up once
+under the run's `GRAPH_RUN_ID`, dispatches every leaf in the foreground in one
+message with the line `leaf mode: the runtime is up and owned by the lead -
+never run up, seed or down`, merges their reports from disk and runs `down`
+last. Each lane writes evidence to `.graph/<run>/qa/<lane>/`, its criterion
+table and verdict line to `.graph/<run>/qa/<lane>.md` and its findings to
+`.graph/<run>/qa/<lane>-findings.json`; only the lead writes `qa.md` and
+`qa-findings.json`, so parallel lanes never overwrite each other.
+
 ## Rules
 
 - **Exit code 0 is not evidence.** A green command whose output you did not read proves nothing - read the output, look at the screenshot.
