@@ -52,7 +52,9 @@ commits.
 - `scripts/check-agent-frontmatter.sh` checks agent frontmatter keys, the model
   tier (opus or sonnet only), tools, maxTurns, omitClaudeMd, qualified skill
   names and graph node agents. `scripts/run-all-tests.sh` is one test runner
-  that finds new suites on its own and is now the only step in CI.
+  that finds new suites on its own and is now the only step in CI. A suite's
+  own `requirements.txt` adds its pins (wcmatch for `tests/graph_control`), and
+  any skipped test makes the run read `partial` instead of `complete`.
 - `retro` roster agent (sonnet, `maxTurns: 40`, preloads only
   `graph-engineering:retro`) for the retro node when something leaked.
 
