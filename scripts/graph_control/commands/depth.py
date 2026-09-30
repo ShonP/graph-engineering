@@ -2,6 +2,8 @@
 
 Reads the profile's `risk:`, `instructionPaths`, `review.panel_lines`,
 `review.seams` and `stacks`, and runs only git. Untracked files are excluded.
+With `--plan`, a changed path in no task's `writable_paths` adds the
+`outside-the-run` row, when the profile keeps it.
 """
 
 from argparse import ArgumentParser, Namespace
@@ -16,10 +18,12 @@ def add_arguments(parser: ArgumentParser) -> None:
     parser.add_argument("--root", required=True, type=Path, help="the Git checkout to inspect")
     parser.add_argument("--base", required=True, help="revision the working tree is compared to")
     parser.add_argument("--profile", required=True, type=Path, help="the repo's .claude/graph-profile.yaml")
+    parser.add_argument("--plan", type=Path, help="the run's plan.json; enables the outside-the-run row")
 
 
 def run(args: Namespace) -> dict[str, Any]:
+    from ..common import load
     from ..depth import decide  # imports wcmatch
     from ..preflight import read_profile  # imports PyYAML
 
-    return decide(args.root, args.base, read_profile(args.profile))
+    return decide(args.root, args.base, read_profile(args.profile), None if args.plan is None else load(args.plan))

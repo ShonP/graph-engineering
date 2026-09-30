@@ -66,6 +66,15 @@ class RouterTests(unittest.TestCase):
         self.assertIn("- <UTC> direct: <goal> | files | <test command>: exit=<n> | "
                       "evidence: <path> | reviewer: none|<risk row>", direct)
 
+    def test_direct_lane_lands_alone_only_on_a_class_none_diff(self):
+        """An owner's --lane direct over a risk row never skips the owner merge (owner_classes invariant)."""
+        direct = lane_block(self.router, "direct")
+        for token in ("graph-control depth --root <worktree> --base <base> --profile <profile>",
+                      "`risk_rows: []`", "`gates.auto_classes` holds `none`", "any matched row",
+                      "waits for the owner", "`gates.owner_classes`"):
+            self.assertIn(token, direct)
+        self.assertNotIn("only when `gates.auto_classes` holds `none` and the verification is green", direct)
+
     def test_quick_and_full_lanes_name_their_graphs(self):
         quick = lane_block(self.router, "quick")
         self.assertIn("at most 5 files", quick)
@@ -120,7 +129,8 @@ class GateTests(unittest.TestCase):
 
     def test_auto_merge_predicate(self):
         for token in ("`gates.owner_classes`", "`gates.auto_classes`", "`none`",
-                      "graph-control depth --root <run worktree> --base <run base> --profile <profile>",
+                      "graph-control depth --root <run worktree> --base <run base> --profile <profile>"
+                      " --plan <run>/plan.json", "`outside-the-run`",
                       "risk_rows",
                       "graph-control findings <run>/findings.json <run>/qa-findings.json --counts",
                       "blocking 0 and important 0", "absent file is BLOCKED",

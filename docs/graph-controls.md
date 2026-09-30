@@ -16,8 +16,8 @@ uv run scripts/graph-control.py event /absolute/run/event.json --state /absolute
 uv run scripts/graph-control.py guard-agent --profile /absolute/repo/.claude/graph-profile.yaml --root /absolute/repo < hook-input.json
 uv run scripts/graph-control.py check /absolute/candidate --reuse
 uv run scripts/graph-control.py doctor --root /absolute/repo [--quick]
-uv run scripts/graph-control.py status [--line] [--root /absolute/repo]
-uv run scripts/graph-control.py depth --root /absolute/candidate --base <rev> --profile /absolute/repo/.claude/graph-profile.yaml
+uv run scripts/graph-control.py status [--line] [--root /absolute/repo] [--session <session id>]
+uv run scripts/graph-control.py depth --root /absolute/candidate --base <rev> --profile /absolute/repo/.claude/graph-profile.yaml [--plan /absolute/run/plan.json]
 uv run scripts/graph-control.py findings /absolute/run/review-1.md [/absolute/run/review-2.md ...] [--counts]
 ```
 
@@ -211,8 +211,8 @@ The Stop hook (`hooks/scripts/configured_check.py test`) memoizes the verdict of
 Read-only plug-in commands; like every control, none executes project commands.
 
 - `doctor --root <repo> [--quick]` inspects the repo's Graph Engineering setup and returns findings.
-- `status [--line] [--root <repo>]` reports run status; `--line` is the one-line form for a status line. Stdlib only, so it also runs as `python3 -m graph_control.status` with `PYTHONPATH=<plugin>/scripts`, without uv or PyYAML.
-- `depth --root <candidate> --base <rev> --profile <profile.yaml>` picks the review depth for a diff and returns `{depth: lint|single|panel, changed_lines, files, risk_rows, reasons, untracked_excluded}`. A `risk:` row matches on a path glob or on a keyword found, spelled exactly (case-sensitive), in an added line; a row with neither is a placeholder and matches nothing.
+- `status [--line] [--root <repo>] [--session <id>]` reports run status; `--line` is the one-line form for a status line. Stdlib only, so it also runs as `python3 -m graph_control.status` with `PYTHONPATH=<plugin>/scripts`, without uv or PyYAML. The session is `--session`, else, with `--line`, the `transcript_path` or `session_id` of the JSON the host pipes to a `statusLine` command (pipe it through: `printf '%s' "$input" | ... --line`), else the newest session of the root. A named session that is not found prints nothing rather than another session's agents.
+- `depth --root <candidate> --base <rev> --profile <profile.yaml> [--plan <plan.json>]` picks the review depth for a diff and returns `{depth: lint|single|panel, changed_lines, files, risk_rows, reasons, untracked_excluded}`. A `risk:` row matches on a path glob or on a keyword found, spelled exactly (case-sensitive), in an added line; a row with neither is a placeholder and matches nothing, except `outside-the-run`: with `--plan`, it matches when a changed path is in no task's `writable_paths` (repo-relative globs). `lint` is prose by file type only (`*.md`, `*.markdown`, `*.rst`, `*.adoc`, and README, CHANGELOG, LICENSE and similar named files, bare or `.txt`), never by directory: `docs/conf.py`, `requirements.txt` and `CMakeLists.txt` are code, and MDX is not prose.
 - `findings <files...> [--counts]` reads reviewer finding files; an absent file is BLOCKED.
 
 ## Regression suite

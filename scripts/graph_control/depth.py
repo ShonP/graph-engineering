@@ -4,9 +4,15 @@ The diff is the working tree against `base` (`git diff <base>`): committed,
 staged and unstaged changes to tracked files. Untracked files are excluded, and
 the result says so. Precedence, first match wins:
 
-1. panel  any `risk:` row matches (a changed path, or a keyword in an added line)
-2. lint   every changed path is prose (*.md, *.txt, docs/**) and none matches
-          `instructionPaths`; also an empty diff. Scripted checks only, no LLM.
+1. panel  any `risk:` row matches (a changed path, or a keyword in an added line);
+          with a plan, `outside-the-run` matches a changed path in no task's
+          `writable_paths` when the profile keeps that row
+2. lint   every changed path is prose and none matches `instructionPaths`; also
+          an empty diff. Scripted checks only, no LLM. Prose is an extension
+          (*.md, *.markdown, *.rst, *.adoc) or a named prose file (README,
+          CHANGELOG, LICENSE and the like, bare or .txt); never a directory or
+          any other .txt, since docs/conf.py, requirements.txt and CMakeLists.txt
+          are code. MDX is not prose: it imports and runs JSX.
 3. panel  changed lines exceed `review.panel_lines` (default 2000), or the diff
           touches every stack of any `review.seams` list (stacks from `stacks[*].paths`)
 4. single otherwise
@@ -21,11 +27,15 @@ from typing import Any
 
 from .common import Invalid, array, integer, require, strings
 from .identity import git
-from .risk import classify, load_rows, matcher
+from .plan import Plan
+from .risk import Row, classify, load_rows, matcher
 
-PROSE = ("**/*.{md,txt}", "docs/**")
+PROSE_NAMES = "README,CHANGELOG,CHANGES,HISTORY,NEWS,AUTHORS,CONTRIBUTORS,CONTRIBUTING,LICENSE,LICENCE,NOTICE,COPYING"
+PROSE = ("**/*.{md,markdown,rst,adoc}", f"**/{{{PROSE_NAMES}}}{{,.txt}}")
 PANEL_LINES = 2000
-LINT = "prose only: every changed file matches *.md, *.txt or docs/** and none matches instructionPaths"
+OUTSIDE = "outside-the-run"
+LINT = ("prose only: every changed file is *.md, *.markdown, *.rst, *.adoc or a named prose file "
+        "(README, CHANGELOG, LICENSE and the like) and none matches instructionPaths")
 EMPTY = "no tracked change against base; untracked files are excluded"
 DIFF = ("diff", "--no-ext-diff", "--no-textconv", "--no-color", "--no-relative", "--find-renames")
 
@@ -84,13 +94,23 @@ def _commit(root: Path, base: str) -> str:
         raise Invalid(f"base {base!r} is not a commit in {root}") from error
 
 
-def decide(root: Path, base: str, profile: dict[str, Any]) -> dict[str, Any]:
+def _outside(paths: list[str], rows: tuple[Row, ...], plan: Any) -> list[str]:
+    """Changed paths no task's `writable_paths` covers; evaluated only with a plan and the profile's row."""
+    if plan is None or OUTSIDE not in {row.id for row in rows}:
+        return []
+    owned = matcher(glob for task in Plan.parse(plan).tasks for glob in task.writable_paths)
+    return [path for path in paths if not owned.match(path)]
+
+
+def decide(root: Path, base: str, profile: dict[str, Any], plan: Any = None) -> dict[str, Any]:
     panel_lines = integer(_mapping(profile.get("review"), "review").get("panel_lines", PANEL_LINES), 1)
     instruction = matcher(strings(profile.get("instructionPaths", [])))
     seams, rows = _seams(profile), load_rows(profile)
     commit = _commit(root, base)
     lines, files, paths = _numstat(git(root, *DIFF, "--numstat", "-z", commit, "--"))
     risk_rows = classify(paths, _added(git(root, *DIFF, "--unified=0", commit, "--")), rows)
+    outside = _outside(paths, rows, plan)
+    risk_rows = sorted({*risk_rows, OUTSIDE}) if outside else risk_rows
     prose = matcher(PROSE)
 
     def result(depth: str, reasons: list[str]) -> dict[str, Any]:
@@ -98,6 +118,10 @@ def decide(root: Path, base: str, profile: dict[str, Any]) -> dict[str, Any]:
                 "reasons": reasons, "untracked_excluded": True}
 
     reasons = [f"risk rows: {', '.join(risk_rows)}"] if risk_rows else []
+    if outside:
+        shown = ", ".join(outside[:5]) + (f" and {len(outside) - 5} more" if len(outside) > 5 else "")
+        plural = "path" if len(outside) == 1 else "paths"
+        reasons.append(f"{OUTSIDE}: {len(outside)} changed {plural} in no task's writable_paths: {shown}")
     if not reasons and all(prose.match(path) and not instruction.match(path) for path in paths):
         return result("lint", [LINT if paths else EMPTY])
     if lines > panel_lines:

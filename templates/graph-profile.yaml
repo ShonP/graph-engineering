@@ -569,8 +569,11 @@ risk:
     paths: ["**/{email,emails,mailers,notifications,notifier*}/**"]
     keywords: []
   - id: spend
+    # Keywords are the provider's call spellings, never bare words: `stripe`
+    # alone matches `table-striped` and `charge` matches `recharge`. Add this
+    # repo's provider calls (a client name, `charges.create`) when it has them.
     paths: ["**/{billing,payments}/**"]
-    keywords: ["stripe", "charge"]
+    keywords: ["stripe.", "Stripe("]
   - id: destructive
     paths: []
     keywords: ["DROP ", "TRUNCATE", "DELETE FROM"]
@@ -578,8 +581,9 @@ risk:
     paths: [".sops.yaml", "**/*.enc.{yaml,yml}", "**/.env*"]
     keywords: []
   - id: outside-the-run
-    # No globs: evaluated by the engine, which flags any changed path outside
-    # the plan's writable_paths.
+    # No globs: `graph-control depth --plan <run>/plan.json` reports this row
+    # when a changed path matches no task's writable_paths. Without a plan (the
+    # direct lane) it is not evaluated. Remove the row to switch the check off.
     paths: []
     keywords: []
 

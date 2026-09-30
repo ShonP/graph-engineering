@@ -138,6 +138,8 @@ push-main` picks how approved work lands.
 `graph-control status --line` prints a status line that costs no tokens and
 lists the live subagents per `<run8>:<node>`, with model and idle age; plain
 `graph-control status` adds NEEDS YOU decision cards and cost by agent type.
+Pipe the host's status-line JSON into `--line` (or pass `--session <id>`) so
+each session shows its own agents when several share one checkout.
 
 ## Hooks
 

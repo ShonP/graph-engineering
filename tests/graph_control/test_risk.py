@@ -74,6 +74,9 @@ class PlaceholderRows(unittest.TestCase):
         added = '<span className="truncate">{name}</span>\nonDrop={() => drop (item)}'
         self.assertEqual(classify(["web/src/Card.tsx"], added, rows), [])
         self.assertEqual(classify(["web/src/Card.tsx"], "TRUNCATE users;", rows), ["destructive"])
+        striped = '<table className="table-striped" />\n// recharge, surcharge, discharge'
+        self.assertEqual(classify(["web/src/Table.tsx"], striped, rows), [])
+        self.assertEqual(classify(["src/pay.py"], "stripe.PaymentIntent.create(amount=1)", rows), ["spend"])
 
 
 class Classify(unittest.TestCase):

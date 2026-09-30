@@ -72,7 +72,12 @@ commits.
   one reader of the risk table: a row matches on a path glob, or on a keyword
   that appears in an added line, spelled exactly (case-sensitive); a row with no
   paths and no keywords is a placeholder that matches nothing. `wcmatch==11.0.1`
-  is now pinned in the entry point.
+  is now pinned in the entry point. `--plan <run>/plan.json` evaluates the
+  `outside-the-run` row (a changed path in no task's `writable_paths`), which
+  the merge gate's condition (a) now passes. `lint` is prose by file type only
+  (`*.md`, `*.markdown`, `*.rst`, `*.adoc`, and named files such as README or
+  LICENSE): `docs/**` and other `*.txt` files, such as `requirements.txt`,
+  `CMakeLists.txt` or a Sphinx `docs/conf.py`, get a review.
 - `graph-control findings <path>... [--counts]` validates `findings.json` and
   `qa-findings.json` (schema v1: a route on every finding) and totals the open
   findings; a missing file is BLOCKED (exit 1), never zero.
@@ -80,6 +85,9 @@ commits.
   line that costs no tokens and lists live subagents (type, model, idle age
   with `!` past 10 min, grouped by `<run8>:<node>`), plus NEEDS YOU decision
   cards and cost by agent type, cached for 5 s and parsed incrementally.
+  The session is `--session <id>`, else the status-line stdin JSON
+  (`transcript_path`, `session_id`), else the newest one, so concurrent
+  sessions in one checkout each show their own agents.
   `session_usage.py` gains `--session`, `--role`, `--run` and per-role
   `--medians`.
 - `graphs/quick.md`: the small-ask playbook for the router's `quick` lane.
@@ -96,7 +104,10 @@ commits.
   `direct`, `quick`, `full` and `spike`. Any `risk:` row match forces at least
   `quick`. It adds decision cards and merge gates by risk class:
   `gates.auto_classes` auto-merges on full green only after the owner opts in,
-  and the template default `[]` keeps every merge with the owner. The profile's
+  and the template default `[]` keeps every merge with the owner. A `direct`
+  change lands without asking only when `graph-control depth` reports no risk
+  row and `auto_classes` holds `none`; an owner's `--lane direct` over a risk
+  row still waits for the owner. The profile's
   `integration: pr | push-main` picks how approved work lands. Replies follow a
   5-line contract, and the full report is written to
   `.graph/<run>/run-report.md`, so it no longer overwrites the bug playbook's
@@ -106,14 +117,17 @@ commits.
   resume, fork and `--agent` sessions.
 - **Profile schema v2**: the template adds `schema_version: 2` and one generic
   `risk:` table of 10 rows (path globs plus literal keywords), shared by the
-  router, review depth and gates. It also adds `gates.owner_classes` and
+  router, review depth and gates. `spend` keywords are provider call spellings
+  (`stripe.`, `Stripe(`), so `table-striped` or `recharge` never gate a merge. It also adds `gates.owner_classes` and
   `gates.auto_classes`, `integration`, `localLanes`, `instructionPaths`,
   `review`, `ownerAccess` and `ci.parity`. `content` and `gates.publication` are
   removed. `/graph-init --upgrade` edits an existing profile as text and writes
   only after the owner approves the diff. Routing is derived from every
   manifest through the template's dependency table. /graph-init also proposes
-  `.claude/graph-checks.json`, env pins and deny rules for `settings.json`, and
-  a `.gitignore` line.
+  `.claude/graph-checks.json` (test rows for pytest via uv or poetry, `swift
+  test`, `./gradlew test`, `./mvnw test` and `mvn test` beside npm, task, make,
+  go and cargo), env pins and deny rules for `settings.json`, and a `.gitignore`
+  line.
 - The Stop hook reuses the test verdict when the tree has not changed. The
   verdict is keyed on the git state (commit, uncommitted and untracked files),
   the test argv and the bytes of `graph-checks.json`, and stored in

@@ -24,7 +24,7 @@ RISK = [
     ("infra", ["argocd/**", "manifests/**", "**/Chart.yaml", "**/*.tf", ".github/workflows/**"], []),
     ("public-copy", [], []),
     ("outbound-messaging", ["**/{email,emails,mailers,notifications,notifier*}/**"], []),
-    ("spend", ["**/{billing,payments}/**"], ["stripe", "charge"]),
+    ("spend", ["**/{billing,payments}/**"], ["stripe.", "Stripe("]),
     ("destructive", [], ["DROP ", "TRUNCATE", "DELETE FROM"]),
     ("credentials-and-access", [".sops.yaml", "**/*.enc.{yaml,yml}", "**/.env*"], []),
     ("outside-the-run", [], []),
@@ -94,6 +94,7 @@ class SchemaV2Tests(unittest.TestCase):
         text = TEMPLATE.read_text()
         self.assertRegex(text, r"- id: public-copy.*\n(\s*#.*\n)*?.*#.*public pages")
         self.assertRegex(text, r"- id: outside-the-run.*\n(\s*#.*\n)*?.*#.*writable_paths")
+        self.assertRegex(text, r"- id: outside-the-run.*\n(\s*#.*\n)*?.*#.*graph-control depth --plan")
         self.assertIn("tune", comment_before("risk:"))
 
     def test_no_em_dashes(self):
