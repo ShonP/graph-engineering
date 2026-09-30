@@ -12,14 +12,14 @@ Normally your dispatch names your REQUIRED skills (the spine derives them from t
 
 | Files | Load |
 |---|---|
-| `*.ts` / `*.tsx` React | react-rules, tanstack-query-rules, tanstack-router, frontend-rules |
-| `*.swift` | swiftui-pro (+ healthkit / widgetkit / activitykit / photokit / push-notifications when the task touches that framework) |
-| `*.kt` / `*.kts` | compose-state, compose-ui, kotlin-concurrency (+ kotlin-functions, kotlin-types-value-class, kotlin-control-flow as the task calls for them) |
-| SQL / migrations / schemas | supabase, supabase-postgres-best-practices (+ gdpr-erasure-retention, gdpr-consent for personal data) |
-| `*.py` | uv, pydantic, pydantic-house-rules, fastapi, backend-rules, architecture-resilience-rules |
+| TS/JS in a package that depends on react | react-rules, frontend-rules (+ tanstack-query-rules, tanstack-router when it depends on @tanstack/react-query, @tanstack/react-router) |
+| `*.swift` | swiftui-pro when the file imports SwiftUI (+ healthkit / widgetkit / activitykit / photokit / push-notifications when the task touches that framework) |
+| `*.kt` / `*.kts` | kotlin-concurrency, kotlin-types-value-class (+ compose-state, compose-ui when the Gradle module uses Jetpack Compose; + kotlin-functions, kotlin-control-flow as the task calls for them) |
+| SQL / migrations / schemas | supabase-postgres-best-practices (+ supabase only in a Supabase project, one with `supabase/config.toml`; + gdpr-erasure-retention, gdpr-consent for personal data) |
+| `*.py` | uv, ruff (+ pydantic, pydantic-house-rules when the code imports pydantic; + fastapi, backend-rules, architecture-resilience-rules when it imports fastapi) |
 | `pyproject.toml`, `uv.lock`, `.python-version` | uv |
-| `*.py` under `agents/**` | microsoft-agent-framework, agent-workflow-rules (+ building-pydantic-ai-agents, pydantic-ai-harness when the repo uses Pydantic AI) |
-| `*.py` under `workflows/**` or `activities/**` | temporal-developer, pydantic-house-rules, architecture-resilience-rules |
+| `*.py` under `agents/**` | agent-workflow-rules (+ microsoft-agent-framework when it imports agent_framework; + building-pydantic-ai-agents, pydantic-ai-harness when it imports pydantic_ai) |
+| `*.py` under `workflows/**` or `activities/**` that imports temporalio | temporal-developer, pydantic-house-rules, architecture-resilience-rules |
 | `argocd/**` | argocd, helm, kubectl, architecture-resilience-rules |
 | `manifests/**` | kubectl, kustomize (+ cloudnativepg under a `postgres` / `cnpg` / `*-pg` directory, envoy-gateway under `gateway*`, agent-router under `ai-gateway` / `agent-router` / `llm-gateway`) |
 | `Chart.yaml`, a chart's `templates/**` | helm |
@@ -43,14 +43,14 @@ Normally your dispatch names your REQUIRED skills (the spine derives them from t
 
 | Files | Load |
 |---|---|
-| `*.ts` / `*.tsx` React | react-rules, tanstack-query-rules, tanstack-router, frontend-rules |
-| `*.swift` | swiftui-pro (+ healthkit / widgetkit / activitykit / photokit / push-notifications when the task touches that framework) |
-| `*.kt` / `*.kts` | compose-state, compose-ui, kotlin-concurrency (+ kotlin-functions, kotlin-types-value-class, kotlin-control-flow as the task calls for them) |
-| SQL / migrations / schemas | supabase, supabase-postgres-best-practices (+ gdpr-erasure-retention, gdpr-consent for personal data) |
-| `*.py` | uv, pydantic, pydantic-house-rules, fastapi, backend-rules, architecture-resilience-rules |
+| TS/JS in a package that depends on react | react-rules, frontend-rules (+ tanstack-query-rules, tanstack-router when it depends on @tanstack/react-query, @tanstack/react-router) |
+| `*.swift` | swiftui-pro when the file imports SwiftUI (+ healthkit / widgetkit / activitykit / photokit / push-notifications when the task touches that framework) |
+| `*.kt` / `*.kts` | kotlin-concurrency, kotlin-types-value-class (+ compose-state, compose-ui when the Gradle module uses Jetpack Compose; + kotlin-functions, kotlin-control-flow as the task calls for them) |
+| SQL / migrations / schemas | supabase-postgres-best-practices (+ supabase only in a Supabase project, one with `supabase/config.toml`; + gdpr-erasure-retention, gdpr-consent for personal data) |
+| `*.py` | uv, ruff (+ pydantic, pydantic-house-rules when the code imports pydantic; + fastapi, backend-rules, architecture-resilience-rules when it imports fastapi) |
 | `pyproject.toml`, `uv.lock`, `.python-version` | uv |
-| `*.py` under `agents/**` | microsoft-agent-framework, agent-workflow-rules (+ building-pydantic-ai-agents, pydantic-ai-harness when the repo uses Pydantic AI) |
-| `*.py` under `workflows/**` or `activities/**` | temporal-developer, pydantic-house-rules, architecture-resilience-rules |
+| `*.py` under `agents/**` | agent-workflow-rules (+ microsoft-agent-framework when it imports agent_framework; + building-pydantic-ai-agents, pydantic-ai-harness when it imports pydantic_ai) |
+| `*.py` under `workflows/**` or `activities/**` that imports temporalio | temporal-developer, pydantic-house-rules, architecture-resilience-rules |
 | `argocd/**` | argocd, helm, kubectl, architecture-resilience-rules |
 | `manifests/**` | kubectl, kustomize (+ cloudnativepg under a `postgres` / `cnpg` / `*-pg` directory, envoy-gateway under `gateway*`, agent-router under `ai-gateway` / `agent-router` / `llm-gateway`) |
 | `Chart.yaml`, a chart's `templates/**` | helm |
@@ -74,13 +74,13 @@ Your dispatch names the conditional stack lenses (the spine derives them from th
 
 | Diff touches | Load |
 |---|---|
-| `*.ts` / `*.tsx` React | react-rules, tanstack-query-rules, frontend-rules |
-| `*.swift` | swiftui-pro |
-| `*.kt` / `*.kts` | compose-performance, compose-state, kotlin-control-flow |
+| TS/JS in a package that depends on react | react-rules, frontend-rules (+ tanstack-query-rules when it depends on @tanstack/react-query) |
+| `*.swift` importing SwiftUI | swiftui-pro |
+| `*.kt` / `*.kts` | kotlin-control-flow (+ compose-performance, compose-state when the Gradle module uses Jetpack Compose) |
 | SQL / migrations / schemas | supabase-postgres-best-practices (+ gdpr-erasure-retention, gdpr-consent for migrations touching personal data) |
-| `*.py` | pydantic, pydantic-house-rules, fastapi, backend-rules, architecture-resilience-rules |
-| `*.py` under `agents/**` | microsoft-agent-framework, agent-workflow-rules |
-| `*.py` under `workflows/**` or `activities/**` | temporal-developer, architecture-resilience-rules |
+| `*.py` | ruff (+ pydantic, pydantic-house-rules when the code imports pydantic; + fastapi, backend-rules, architecture-resilience-rules when it imports fastapi) |
+| `*.py` under `agents/**` | agent-workflow-rules (+ microsoft-agent-framework when it imports agent_framework) |
+| `*.py` under `workflows/**` or `activities/**` that imports temporalio | temporal-developer, architecture-resilience-rules |
 | `argocd/**` | argocd, helm |
 | `manifests/**`, `kustomization.yaml` | kubectl, kustomize (+ cloudnativepg for Cluster manifests) |
 | `Chart.yaml`, a chart's `templates/**` | helm |
