@@ -41,6 +41,15 @@ coverage is imaginary.
 Watch for a witness that a *different* guard also catches. It proves nothing
 about the guard it is named for.
 
+**Mutation receipts.** For each new guard or validation the implementer runs
+`scripts/mutate-witness.sh` beside this skill and lists each receipt path. A
+receipt is JSON (`file`, `lines`, `find`, `replace`, `killed`, `test_exit`,
+`head`, `observed_at`, `test`): check that `lines` sit on the guard, `test` is
+that guard's own test and `head` is on the reviewed branch. A surviving mutant
+(`killed: false`) is Important, and so is a new guard or validation with no
+receipt. Re-run a doubtful one from its fields: the script mutates only a
+disposable worktree, never the shared one.
+
 ## Always-on lenses
 
 Security and privacy load as their own skills. Two more lenses apply with no

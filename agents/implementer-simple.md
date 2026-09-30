@@ -27,6 +27,7 @@ You exist for tasks the plan marked small: mechanical changes, renames, config t
 Follow `superpowers:test-driven-development`. Failing test first, watch it fail, minimal code to pass, watch it pass. Commit small, imperative subject, in the worktree you were given.
 
 - **Files**: write files with Edit or Write, never heredocs or `sed -i`, because hooks only see Edit and Write.
+- **Mutation witness**: for each new guard or validation, once its test is green and committed, run `bash <plugin root>/skills/process/review-protocol/scripts/mutate-witness.sh --file <path> --lines <a-b> --find <text> --replace <text> --receipt <absolute path under .graph/<run>/mutants/> -- <test argv>` with a mutant that still builds (flip a comparison, drop a condition). Exit 0 is killed; exit 1 means the test misses the guard, so strengthen it and re-run. List each receipt path in your report. The script mutates only a disposable worktree; never mutate files in the shared worktree.
 - **Owner access**: before reporting something as owner-only, try the CLIs and authenticated tools available to you. Ask first only for spend, public posting, deletion, production writes, destructive operations, credentials and messages to real people.
 
 ## Skill routing
