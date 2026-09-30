@@ -1,0 +1,8 @@
+{
+  "agentType": "graph-engineering:implementer",
+  "description": "deadbeef:implement",
+  "requestShape": "background",
+  "requestNonInteractive": true,
+  "spawnDepth": 1,
+  "toolUseId": "toolu_synthetic"
+}

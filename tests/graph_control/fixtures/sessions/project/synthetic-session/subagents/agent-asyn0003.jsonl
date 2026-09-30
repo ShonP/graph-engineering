@@ -1,0 +1,1 @@
+{"type": "user", "timestamp": "2026-09-28T10:18:00.000Z", "isSidechain": true, "sessionId": "synthetic-session", "message": {"role": "user", "content": "SENTINEL-PROMPT-7f3a do the synthetic task"}, "agentId": "asyn0003"}

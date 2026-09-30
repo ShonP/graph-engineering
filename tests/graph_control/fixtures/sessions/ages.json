@@ -1,0 +1,11 @@
+{
+  "synthetic-session.jsonl": 0,
+  "older-session.jsonl": 30,
+  "synthetic-session/subagents/agent-asyn0001.jsonl": 2,
+  "synthetic-session/subagents/agent-asyn0002.jsonl": 12,
+  "synthetic-session/subagents/agent-asyn0003.jsonl": 0,
+  "synthetic-session/subagents/agent-asyn0004.jsonl": 1,
+  "synthetic-session/subagents/workflows/wf_synthetic/agent-asyn0005.jsonl": 3,
+  "synthetic-session/subagents/agent-asyn0006.jsonl": 40,
+  "older-session/subagents/agent-adecoy01.jsonl": 1
+}

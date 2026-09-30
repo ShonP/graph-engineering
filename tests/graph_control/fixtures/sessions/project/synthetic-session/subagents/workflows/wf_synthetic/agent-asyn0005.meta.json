@@ -1,0 +1,10 @@
+{
+  "agentType": "graph-engineering:implementer-simple",
+  "description": "w2:task",
+  "requestShape": "background",
+  "requestNonInteractive": true,
+  "spawnDepth": 1,
+  "toolUseId": "toolu_synthetic",
+  "workflowPhase": "Implement",
+  "model": "sonnet"
+}
