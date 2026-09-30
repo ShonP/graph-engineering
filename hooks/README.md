@@ -4,7 +4,8 @@ Six scripts ship with `graph-engineering`, registered in `hooks/hooks.json` as
 eight handlers. They are generic: nothing in them names a repo, a stack or a
 package manager. What to run is declared by the project in
 `.claude/graph-checks.json`; how agents are tiered is declared in the project's
-`.claude/graph-profile.yaml`.
+`.claude/graph-profile.yaml`. One more script, `scripts/wait-run.sh`, is not a
+hook: agents call it by path to wait on a long suite (see wait-run below).
 
 | Event, matcher | Script | Mode | What it does |
 | --- | --- | --- | --- |
@@ -162,6 +163,47 @@ setup is broken, and says nothing otherwise. It always exits `0`: any failure
   misses it. A run with findings is never cached, so they repeat until fixed.
   Delete the file to force a check.
 
+## wait-run: a bounded wait for long suites
+
+Spike f (2.1.285): a foreground subagent's background jobs are killed when it
+ends its turn, and a background subagent is re-woken only when its lead goes
+idle. The harness also blocks a bare `sleep N`. So a suite longer than one tool
+call runs through
+
+```
+<plugin root>/hooks/scripts/wait-run.sh --log <absolute path> [--max-block S] [-- <argv...>]
+```
+
+- With argv: starts it detached, then waits. Refused with exit `2` and `a job
+  for this log is still running; call again without a command to attach` while
+  `<log>.pid` names a live job that has not written `<log>.exit`.
+- Without argv: attaches to the job for that log and waits.
+- Blocks at most S seconds: default 270, so each return lands inside the
+  5-minute worker cache; above 590 is clamped to 590. Give the Bash call a
+  longer timeout than S (300000 ms for the default).
+- Prints exactly one line,
+  `wait-run: exit=<n>|running state=complete|partial elapsed=<s>s max_block=<S>s log=<path>`.
+  `elapsed` is the job's age; `max_block` is S after clamping. A completed job
+  with a nonzero exit adds the last 20 lines of the log, at most 2000 characters.
+- Exit: the job's code when complete (128+N when signal N killed it, 127 when
+  argv could not start), `75` (EX_TEMPFAIL) when still running, `2` on a usage
+  error, a refusal, no job for the log, or a job that died without writing an
+  exit code. Errors print no summary line, which tells them from a job that
+  itself exited 2 or 75.
+- Beside the log: `<log>.pid`, the supervisor's pid and the job's process
+  group (`kill -- -"$(cat <log>.pid)"` stops the job), and `<log>.exit`. Each
+  start truncates the log. All three are created mode 0600, and a symlink in
+  their place is refused rather than followed. Keep the log outside the
+  worktree, in the run directory or a temp dir, so it never lands in a commit.
+- Why the job survives its caller: a double fork with `setsid` reparents the
+  supervisor to init in its own session, and it closes every descriptor above
+  2. A process-group kill or a tree kill of the caller does not reach it, and a
+  harness waiting for EOF on its pipes is not held open by it.
+- Argv is spawned directly, with the caller's working directory and
+  environment and stdin from `/dev/null`: no shell, no network. The logic is
+  `scripts/wait_run.py`, stdlib only, run by the interpreter
+  `python-runtime.sh` selects.
+
 ## Scope and least privilege
 
 - The only commands these hooks run are the argv arrays committed in
@@ -216,6 +258,7 @@ bash hooks/tests/run-tests.sh
 python3 hooks/tests/test_configured_checks.py
 python3 hooks/tests/test_hooks_registration.py
 python3 hooks/tests/test_doctor_on_start.py
+python3 hooks/tests/test_wait_run.py
 ```
 
 `run-tests.sh` needs only `bash` and `python3`. It copies `hooks/tests/fixtures/`
