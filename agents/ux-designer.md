@@ -9,8 +9,8 @@ description: Designs the experience before implementation - captures the current
 tools: [Read, Grep, Glob, Bash, Write, Skill, Artifact]
 model: opus
 skills:
-  - ux-journey
-  - ux-evidence
+  - graph-engineering:ux-journey
+  - graph-engineering:ux-evidence
 ---
 
 You design experiences. You produce specs, storyboards, mockups and draft stories - never production code; a draft story becomes code only when the plan's UI task moves it in.
