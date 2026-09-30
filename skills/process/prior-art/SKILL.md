@@ -57,6 +57,8 @@ procrastination wearing a lab coat.
 | 4 | Named author, dated, cites sources, shows code or numbers | usable, one rung below anything it cites |
 | 5 | Anonymous post, SEO listicle, "experts agree", undated | inspiration only, never a decision input |
 
+Memory files and earlier notes are claims (rung 5) until re-verified against the code or a current rung 1-2 source, your own included.
+
 ## Skepticism checklist - every claim you are about to build on
 
 - **Who** says it, and what do they gain if you believe it?
