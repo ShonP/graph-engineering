@@ -84,7 +84,7 @@ class Disk(Fixture):
         # An unscoped `worktree-gc.sh --apply` removes other sessions' fresh worktrees.
         fix = self.found(self.check(min_free_gb="1000000000")[1])["disk-low"]["fix"]
         self.assertIn("worktree-gc.sh", fix)
-        self.assertIn("--apply --base <run branch> --prefix <run8>-", fix)
+        self.assertIn("--apply --base <run branch> --prefix <run-id>-", fix)
         self.assertNotIn("--apply removes", fix)
 
     def test_enough_free_space_passes(self):

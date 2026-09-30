@@ -48,7 +48,7 @@ def _disk(root: Path, min_free_gb: int) -> list[Finding]:
         return []
     return [Finding("error", BLOCKING, f"{free:.1f} GB free on the volume holding {root}, below the {min_free_gb} GB minimum",
                     "free space on that volume (the plugin's scripts/worktree-gc.sh lists merged worktrees; the engine "
-                    "removes a run's own from its run worktree with --apply --base <run branch> --prefix <run8>-), "
+                    "removes a run's own from its run worktree with --apply --base <run branch> --prefix <run-id>-), "
                     "or lower --min-free-gb")]
 
 

@@ -108,8 +108,9 @@ commits.
   so a killed job never leaves a stale lock; a busy lane exits 75.
   `scripts/worktree-gc.sh [--apply --prefix <p>] [--base <ref>]` removes
   merged, clean linked worktrees and never forces. `--apply` needs `--prefix`
-  (the engine passes `--base <run branch> --prefix <run8>-`), so it never
-  removes another session's worktrees; a worktree at the base tip has no
+  (the engine passes `--base <run branch> --prefix <run-id>-`, the full run
+  id, as runs opened in the same minute share a UUIDv7's first 8 characters),
+  so it never removes another session's worktrees; a worktree at the base tip has no
   commits of its own and is always kept. `graph-control host-check --root <repo>
   [--min-free-gb 20] [--profile <profile>]` reports low disk (BLOCKED), high
   load, a bare repo, a default branch behind its upstream (local refs only)
@@ -230,7 +231,7 @@ commits.
   declared lane wrapped by `lane-run.sh`. A wave with 2+ writers gives each
   task its own worktree, branched from the run branch head SHA and bootstrapped
   from the profile; branches merge back with `--no-ff` in plan order and
-  `worktree-gc.sh --apply --base <run branch> --prefix <run8>-` removes that
+  `worktree-gc.sh --apply --base <run branch> --prefix <run-id>-` removes that
   run's merged task worktrees after each merge. Spikes dispatch
   `researcher-spike` with a brief that carries the profile, skills, rule packs
   and invariants. Step 4 adds the qa-lead and reviewer-lead triggers

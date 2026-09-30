@@ -12,9 +12,10 @@
 # default branch (init.defaultBranch, main, master). A squash-merged branch is
 # not an ancestor, so it is kept: the gc only removes what git can prove merged.
 # --prefix <p> keeps only worktrees on a branch starting with <p> (never a
-# detached one): the engine passes its run's `<run8>-` from the run worktree
-# with `--base <run branch>`, so it removes its own merged task worktrees and
-# never another session's.
+# detached one): the engine passes its run's full `<run-id>-` from the run
+# worktree with `--base <run branch>`, so it removes its own merged task
+# worktrees and never another session's. The prefix must be unique per run: a
+# UUIDv7's first 8 characters are only its timestamp head.
 #
 # Dry run (default) prints `would remove <path> (<branch>)` per candidate.
 # --apply needs --prefix: other sessions' worktrees share the repo, so the
@@ -41,7 +42,7 @@ while [ $# -gt 0 ]; do
   shift
 done
 [ "$apply" -eq 0 ] || [ "$scoped" -eq 1 ] \
-  || die "--apply needs --prefix <run8>- (other sessions' worktrees share this repo); without it the gc is a dry run"
+  || die "--apply needs --prefix <run-id>- (other sessions' worktrees share this repo); without it the gc is a dry run"
 
 git rev-parse --git-dir >/dev/null 2>&1 || die "not inside a git repository"
 if [ -z "$base" ]; then

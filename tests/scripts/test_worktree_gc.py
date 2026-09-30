@@ -7,16 +7,21 @@ main does not have). Git runs with GIT_DIR and friends scrubbed, as a hook
 running these tests from a linked worktree would otherwise leak its own repo.
 
 --apply is scoped to one run's branch prefix: unscoped, it would remove other
-sessions' freshly cut worktrees (review finding, wave 3 fix round 1).
+sessions' freshly cut worktrees (review finding, wave 3 fix round 1). The prefix
+the engine prescribes must be unique per run: a UUIDv7's first 8 characters are
+its timestamp head, shared by runs opened within ~65 s (fix round 2).
 """
 
 import os
+import re
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 
-GC = Path(__file__).resolve().parents[2] / "scripts" / "worktree-gc.sh"
+ROOT = Path(__file__).resolve().parents[2]
+GC = ROOT / "scripts" / "worktree-gc.sh"
+ENGINE = ROOT / "commands" / "graph-ship.md"
 GIT_VARS = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR")
 ENV = {key: value for key, value in os.environ.items() if key not in GIT_VARS}
 
@@ -67,6 +72,28 @@ class Fixture(unittest.TestCase):
 
     def branch_exists(self, name):
         return git(self.repo, "show-ref", "--verify", "-q", f"refs/heads/{name}", check=False).returncode == 0
+
+
+def engine_key(pattern, run_id):
+    """The engine's prescribed branch or gc key, from graph-ship.md, instantiated for one run id."""
+    match = re.search(pattern, ENGINE.read_text())
+    assert match, f"graph-ship.md no longer prescribes {pattern}"
+    key = match.group(1).replace("<run-id>", run_id).replace("<run8>", run_id[:8])
+    assert "<" not in key, f"unknown placeholder in the engine's key: {match.group(1)}"
+    return key
+
+
+# SYNTHETIC UUIDv7 run ids opened 30 s apart: the first 8 hex digits are the top 32 bits of
+# the millisecond timestamp (RFC 9562, 5.7), so both read 01a0f459; the random tails differ.
+RUN_A, RUN_C = "01a0f459-1c2d-7a3b-8c4d-5e6f7a8b9c0d", "01a0f459-8d4e-7f10-9a21-b3c4d5e6f708"
+
+
+def task_branch(run_id, task):
+    return engine_key(r"git worktree add -b (<[^>]+>-)<task>", run_id) + task
+
+
+def gc_prefix(run_id):
+    return engine_key(r"worktree-gc\.sh --apply --base <run branch> --prefix (\S+?)`", run_id)
 
 
 class DryRunAndApply(Fixture):
@@ -202,6 +229,36 @@ class Scope(Fixture):
         detached = self.add("detached", options=["--detach"], commit="merged-clean")
         self.assertIn(f"would remove {detached} (detached)", self.gc()[1])
         self.assertEqual(self.gc("--prefix", "d")[:2], (0, []))
+
+    def cut_task(self, run_id, task, commit):
+        """`git worktree add -b <engine branch key><task>` at an explicit base, as the engine does."""
+        return self.add(f"{run_id[-4:]}-{task}", options=["-b", task_branch(run_id, task)], commit=commit)
+
+    def test_runs_sharing_their_first_8_characters_cut_the_same_task_name(self):
+        head = git(self.repo, "rev-parse", "HEAD").stdout.strip()
+        self.cut_task(RUN_C, "t1", head)
+        ours = self.cut_task(RUN_A, "t1", head)  # a shared key makes git refuse: the task is BLOCKED
+        self.assertTrue(ours.is_dir())
+        self.assertNotEqual(task_branch(RUN_A, "t1"), task_branch(RUN_C, "t1"))
+
+    def test_scoped_gc_keeps_a_run_sharing_its_first_8_characters(self):
+        # Run C just cut its wave-1 task from its run branch head (still main's tip) and bootstrapped
+        # it; run A, from its run worktree, merged its own task back and runs the prescribed gc.
+        (self.repo / ".git" / "info" / "exclude").write_text("node_modules/\n")
+        head = git(self.repo, "rev-parse", "HEAD").stdout.strip()
+        theirs = self.cut_task(RUN_C, "t9", head)
+        (theirs / "node_modules").mkdir()
+        (theirs / "node_modules" / "dep.js").write_text("installed\n")
+        run = self.add("runA")
+        ours = self.cut_task(RUN_A, "t1", head)
+        self.commit(ours, "t1.txt")
+        git(run, "merge", "-q", "--no-ff", "--no-edit", task_branch(RUN_A, "t1"))
+        code, out, err = self.gc("--apply", "--base", "runA", "--prefix", gc_prefix(RUN_A), cwd=run)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out, [f"removed {ours} ({task_branch(RUN_A, 't1')})",
+                               f"deleted branch {task_branch(RUN_A, 't1')}"])
+        self.assertTrue((theirs / "node_modules" / "dep.js").is_file(), "run C's tree and its ignored files stay")
+        self.assertTrue(self.branch_exists(task_branch(RUN_C, "t9")))
 
     def test_task_branches_merged_into_a_run_branch(self):
         # The engine's shape: task worktrees cut from the run branch head, merged back

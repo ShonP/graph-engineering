@@ -32,7 +32,8 @@ class EngineParallelTests(unittest.TestCase):
         self.assert_tokens(self.steps[2], (
             "superpowers:using-git-worktrees",
             "2+ writers",
-            "git worktree add -b <run8>-<task> <path> <run branch head SHA>",
+            "git worktree add -b <run-id>-<task> <path> <run branch head SHA>",
+            "git merge --no-ff <run-id>-<task>",
             "`bootstrap:`",
             "GRAPH_RUN_ID",
             "git merge-base --is-ancestor <base sha> HEAD",
@@ -40,7 +41,7 @@ class EngineParallelTests(unittest.TestCase):
             "plan order",
             "decision card",
             "git merge --no-ff",
-            "scripts/worktree-gc.sh --apply --base <run branch> --prefix <run8>-",
+            "scripts/worktree-gc.sh --apply --base <run branch> --prefix <run-id>-",
         ))
         self.assertIn("keeps the run worktree", self.steps[2])
 
@@ -51,9 +52,16 @@ class EngineParallelTests(unittest.TestCase):
         for call in calls:
             with self.subTest(call=call):
                 if "--apply" in call:
-                    self.assertIn("--prefix <run8>-", call)
+                    self.assertIn("--prefix <run-id>-", call)
                     self.assertIn("--base <run branch>", call)
         self.assertNotIn("At run end, run", self.steps[2])
+
+    def test_ac_w3_ep_01_task_branches_key_on_the_full_run_id(self):
+        # <run8> is a UUIDv7's timestamp head, shared by runs opened within ~65 s: as a
+        # branch or gc key it lets one run delete another's fresh worktree (fix round 2).
+        for token in ("-b <run8>", "--no-ff <run8>", "--prefix <run8>"):
+            with self.subTest(token=token):
+                self.assertNotIn(token, self.text)
 
     def test_ac_w3_ep_01_host_isolation_is_never_offered(self):
         self.assertIsNone(re.search(r"isolation\W{0,3}worktree", self.text))
