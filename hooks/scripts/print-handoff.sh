@@ -20,7 +20,9 @@
 #
 # Prints, in order: the first 40 lines of docs/HANDOFF.md; a size warning when
 # that file is over 150 lines; the three-line reply contract when the repo has
-# .claude/graph-profile.yaml. No commands are run and nothing is written.
+# .claude/graph-profile.yaml; one line when a run's success measures are due
+# (only when .graph/*/plan.json exists; see hooks/README.md). Nothing is
+# written, and no signal command is run.
 
 set -eu
 
@@ -50,12 +52,34 @@ if [ -f "$HANDOFF" ]; then
   fi
 fi
 
+PRINTED=""
+[ -f "$HANDOFF" ] && PRINTED=1
 if [ -f "$PROJECT_DIR/.claude/graph-profile.yaml" ]; then
-  [ -f "$HANDOFF" ] && printf '\n'
+  [ -n "$PRINTED" ] && printf '\n'
   printf '%s\n' \
     "graph-engineering reply contract: status and decision replies in at most 5 lines, plain words, echoing the owner's choices." \
     "Give one recommended action, say what you did and what you need, and no internal codes or SHAs unless asked." \
     "Deliverables go to a durable repo path, never only to chat or a scratchpad."
+  PRINTED=1
+fi
+
+# Due success measures. The glob is decided in bash, so a repo with no
+# .graph/*/plan.json never starts an interpreter. The one Python call reads
+# plan.json, measure.md, the ledger and the merge commit's date; it never runs a
+# signal's command (measure_signals.py does that when someone runs it).
+shopt -s nullglob
+PLANS=("$PROJECT_DIR"/.graph/*/plan.json)
+shopt -u nullglob
+if [ "${#PLANS[@]}" -gt 0 ]; then
+  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)" || exit 0
+  # shellcheck source=python-runtime.sh
+  . "$SCRIPT_DIR/python-runtime.sh" 2>/dev/null || exit 0
+  ge_python_runtime 2>/dev/null || exit 0
+  DUE="$("$GE_PYTHON" "$SCRIPT_DIR/../../scripts/measure_signals.py" --due "$PROJECT_DIR" 2>/dev/null)" || DUE=""
+  if [ -n "$DUE" ]; then
+    [ -n "$PRINTED" ] && printf '\n'
+    printf '%s\n' "$DUE"
+  fi
 fi
 
 exit 0
