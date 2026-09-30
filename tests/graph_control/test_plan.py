@@ -1,9 +1,14 @@
 import copy
+import json
+import re
 import unittest
+from pathlib import Path
 
 from helpers import plan_data
 from graph_control.common import Invalid
-from graph_control.plan import Plan
+from graph_control.plan import Plan, Signal
+
+ROOT = Path(__file__).resolve().parents[2]
 
 
 class PlanTests(unittest.TestCase):
@@ -121,12 +126,21 @@ class SuccessSignalTests(unittest.TestCase):
         self.assertEqual(Plan.parse(v2()).success_signals, ())
 
     def test_v2_valid_signals_parse(self):  # AC-W4-SS-02
-        second = {**SIGNAL, "source": "sql-readonly", "command": ["psql", "-c", "select count(*) from orders"],
+        second = {**SIGNAL, "goal": "orders keep growing", "source": "sql-readonly", "command": ["psql", "-c", "select count(*) from orders"],
                   "success_condition": "value >= baseline * 1.1 + 5", "window_days": 90}
         plan = Plan.parse(v2(success_signals=[SIGNAL, second]))
         self.assertEqual([(s.source, s.window_days) for s in plan.success_signals],
                          [("prometheus", 7), ("sql-readonly", 90)])
         self.assertEqual(plan.success_signals[1].command, ("psql", "-c", "select count(*) from orders"))
+
+    def test_signal_goals_are_unique(self):
+        # measure_signals keys measure.md, baseline.json and the due count by the goal as a table cell
+        # shows it (control characters and runs of whitespace collapsed, a pipe as a slash).
+        for goal in ("checkout errors stay rare", " checkout  errors\tstay rare", "checkout errors stay rare\x00"):
+            with self.subTest(goal=goal), self.assertRaisesRegex(Invalid, "duplicate success signal goal"):
+                Plan.parse(v2(success_signals=[SIGNAL, {**SIGNAL, "goal": goal, "window_days": 30}]))
+        with self.assertRaisesRegex(Invalid, "'a / b'"):
+            Plan.parse(v2(success_signals=[{**SIGNAL, "goal": "a | b"}, {**SIGNAL, "goal": "a / b"}]))
 
     def test_empty_signals_need_a_reason(self):  # AC-W4-SS-02
         with self.assertRaisesRegex(Invalid, "success_signals_reason"):
@@ -183,6 +197,23 @@ class SuccessSignalTests(unittest.TestCase):
         data["tasks"][0]["depends_on"] = ["T1"]
         with self.assertRaisesRegex(Invalid, "cyclic or unknown"):
             Plan.parse(data)
+
+
+
+class DocumentedSignalTests(unittest.TestCase):
+    """The schema reference and the planner show one example row, and it is one measure_signals accepts."""
+
+    def test_reference_example_is_the_planners_adapter_row(self):
+        doc = (ROOT / "docs" / "graph-controls.md").read_text()
+        block = re.search(r"### Success signals \(version 2\).*?```json\n(.*?)```", doc, re.S).group(1)
+        (reference,) = json.loads(block)["success_signals"]
+        Signal.parse(reference)
+        planner = (ROOT / "agents" / "planner.md").read_text()
+        (example,) = (json.loads(x) for x in re.findall(r'`(\{"goal".*?\})`', planner))
+        self.assertEqual(reference, example)
+        rule = re.sub(r"\s+", " ", doc.split("- `command`:", 1)[1].split("\n- `", 1)[0])
+        for needle in ('`{"value": n}`', "rejects", "raw tool output", "adapter"):
+            self.assertIn(needle, rule)
 
 
 if __name__ == "__main__":

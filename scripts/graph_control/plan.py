@@ -10,6 +10,12 @@ NUMBER = r"-?[0-9]+(?:\.[0-9]+)?"
 CONDITION = re.compile(rf"value (<=|>=|==|<|>) (?:({NUMBER})|baseline \* ({NUMBER})(?: \+ ({NUMBER}))?)")
 SOURCES = {"prometheus", "sentry", "sql-readonly", "command"}
 SIGNAL_KEYS = {"success_signals", "success_signals_reason"}
+CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def measure_key(goal: str) -> str:
+    """The goal as scripts/measure_signals.py clean() keys it in measure.md, baseline.json and --due."""
+    return " ".join(CONTROL.sub(" ", goal).replace("|", "/").split())
 
 
 @dataclass(frozen=True)
@@ -115,6 +121,9 @@ class Plan:
         reason = text(row["success_signals_reason"]) if "success_signals_reason" in row else None
         require(not empty or reason is not None, "an empty success_signals list needs a success_signals_reason")
         require(reason is None or empty, "success_signals_reason only explains an empty success_signals list")
+        keys = [measure_key(signal.goal) for signal in signals]
+        for key in keys:
+            require(keys.count(key) == 1, f"duplicate success signal goal {key!r}: each is measured by its goal")
         result = cls(tuple(Case.parse(x) for x in array(row["cases"])),
                      tuple(Task.parse(x) for x in array(row["tasks"])),
                      tuple(Contract.parse(x) for x in array(row["external_contracts"])),

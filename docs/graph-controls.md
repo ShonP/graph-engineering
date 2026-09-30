@@ -71,15 +71,15 @@ A version 2 plan may add two optional top-level keys (shown alone below; the res
   "schema_version": 2,
   "success_signals": [{
     "goal": "checkout errors stay rare", "source": "prometheus",
-    "command": ["promtool", "query", "instant", "http://prometheus:9090", "sum(rate(checkout_errors_total[1d]))"],
+    "command": ["scripts/signals/checkout-error-ratio"],
     "success_condition": "value <= 0.01", "window_days": 7
   }]
 }
 ```
 
-- `goal`: nonempty text, the outcome in the user's terms.
+- `goal`: nonempty text, the outcome in the user's terms, unique within the plan: `measure.md`, `baseline.json` and the due count key each signal by its goal, compared as a table cell shows it (whitespace collapsed, `|` as `/`).
 - `source`: exactly `prometheus`, `sentry`, `sql-readonly` or `command`.
-- `command`: a nonempty argv array of nonempty strings (repeated flags are fine). It must return one aggregate number; row-level queries are a planner and reviewer rule, which this parser cannot detect.
+- `command`: a nonempty argv array of nonempty strings (repeated flags are fine). It must print one aggregate, a bare number or `{"value": n}`; `scripts/measure_signals.py` rejects anything else, raw tool output included (`promtool query instant` prints `{} => 0.003 @[...]`), so the command is usually the repo's own adapter around the query. Row-level queries are a planner and reviewer rule, which this parser cannot detect.
 - `success_condition`: the grammar below.
 - `window_days`: an integer from 1 to 90.
 - `success_signals: []` is valid only with a nonempty `success_signals_reason` (internal, refactor and infra work usually has no user-facing signal). The reason is rejected next to a nonempty list, or without the list, because it only explains an empty one. Omitting both keys is also valid.
