@@ -1,0 +1,43 @@
+Destructive-command guard: sample permission prompt reasons (after).
+Before: no prompt; each of these commands ran without confirmation.
+SYNTHETIC fixture: throwaway repo with remote https://example.invalid/app.git,
+a docker stub listing 3 volumes; paths masked as <repo>, <home>, <parent>.
+
+$ git remote remove origin
+  graph-engineering guard: removes git remote origin (https://example.invalid/app.git); recover with: git remote add origin https://example.invalid/app.git. Approve only if this is intended.
+
+$ git push --force origin main
+  graph-engineering guard: force push without --force-with-lease to origin main (local 2ec3c96, last known remote 6bf7af4). Approve only if this is intended.
+
+$ git push origin +main
+  graph-engineering guard: force push without --force-with-lease to origin main (local 2ec3c96, last known remote 6bf7af4). Approve only if this is intended.
+
+$ docker volume prune
+  graph-engineering guard: deletes Docker volumes (3 present). Approve only if this is intended.
+
+$ docker system prune -a --volumes
+  graph-engineering guard: deletes Docker volumes (3 present). Approve only if this is intended.
+
+$ rm -rf /
+  graph-engineering guard: recursive delete of / (filesystem root). Approve only if this is intended.
+
+$ rm -rf ~
+  graph-engineering guard: recursive delete of <home> (home directory). Approve only if this is intended.
+
+$ rm -rf .git
+  graph-engineering guard: recursive delete of <repo>/.git (git metadata directory). Approve only if this is intended.
+
+$ rm -rf ..
+  graph-engineering guard: recursive delete of <repo> (repository root). Approve only if this is intended.
+
+$ rm -rf ~/*
+  graph-engineering guard: recursive delete of <home>/* (everything in the home directory). Approve only if this is intended.
+
+$ rm -rf "/
+  graph-engineering guard: could not parse this command; it matches a destructive pattern. Approve only if this is intended.
+
+$ rm -rf node_modules
+  (no prompt: runs as before)
+
+$ docker compose -p ge-x down -v
+  (no prompt: runs as before)
