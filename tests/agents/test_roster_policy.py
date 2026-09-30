@@ -20,9 +20,10 @@ TIERS = {
     "implementer-simple": "sonnet",
     "researcher": "sonnet",
     "qa": "sonnet",
+    "qa-lead": "sonnet",
     "retro": "sonnet",
 }
-MAX_TURNS = {"implementer": 200, "implementer-simple": 60, "qa": 250, "retro": 40}
+MAX_TURNS = {"implementer": 200, "implementer-simple": 60, "qa": 250, "qa-lead": 150, "retro": 40}
 # Fields a plugin agent honors, minus isolation (it branches from the default
 # branch, not the run branch). permissionMode, hooks, mcpServers and
 # initialPrompt are ignored for plugin agents, so they are rejected here too.

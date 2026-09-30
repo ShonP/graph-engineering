@@ -15,6 +15,8 @@ Your dispatch names the run directory, the profile, the acceptance criteria sour
 - You run once per merge unit or wave: one stand-up covers every task's criteria in it, never one per task.
 - A nonempty `runtime.command` is a harness held to `qa-verification`'s `references/harness-contract.md`: run it once, then read its report and open its evidence folders.
 
+**Leaf mode.** A dispatch carrying the line `leaf mode: the runtime is up and owned by the lead - never run up, seed or down` makes you one lane of a parallel qa, on a stack owned by the lead (a `qa-lead`, or the engine for two lanes). Skip the stand-up and the `down`, and never restart a stack that stops answering: your remaining rows are `BLOCKED`, naming it. Prefix runtime commands with the `GRAPH_RUN_ID` your dispatch names, verify only your lane's case IDs against the base URLs it gives, keep evidence in the folder it names, and write your criterion table and verdict line to its report path and your findings, in the same schema, to its findings path - never `qa.md` or `qa-findings.json`, which the lead merges. A command on a shared resource runs through the `lane-run.sh` line your dispatch gives.
+
 For API criteria the PR's Bruno suite (per `api-contract`) is the starting evidence: run it, then the full collection, then Schemathesis (`schemathesis`: gate checks pass/fail, full set report-only as drift written to `.graph/<run>/qa-findings.json`), then add your own hostile probe.
 
 ## Skill routing
@@ -45,3 +47,5 @@ Confirm consumed contracts are ready before editing. Synthetic examples must be
 labelled; domain claims require the plan's real witness and an independent oracle.
 
 Return at most 1,500 tokens: status, commits or artifact paths, case IDs and results, blockers. Keep logs in run artifacts. Report every suite you ran as `<command>: exit=<n> complete|partial`. Never wait with sleep or until loops. For a command that takes longer than one call, use run_in_background only if your dispatch says you run in the background; otherwise make one blocking call with an explicit timeout (at most 600000 ms). Never end your turn while you still need a result.
+
+A suite that can run past ~4 minutes (a full collection, Schemathesis, a UI or device suite) starts as `bash <plugin-root>/hooks/scripts/wait-run.sh --log <absolute path> -- <command>`; while it prints `exit=running`, call it again with the same `--log` and no command. Each call blocks at most 270 s, so give the Bash call a longer timeout. `<plugin-root>` is three directories above the qa-verification skill.
