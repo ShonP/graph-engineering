@@ -6,6 +6,9 @@ profile template names, wcmatch GLOBSTAR | BRACE | DOTGLOB.
 
 import importlib.util
 import unittest
+from pathlib import Path
+
+import yaml
 
 import helpers  # noqa: F401 - puts scripts/ on sys.path
 
@@ -14,6 +17,8 @@ if importlib.util.find_spec("wcmatch") is None:  # the PEP 723 pin; scripts/run-
 
 from graph_control.common import Invalid  # noqa: E402
 from graph_control.risk import Row, classify, load_rows  # noqa: E402
+
+TEMPLATE = Path(__file__).resolve().parents[2] / "templates" / "graph-profile.yaml"
 
 ROWS = {"risk": [
     {"id": "db-schema", "paths": ["**/{migrations,schemas}/**"]},
@@ -44,12 +49,31 @@ class LoadRows(unittest.TestCase):
             "paths not a list": {"risk": [{"id": "x", "paths": "a/**"}]},
             "keyword not text": {"risk": [{"id": "x", "keywords": [3]}]},
             "unknown field": {"risk": [{"id": "x", "paths": ["a/**"], "glob": "b"}]},
-            "neither paths nor keywords": {"risk": [{"id": "x", "paths": [], "keywords": []}]},
             "duplicate id": {"risk": [{"id": "x", "paths": ["a/**"]}, {"id": "x", "keywords": ["k"]}]},
         }
         for name, profile in bad.items():
             with self.subTest(name), self.assertRaises(Invalid):
                 load_rows(profile)
+
+
+class PlaceholderRows(unittest.TestCase):
+    """The template ships rows the repo or the engine fills: they load and match nothing."""
+
+    def test_a_row_with_no_paths_or_keywords_loads_and_matches_nothing(self):
+        rows = load_rows({"risk": [{"id": "public-copy", "paths": [], "keywords": []}, {"id": "outside-the-run"}]})
+        self.assertEqual([row.id for row in rows], ["public-copy", "outside-the-run"])
+        self.assertEqual(classify(["site/index.html"], "anything", rows), [])
+
+    def test_the_shipped_template_rows_load(self):
+        rows = load_rows(yaml.safe_load(TEMPLATE.read_text()))
+        self.assertIn("public-copy", [row.id for row in rows])
+        self.assertIn("outside-the-run", [row.id for row in rows])
+
+    def test_template_keywords_skip_ui_code_that_shares_their_letters(self):
+        rows = load_rows(yaml.safe_load(TEMPLATE.read_text()))
+        added = '<span className="truncate">{name}</span>\nonDrop={() => drop (item)}'
+        self.assertEqual(classify(["web/src/Card.tsx"], added, rows), [])
+        self.assertEqual(classify(["web/src/Card.tsx"], "TRUNCATE users;", rows), ["destructive"])
 
 
 class Classify(unittest.TestCase):
@@ -63,13 +87,14 @@ class Classify(unittest.TestCase):
         got = classify(["services/api/auth/login.py", "db/migrations/0001.sql"], "", self.rows)
         self.assertEqual(got, ["auth", "db-schema"])
 
-    def test_keyword_in_added_text_matches_case_insensitively(self):
-        self.assertEqual(classify(["src/app.py"], "config.api_key = read()", self.rows), ["credentials-and-access"])
-        self.assertEqual(classify(["src/app.py"], "-----BEGIN PRIVATE KEY-----", self.rows),
-                         ["credentials-and-access"])
+    def test_keywords_match_literally_and_case_sensitively(self):
+        # The template's contract: write keywords the way the code spells them.
+        self.assertEqual(classify(["src/app.py"], "API_KEY = read()", self.rows), ["credentials-and-access"])
+        self.assertEqual(classify(["src/app.py"], "config.api_key = read()", self.rows), [])
+        self.assertEqual(classify(["src/app.py"], "-----BEGIN PRIVATE KEY-----", self.rows), [])
 
     def test_either_paths_or_keywords_match_a_row(self):
-        self.assertEqual(classify(["src/web/page.tsx"], "set(SESSION_TOKEN)", self.rows), ["auth"])
+        self.assertEqual(classify(["src/web/page.tsx"], "set(session_token)", self.rows), ["auth"])
 
 
 class GlobDialect(unittest.TestCase):

@@ -22,6 +22,7 @@ from graph_control.common import Invalid  # noqa: E402
 from graph_control.depth import decide  # noqa: E402
 
 CLI = Path(__file__).resolve().parents[2] / "scripts" / "graph-control.py"
+TEMPLATE = Path(__file__).resolve().parents[2] / "templates" / "graph-profile.yaml"
 KEYS = {"depth", "changed_lines", "files", "risk_rows", "reasons", "untracked_excluded"}
 LINT = "prose only: every changed file matches *.md, *.txt or docs/** and none matches instructionPaths"
 RISK = {"risk": [{"id": "db-schema", "paths": ["**/{migrations,schemas}/**"]},
@@ -113,7 +114,7 @@ class Risk(Fixture):
         self.assertEqual(result["reasons"], ["risk rows: db-schema"])
 
     def test_added_line_with_a_keyword_matches(self):
-        self.append("src/app.py", "client = connect(api_key)\n")
+        self.append("src/app.py", "client = connect(API_KEY)\n")
         self.assertEqual(self.decide(RISK)["risk_rows"], ["credentials-and-access"])
 
     def test_removed_line_with_a_keyword_does_not_match(self):
@@ -184,7 +185,7 @@ class Validation(Fixture):
             "seam of one stack": (self.base, {**SEAMS, "review": {"seams": [["web"]]}}),
             "panel_lines not an integer": (self.base, {"review": {"panel_lines": "2000"}}),
             "instructionPaths not a list": (self.base, {"instructionPaths": "CLAUDE.md"}),
-            "bad risk row": (self.base, {"risk": [{"id": "x"}]}),
+            "bad risk row": (self.base, {"risk": [{"id": "x", "paths": "a/**"}]}),
         }
         for name, (base, profile) in bad.items():
             with self.subTest(name), self.assertRaises(Invalid):
@@ -205,6 +206,12 @@ class Cli(Fixture):
         self.assertEqual(json.loads(result.stdout), {
             "status": "PASS", "depth": "panel", "changed_lines": 1, "files": 1, "risk_rows": ["db-schema"],
             "reasons": ["risk rows: db-schema"], "untracked_excluded": True})
+
+    def test_cli_decides_with_the_shipped_template_profile(self):
+        self.append("README.md", "more prose\n")
+        result = self.run_cli(self.base, TEMPLATE.read_text())
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(json.loads(result.stdout)["status"], "PASS")
 
     def test_cli_blocks_on_an_unknown_base(self):
         result = self.run_cli("no-such-branch", "stacks: {}\n")

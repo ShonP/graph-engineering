@@ -1,8 +1,11 @@
 """The profile's single risk table: which rows a change matches.
 
 A `risk:` row is {id, paths: [globs], keywords: [strings]}. It matches when any
-changed path matches any of its globs, or any keyword occurs, case-insensitively,
-in the added lines. Globs use the dialect the profile template names: wcmatch
+changed path matches any of its globs, or any keyword occurs literally and
+case-sensitively in the added lines (the template's contract: keywords are
+spelled the way the code spells them). A row with neither is a placeholder the
+repo or the engine fills (`public-copy`, `outside-the-run`); it matches nothing
+here. Globs use the dialect the profile template names: wcmatch
 GLOBSTAR | BRACE | DOTGLOB against repo-relative paths. Pure: no I/O.
 """
 
@@ -12,7 +15,7 @@ from typing import Any
 
 from wcmatch import glob
 
-from .common import array, obj, require, strings, text, unique
+from .common import array, obj, strings, text, unique
 
 FLAGS = glob.GLOBSTAR | glob.BRACE | glob.DOTGLOB
 
@@ -36,9 +39,7 @@ def load_rows(profile: dict[str, Any]) -> tuple[Row, ...]:
     rows = []
     for item in array(value):
         row = obj(item, "id", "paths keywords")
-        parsed = Row(text(row["id"]), strings(row.get("paths", [])), strings(row.get("keywords", [])))
-        require(bool(parsed.paths or parsed.keywords), f"risk row {parsed.id} needs paths or keywords")
-        rows.append(parsed)
+        rows.append(Row(text(row["id"]), strings(row.get("paths", [])), strings(row.get("keywords", []))))
     unique(tuple(rows))
     return tuple(rows)
 
@@ -46,10 +47,9 @@ def load_rows(profile: dict[str, Any]) -> tuple[Row, ...]:
 def classify(paths: Iterable[str], added_text: str, rows: Iterable[Row]) -> list[str]:
     """Sorted ids of the rows the change matches; an empty list when none does."""
     changed = list(paths)
-    added = added_text.casefold()
     hits = set()
     for row in rows:
         match = matcher(row.paths).match
-        if any(match(path) for path in changed) or any(k.casefold() in added for k in row.keywords):
+        if any(match(path) for path in changed) or any(k in added_text for k in row.keywords):
             hits.add(row.id)
     return sorted(hits)
