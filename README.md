@@ -43,7 +43,9 @@ flowchart LR
 
     subgraph agents [" "]
         direction LR
-        a1["planner: goal, plan, merge, retro"]
+        a1["planner: goal, plan"]
+        a6["engine: merge exhibit (no dispatch)"]
+        a7["retro: retro (engine writes a one-line retro when nothing leaked)"]
         a0["researcher: research-ux / tech / competitor / impact (parallel)"]
         a5["ux-designer: design (captures the running UI, decides placement)"]
         a2["implementer / implementer-simple: implement, fix"]
@@ -122,47 +124,55 @@ the owner sees it at the first gate.
 
 ## Hooks
 
-Installing this plugin turns on three hooks, and they run your repository's own
-scripts. Read this before enabling it on a repo you did not write.
+Installing this plugin registers five hooks. The two that run your repository's
+own commands (lint and test) are opt-in: they do nothing until the repo commits
+`.claude/graph-checks.json` (copy `templates/graph-checks.json` and edit the argv
+lists). Read this before enabling it on a repo you did not write.
 
 | When | What runs | If it is unhappy |
 |---|---|---|
-| after every `Edit` or `Write` | your `lint`, then your `typecheck`, on the file just touched | nothing is blocked. The output comes back to Claude as context beside the tool result |
-| before Claude stops | your whole `test` script | the turn is blocked with exit 2 and Claude keeps working until the suite is green, or until Claude Code ends the turn after 8 consecutive blocks (hooks reference, "Stop input") |
-| at session start | the first 40 lines of `docs/HANDOFF.md`, when that file exists | nothing |
+| after every `Edit` or `Write`, async | `lint.argv` from `graph-checks.json` on the file just touched, only for a listed extension | nothing is blocked. Findings arrive on the next turn |
+| before a `Bash` command that pushes, removes a remote, runs `rm` or `docker` | the destructive-command guard (a bash filter; python only on a match) | Claude Code asks the owner, showing the evidence it gathered (force push without a lease, remote removal, Docker volume delete, recursive `rm` of a protected path). It never denies |
+| before an `Agent` call | the policy guard, only when the profile has a `policy:` block | `general-purpose` and `policy.never` models are denied; each role runs on its `policy.roles` tier; a `policy-override: <reason>` line in the prompt skips it and is logged |
+| after Claude stops, `asyncRewake` | `test.argv` from `graph-checks.json`, after an optional `precheck` | Claude is woken with the failure, at most once per prompt. A precheck failure or timeout reports "not verified" and does not wake it |
+| at session start (`startup`, `clear`, `compact`) | the first 40 lines of `docs/HANDOFF.md`, when that file exists | nothing |
 
-The edit hook acts only on a real file strictly inside `$CLAUDE_PROJECT_DIR`, so
-an edit inside a scratch clone of somebody else's repo never runs that repo's
-scripts. The stop hook looks in the project root and nowhere else. Neither runs
-anything unless your repo declares the script under one of three conventions
-(`pyproject.toml`, `package.json`, `Taskfile.yml`), so a repo with none of them
-sees no change at all.
+**0.15 breaks 0.14 autodetect.** The `pyproject.toml`, `package.json` and
+`Taskfile.yml` script lookups are gone; a repo that relied on them adds
+`.claude/graph-checks.json` to keep the Stop gate and the lint.
 
-Two costs to know before you install. A suite that is red for reasons unrelated
-to the current task blocks up to 8 turns, running your full test command each
-time; and a slow suite is paid on every stop. To turn them off, disable the
-plugin with `claude plugin disable graph-engineering`, or every hook in a scope
-with `"disableAllHooks": true` in that scope's settings file (hooks reference,
-"Disable or remove hooks").
+To turn the hooks off, disable the plugin with `claude plugin disable
+graph-engineering`, or every hook in a scope with `"disableAllHooks": true` in
+that scope's settings file (hooks reference, "Disable or remove hooks").
 
-Detection order, the project-directory bound, the dependency list and the test
-command: [`hooks/README.md`](hooks/README.md).
+The `graph-checks.json` contract, version floors and the rationale for each
+handler: [`hooks/README.md`](hooks/README.md).
 
 ## Roster
 
-The full organization - seven agents, engineering only:
+The full organization - eight agents, engineering only:
 
 | Agent | Model | Job | Writes |
 |---|---|---|---|
-| `planner` | fable | spec, then task-decomposed plan with per-task sizing | specs only |
+| `planner` | opus | spec, then task-decomposed plan with per-task sizing | specs only |
 | `researcher` | sonnet | one bounded question, five modes: ux / tech / competitor / impact (blast radius + adjacent-issue triage) / spike (strict turn budget) | reports only |
 | `ux-designer` | opus | the `design` node: captures the running UI, decides placement, shows it in the best-suited available medium (live-app capture, Storybook, HTML, Claude artifact, Claude Design), writes the experience spec with UI acceptance rows; variant exploration scored against the house rubric | mockups only |
 | `implementer` | opus | one non-trivial task, test-first, with spine-named skills | yes |
 | `implementer-simple` | sonnet | one SMALL task (mechanical, 1-2 files); escalates instead of pushing through | yes |
 | `reviewer` | opus | reads the diff once through every lens it needs | no (read-only) |
-| `qa` | sonnet | acceptance criteria verified on a RUNNING system, evidence per criterion | tests only |
+| `qa` | sonnet | acceptance criteria verified on a RUNNING system, evidence per criterion; any row not VERIFIED makes the verdict `INCOMPLETE: <row ids>` | tests only |
+| `retro` | sonnet | the `retro` node when a finding leaked past its gate: leak table and proposed rule diffs, never applied | `retro.md` only |
 
-The model column is the agent's frontmatter and the engine dispatches it unchanged: `/graph-ship` never passes a `model:` override, so a scoped re-check of a three-line fix runs on the same opus reviewer as the first review. Implementer versus implementer-simple, by task size, is the engine's only model choice.
+The model column is the default tier in the agent's frontmatter. The profile's
+`policy:` block is the single source of tiers: the engine passes
+`model: <policy.roles tier>` on every dispatch, and the `guard-agent` hook
+rewrites any roster call to its role's tier. Never haiku, never fable, never
+`general-purpose`. Review never drops to a cheaper tier; the only move is up:
+fix round 3 escalates a small task from `implementer-simple` to `implementer`.
+`implementer` (200), `implementer-simple` (60), `qa` (250) and `retro` (40) carry
+a frontmatter `maxTurns` cap. Children return at most 1,500 tokens plus artifact
+paths; the reviewer ends with one `PASS|CHANGES-REQUESTED ... findings=<path>`
+verdict line.
 
 The engine picks the implementer by the task's `size` in the plan: `small` goes
 to `implementer-simple`, everything else to `implementer`. Every agent below its
@@ -178,21 +188,33 @@ task's files. The directory name is the routing name, and
 `scripts/check-skill-frontmatter.sh` enforces that the frontmatter `name` agrees
 with it, and `scripts/check-routing-resolves.sh` checks that every name the
 routing table and the roster reference actually resolves to one skill.
+`scripts/check-agent-frontmatter.sh` holds every roster agent to the allowed
+frontmatter keys, an opus or sonnet tier, a well-formed `maxTurns`, and fully
+qualified `graph-engineering:` skill names, and checks that every playbook node
+names a real agent (or `engine`).
 `scripts/check-skill-scripts.sh` runs the regression tests that ship beside
 skill scripts (`skills/**/tests/`): `vet_smoke.py`, which guards writes to a
 shared environment, and `compose_isolation.sh`, which keeps qa's stack off the
-developer's.
+developer's. `bash scripts/run-all-tests.sh` runs every suite and check,
+discovering new ones by convention, and is the only CI step.
+
+Framework skills are routed by what a manifest declares, not by a file
+extension: `/graph-init` reads the template's dependency-derived block and
+writes a row per manifest (a `package.json` that depends on react, a
+`pyproject.toml` that depends on fastapi, a Gradle build that uses Compose).
+Static rows are language or file-type only, so a Go CLI or an Express service
+routes no React or FastAPI skill.
 
 | Group | Skills | Routed by |
 |---|---|---|
-| `ios` | swiftui-pro, healthkit, widgetkit, activitykit, photokit, push-notifications | `**/*.swift`, plus dir globs per framework |
-| `android` | compose-state, compose-ui, compose-performance, compose-build-and-test, kotlin-concurrency, kotlin-control-flow, kotlin-functions, kotlin-types-value-class | `**/*.{kt,kts}` |
-| `react` | react-rules, tanstack-query-rules, tanstack-router, tailwind, forms-i18n, turborepo | `**/*.{ts,tsx}`; tailwind also on `**/*.css`, forms-i18n on `**/{i18n,locales}/**` and `*.{form,forms}.tsx`, turborepo on `**/turbo.json`, `pnpm-workspace.yaml`, `**/package.json` |
-| `supabase` | supabase, supabase-postgres-best-practices | `**/*.sql` |
-| `python` | uv, pydantic, pydantic-house-rules, fastapi, building-pydantic-ai-agents, pydantic-ai-harness | `**/*.py`, `**/{pyproject.toml,uv.lock,.python-version}`; building-pydantic-ai-agents on `**/agents/**/*.py`; pydantic-ai-harness by the agent catalogs only, no routing row |
-| `agents` | microsoft-agent-framework | `**/agents/**/*.py` |
+| `ios` | swiftui-pro, healthkit, widgetkit, activitykit, photokit, push-notifications | derived: `.swift` files that import SwiftUI; Apple framework skills by Swift file name (`{Health,Workout}*.swift`, ...) |
+| `android` | compose-state, compose-ui, compose-performance, compose-build-and-test, kotlin-concurrency, kotlin-control-flow, kotlin-functions, kotlin-types-value-class | `**/*.{kt,kts}` for the Kotlin rules; Compose skills derived when the Gradle build uses Compose |
+| `react` | react-rules, tanstack-query-rules, tanstack-router, tailwind, forms-i18n, turborepo | derived from `package.json` dependencies (react, @tanstack/*, tailwindcss, react-hook-form / i18next); turborepo on `**/turbo.json`, `pnpm-workspace.yaml`, and `**/package.json` when a root `turbo.json` exists |
+| `supabase` | supabase, supabase-postgres-best-practices | supabase-postgres-best-practices on `**/*.sql`; supabase derived from `supabase/config.toml` |
+| `python` | uv, ruff, pydantic, pydantic-house-rules, fastapi, sqlalchemy, loguru, building-pydantic-ai-agents, pydantic-ai-harness | uv and ruff on `**/*.py` and `**/{pyproject.toml,uv.lock,.python-version}`; pydantic, fastapi, sqlalchemy, loguru and building-pydantic-ai-agents derived from `pyproject.toml` dependencies; pydantic-ai-harness by the agent catalogs only, no routing row |
+| `agents` | microsoft-agent-framework | derived: `**/agents/**/*.py` when `pyproject.toml` depends on agent-framework |
 | `k8s-gitops` | argocd, helm, kubectl, kustomize, cloudnativepg, envoy-gateway, agent-router, sops-age | `argocd/**`, `manifests/**`, `**/Chart.yaml`, `**/kustomization.{yaml,yml}`, `**/*.enc.yaml` |
-| `temporal` | temporal-developer | `**/{workflows,activities}/**/*.py` |
+| `temporal` | temporal-developer | derived: `**/{workflows,activities}/**/*.py` when `pyproject.toml` depends on temporalio |
 | `qa` | playwright-cli, playwright-trace, playwright-component-testing, bruno, schemathesis | `tests/**/*.spec.ts`, `playwright.config.ts`, `**/*.bru`; bruno and schemathesis also on every API-surface row |
 | `observability` | promql, loki, tempo | `observability/**`, `**/dashboards/**/*.json`, `**/*rule*.{yaml,yml}` |
 | `security` | security-review | `always.review` |
@@ -324,6 +346,7 @@ Configure project Stop gates in `.claude/graph-checks.json`; see
 [hook prerequisites and worktree binding](hooks/README.md). Python 3.11+ is required;
 `uv python install 3.12` supplies it when your system Python is older.
 
-Cache lifetimes and role model mappings belong to host settings. See
+Model tiers per role live in the profile's `policy:` block (see Roster).
+Cache lifetimes belong to host settings. See
 [cost measurement](docs/cost-measurement.md) before changing them; a gateway must
 actually report one-hour cache writes before a TTL experiment counts as enabled.

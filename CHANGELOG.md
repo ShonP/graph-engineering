@@ -38,6 +38,56 @@ commits.
 - `frontend-rules` defers colour and dark mode to `tailwind` (tokens in the
   `@theme` preset flip themselves; `dark:` only for non-colour) and catalogue
   paths to `forms-i18n` (`i18n/<ns>.<lng>.json`).
+- Destructive-command guard (`hooks/scripts/guard-destructive.sh`): asks the
+  owner to confirm, showing evidence, before a git remote removal, a force push
+  without a lease, a Docker volume delete, or a recursive rm on /, $HOME, a repo
+  root, a .git path or Docker data. Any other command passes a bash-only check
+  (about 4 ms, no python).
+- graph-control: new subcommands are plug-in modules under
+  `scripts/graph_control/commands/`, so `cli.py` no longer needs editing. New
+  `guard-agent` PreToolUse(Agent|Task) policy hook: blocks `general-purpose` and
+  never-listed models, sets role model tiers through `updatedInput`, logs
+  `policy-override:` lines to `.graph/ledger.md`, does nothing without a profile
+  `policy:` block, and fails open on errors.
+- `scripts/check-agent-frontmatter.sh` checks agent frontmatter keys, the model
+  tier (opus or sonnet only), tools, maxTurns, omitClaudeMd, qualified skill
+  names and graph node agents. `scripts/run-all-tests.sh` is one test runner
+  that finds new suites on its own and is now the only step in CI.
+- `retro` roster agent (sonnet, `maxTurns: 40`, preloads only
+  `graph-engineering:retro`) for the retro node when something leaked.
+
+### Changed
+
+- **Breaking: Stop and PostToolUse hooks are opt-in** through
+  `.claude/graph-checks.json` (`test`, `precheck`, `lint` with `{file}` and
+  `extensions`; template at `templates/graph-checks.json`). The Stop check runs
+  at most once per prompt and waits while background tasks run. Timeouts report
+  "not verified" instead of blocking. Script autodetection (`pyproject.toml`,
+  `package.json`, `Taskfile.yml`) and the whole-project typecheck on every edit
+  are removed.
+- hooks: `hooks.json` registers async lint, the four-handler destructive-command
+  guard, the Agent|Task policy guard, an `asyncRewake` Stop gate, and
+  SessionStart limited to `startup|clear|compact`. `hooks/README.md` documents
+  the opt-in `.claude/graph-checks.json` contract and states that 0.15 breaks
+  0.14 autodetect.
+- Roster runs on opus/sonnet only (planner moves from fable to opus), with
+  qualified `graph-engineering:` preloads, `maxTurns` caps, a shared return
+  contract, a reviewer preload check and `findings=` verdict line, and qa
+  `INCOMPLETE:` verdicts.
+- Profile template is generic for any stack: `stacks` ships empty, a new
+  `policy:` block is the single source of model tiers (opus for planning,
+  design, implementation and review; sonnet for simple implementation,
+  research, qa and retro; haiku and fable never allowed; general-purpose agents
+  blocked), and framework skills are routed from dependency-derived rows that
+  /graph-init applies per manifest instead of from file extensions.
+- Engine dispatch: the profile's `policy.roles` is the only model-tier source;
+  REQUIRED skills use full `graph-engineering:` names; dispatches have five
+  parts and a `<run8>:<node>` label; fix rounds are fresh dispatches and round 3
+  moves up one tier; children return at most 1,500 tokens; the engine writes the
+  merge exhibit itself (`agent: engine`) and a one-line retro when no findings
+  leaked, otherwise it dispatches the `retro` agent.
+- `docs/efficiency-implementation.md` item 3 (reduce repeated context and
+  unconditional research) marked resolved.
 
 ## [0.14.0] - 2026-09-29
 
