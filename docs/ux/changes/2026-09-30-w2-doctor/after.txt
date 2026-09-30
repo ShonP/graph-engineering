@@ -1,0 +1,40 @@
+# after: branch ge-t-w2-doctor (uncommitted change on 7593295), `bash capture.sh <plugin-root>`
+
+### git repo with package.json, no .claude/graph-profile.yaml
+hooks/scripts/print-handoff.sh: exit 0
+(no output)
+hooks/scripts/doctor-on-start.sh: exit 0
+graph-engineering: this repo has no .claude/graph-profile.yaml. The owner can run /graph-init to set it up.
+
+### git repo with no stack marker and no profile
+hooks/scripts/print-handoff.sh: exit 0
+(no output)
+hooks/scripts/doctor-on-start.sh: exit 0
+(no output)
+
+### directory that is not a git repo
+hooks/scripts/print-handoff.sh: exit 0
+(no output)
+hooks/scripts/doctor-on-start.sh: exit 0
+(no output)
+
+### profile without schema_version, with stale content key, no graph-checks.json
+hooks/scripts/print-handoff.sh: exit 0
+(no output)
+hooks/scripts/doctor-on-start.sh: exit 0
+graph-engineering doctor: profile schema_version is missing; this plugin reads version 2 - fix: run /graph-init --upgrade
+graph-engineering doctor: profile key `content` was removed in 0.12 and is ignored - fix: delete `content`, or run /graph-init --upgrade
+graph-engineering doctor: .claude/graph-checks.json is missing, so the Stop and lint hooks do nothing (opt-in since 0.15) - fix: copy the plugin's templates/graph-checks.json to .claude/graph-checks.json and set this repo's commands
+
+### same repo after the fix, first startup
+hooks/scripts/print-handoff.sh: exit 0
+(no output)
+hooks/scripts/doctor-on-start.sh: exit 0
+(no output)
+
+### same repo, second startup, nothing changed (cache hit)
+hooks/scripts/print-handoff.sh: exit 0
+(no output)
+hooks/scripts/doctor-on-start.sh: exit 0
+(no output)
+

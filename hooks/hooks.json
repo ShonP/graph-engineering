@@ -78,6 +78,17 @@
             "timeout": 15
           }
         ]
+      },
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/doctor-on-start.sh",
+            "args": [],
+            "timeout": 5
+          }
+        ]
       }
     ]
   }

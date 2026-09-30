@@ -73,7 +73,11 @@ class RegistrationContract(unittest.TestCase):
                 {
                     "matcher": "startup|clear|compact",
                     "hooks": [handler("print-handoff.sh", timeout=15)],
-                }
+                },
+                {
+                    "matcher": "startup",
+                    "hooks": [handler("doctor-on-start.sh", timeout=5)],
+                },
             ],
         )
 
