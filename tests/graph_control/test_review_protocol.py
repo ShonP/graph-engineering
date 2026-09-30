@@ -69,7 +69,8 @@ class ReviewProtocol(unittest.TestCase):
     def test_instruction_paths_decide_depth(self):
         body = flat(section(self.text, "Review depth"))
         for needle in ("instructionPaths", "full review", "`lint`", "no LLM review",
-                       "by file type", "never by directory", "requirements.txt"):
+                       "by file type", "never by directory", "requirements.txt",
+                       "`agent-control`", "no reviewer is dispatched", "lint.argv", "review receipt"):
             self.assertIn(needle, body)
 
 

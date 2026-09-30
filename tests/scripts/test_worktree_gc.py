@@ -21,7 +21,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 GC = ROOT / "scripts" / "worktree-gc.sh"
-ENGINE = ROOT / "commands" / "graph-ship.md"
+ENGINE = ROOT / "docs" / "engine" / "run.md"  # /graph-ship steps 2-8 and 10
 GIT_VARS = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR")
 ENV = {key: value for key, value in os.environ.items() if key not in GIT_VARS}
 
@@ -75,9 +75,9 @@ class Fixture(unittest.TestCase):
 
 
 def engine_key(pattern, run_id):
-    """The engine's prescribed branch or gc key, from graph-ship.md, instantiated for one run id."""
+    """The engine's prescribed branch or gc key, from docs/engine/run.md, instantiated for one run id."""
     match = re.search(pattern, ENGINE.read_text())
-    assert match, f"graph-ship.md no longer prescribes {pattern}"
+    assert match, f"the engine (docs/engine/run.md) no longer prescribes {pattern}"
     key = match.group(1).replace("<run-id>", run_id).replace("<run8>", run_id[:8])
     assert "<" not in key, f"unknown placeholder in the engine's key: {match.group(1)}"
     return key

@@ -47,7 +47,7 @@ Layout
   the dispatch named one: 6 of 366 Agent-tool metas), `parentAgentId`, `stoppedByUser`,
   `workflowPhase`, `spawnedWithWorktree`, `worktreeBranch`, `worktreePath`.
 - `description` carries the engine's `<run8>:<node>` prefix
-  (`commands/graph-ship.md`, dispatch shape). None of the witnessed Agent-tool
+  (`docs/engine/run.md` step 4, dispatch shape). None of the witnessed Agent-tool
   descriptions had it yet; workflow ones use `<wave>:<task>`.
 
 Transcript rows (`*.jsonl`, one JSON object per line)

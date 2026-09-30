@@ -5,9 +5,11 @@ product preset for "is this worth building"; the router in graph-ship step 1
 picks it, and the engine reads this file only when the lane runs. A single
 lookup stays in the `answer` lane. Nothing here writes code, so there is no
 worktree, no plan, no qa and no merge. No `run.json` controls apply: the run
-dir holds the ledger, the briefs and the claims, and the report goes to a
-durable path. The engine writes the brief and the report itself; only the
-leaves are dispatched.
+dir holds the ledger, the briefs, the leaf reports and the claims, all working
+data. The deliverables (the report, the product concept, the spike report) go
+to a durable repo path under the profile's `docsPath`, never only to `.graph/`,
+which is git-ignored; the gate names them so the owner commits them. The engine
+writes the brief and the report itself; only the leaves are dispatched.
 
 ## Presets
 
@@ -62,19 +64,21 @@ artifact is already on disk.
    competitor; ux when the idea has a user-facing surface. 5 leaves only when
    the appetite is large. The brief writes `deep: no - product preset: the
    spike tests the riskiest assumption`.
-3. **Concept.** ONE `planner` dispatch writes `.graph/<run>/concept.md` from the
-   reports: the `product-spec` sections; 2-3 options, always including the
-   smallest thing that could work and buy or do nothing; the riskiest
+3. **Concept.** ONE `planner` dispatch writes the concept to
+   `<docsPath>/research/<UTC date>-<slug>-concept.md` from the reports: the
+   `product-spec` sections; 2-3 options, always including the smallest thing
+   that could work and buy or do nothing; the riskiest
    assumption of each option; the checklist status; and one line
    `signal: already logged | instrumentation task`.
 4. **Spike.** One `researcher-spike` on the recommended option's riskiest
-   assumption, with the brief graph-ship step 1 gives the spike lane; its
-   verdict goes into `concept.md`.
+   assumption, with the brief graph-ship step 1 gives the spike lane, its
+   report at `<docsPath>/research/<UTC date>-spike-<slug>.md`; its verdict goes
+   into the concept.
 5. **Gate.** go / kill / clarify, with a 5-line summary: the idea, the
    recommended option, its riskiest assumption and the spike's verdict, the
    cost against the appetite, the signal line. kill closes the run with the
    reason in the ledger. clarify re-runs only the leaves the answer changes.
-   go opens a feature run with `concept.md` as its goal input: its
+   go opens a feature run with the concept as its goal input: its
    `research-ux`, `research-tech` and `research-competitor` nodes are marked
    `skipped (product run <id>)` and point at this run's reports, while
    `research-impact` still runs, since this run never mapped the repo.
@@ -105,6 +109,6 @@ next: report
 ## node: report
 agent: engine
 in: .graph/<run>/goal.md, every .graph/<run>/research/*.md, .graph/<run>/research/claims.jsonl
-out: .graph/research/<slug>.md (the recommendation in one paragraph up top; the evidence per dimension with each source's rung; `## Evidence against`, never empty, naming what was searched when nothing turned up; `## Unverified`, each load-bearing claim no leaf reproduced with the spike that settles it, as a hypothesis and the smallest experiment), the ledger; in the product preset, .graph/<run>/concept.md and the go / kill / clarify summary. The gate presents it: with nothing downstream, the owner's reply closes a research run
+out: <docsPath>/research/<UTC date>-<slug>.md (the profile's `docsPath`; the recommendation in one paragraph up top; the evidence per dimension with each source's rung; `## Evidence against`, never empty, naming what was searched when nothing turned up; `## Unverified`, each load-bearing claim no leaf reproduced with the spike that settles it, as a hypothesis and the smallest experiment), the ledger; in the product preset, <docsPath>/research/<UTC date>-<slug>-concept.md and the go / kill / clarify summary. The gate presents it and names each deliverable path, uncommitted, for the owner to commit: with nothing downstream, the owner's reply closes a research run
 gate: yes
 next: END

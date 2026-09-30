@@ -10,10 +10,9 @@ from pathlib import Path
 
 import helpers  # noqa: F401  (puts scripts/ on sys.path)
 from graph_control.preflight import read_graph
-from test_playbooks import steps
+from test_playbooks import ENGINE, ENGINE_LANES, engine_text, steps
 
 ROOT = Path(__file__).resolve().parents[2]
-ENGINE = ROOT / "commands" / "graph-ship.md"
 QUICK = ROOT / "graphs" / "quick.md"
 
 
@@ -31,9 +30,18 @@ class RouterTests(unittest.TestCase):
         cls.text = ENGINE.read_text()
         cls.steps = steps(cls.text)
         cls.router = cls.steps[1]
+        cls.lanes = ENGINE_LANES.read_text()
+
+    def lane(self, name):
+        """A lane's router bullet plus its detail in docs/engine/lanes.md, when it has any."""
+        return lane_block(self.router, name) + lane_block(self.lanes, name)
 
     def test_file_stays_within_budget(self):
         self.assertLessEqual(len(self.text.splitlines()), 250)
+
+    def test_control_plane_row_always_applies(self):
+        for token in ("`agent-control`", "`.claude/**`", "`CLAUDE.md`", "`instructionPaths`"):
+            self.assertIn(token, self.router)
 
     def test_false_gate_claim_is_gone(self):
         self.assertNotIn("wrong pick costs one gate", self.text)
@@ -58,7 +66,7 @@ class RouterTests(unittest.TestCase):
             self.assertIn(token, answer)
 
     def test_direct_lane(self):
-        direct = lane_block(self.router, "direct")
+        direct = self.lane("direct")
         for token in ("at most 2 files", "no `run.json`", "exactly one `implementer-simple`",
                       "non-code text", "`ESCALATE`", "past 2 files", "risk row",
                       "ux-evidence", "Bruno", "reads the diff", "`.graph/ledger.md`"):
@@ -68,10 +76,11 @@ class RouterTests(unittest.TestCase):
 
     def test_direct_lane_lands_alone_only_on_a_class_none_diff(self):
         """An owner's --lane direct over a risk row never skips the owner merge (owner_classes invariant)."""
-        direct = lane_block(self.router, "direct")
+        direct = self.lane("direct")
         for token in ("graph-control depth --root <worktree> --base <base> --profile <profile>",
                       "`risk_rows: []`", "`gates.auto_classes` holds `none`", "any matched row",
-                      "waits for the owner", "`gates.owner_classes`"):
+                      "waits for the owner", "`gates.owner_classes`", "`agent-control`",
+                      "<plugin-root>/docs/engine/land.md"):
             self.assertIn(token, direct)
         self.assertNotIn("only when `gates.auto_classes` holds `none` and the verification is green", direct)
 
@@ -94,7 +103,9 @@ class RouterTests(unittest.TestCase):
         self.assertNotIn("one `researcher` dispatch", spike)
         for part in ("profile path", "REQUIRED skills", "rule packs", "project invariants"):
             self.assertIn(part, spike)
-        self.assertIn(".graph/research/<slug>.md", self.router)
+        self.assertIn("`<docsPath>/research/<UTC date>-spike-<slug>.md`", spike)
+        self.assertIn("`<docsPath>/research/<UTC date>-<slug>.md`", lane_block(self.router, "research"))
+        self.assertNotIn(".graph/research/<slug>.md", self.router)
         self.assertIn("exempt from `run.json` controls", self.router)
 
     def test_risk_rows_force_quick(self):
@@ -114,7 +125,14 @@ class GateTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.step = steps(ENGINE.read_text())[5]
+        cls.step = steps(engine_text())[5]
+
+    def test_control_plane_always_waits_for_the_owner(self):
+        for token in ("`agent-control`", "even under `--auto-merge`"):
+            self.assertIn(token, self.step)
+
+    def test_plan_gate_always_stops(self):
+        self.assertIn("`gates.plan` and `gates.merge` take only `owner`", self.step)
 
     def test_decision_card_format(self):
         self.assertIn(".graph/<run>/decisions.md", self.step)
@@ -152,7 +170,7 @@ class IntegrationAndReplyTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.steps = steps(ENGINE.read_text())
+        cls.steps = steps(engine_text())
 
     def test_integration_modes(self):
         step = self.steps[9]

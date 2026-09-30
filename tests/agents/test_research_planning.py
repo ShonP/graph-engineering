@@ -133,7 +133,7 @@ class PlannerConcept(GenericText):  # AC-W4-RP-03
 
     def test_concept_md_for_the_product_preset(self):
         concept = flat(section(self.body, "## Product concept"))
-        for needle in ("`concept.md`", "`product-spec`", "smallest thing", "buy / do nothing",
+        for needle in ("`<docsPath>/research/<UTC date>-<slug>-concept.md`", "`product-spec`", "smallest thing", "buy / do nothing",
                        "riskiest assumption", "completeness checklist", SIGNAL_LINE, "go / kill / clarify"):
             self.assertIn(needle, concept)
         self.assertRegex(concept, r"2-3 options")

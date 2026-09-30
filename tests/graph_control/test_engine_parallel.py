@@ -10,16 +10,15 @@ import unittest
 from pathlib import Path
 
 import helpers  # noqa: F401  (puts scripts/ on sys.path)
-from test_playbooks import steps
+from test_playbooks import ENGINE, engine_text, steps
 
 ROOT = Path(__file__).resolve().parents[2]
-ENGINE = ROOT / "commands" / "graph-ship.md"
 
 
 class EngineParallelTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.text = ENGINE.read_text()
+        cls.text = engine_text()
         cls.steps = steps(cls.text)
         cls.execution = "".join(cls.steps[n] for n in (2, 3, 4))
 
@@ -140,7 +139,7 @@ class EngineParallelTests(unittest.TestCase):
         ))
 
     def test_ac_w3_ep_05_file_stays_within_budget(self):
-        self.assertLessEqual(len(self.text.splitlines()), 250)
+        self.assertLessEqual(len(ENGINE.read_text().splitlines()), 250)
 
     def test_engine_is_generic(self):
         lowered = self.text.lower()

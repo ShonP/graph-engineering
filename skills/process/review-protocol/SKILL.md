@@ -162,10 +162,16 @@ goes to the owner.
 ## Review depth
 
 The profile's `instructionPaths` globs name the files that steer agents:
-prompts, skills, agent definitions, rule packs, `CLAUDE.md`. A diff to one of
-them changes agent behavior and gets a full review. Any other prose-only diff
-(docs, changelogs, READMEs) gets the `lint` depth: scripted checks only, no LLM
-review. A diff with code in it is never `lint`. Prose is decided by file type
+prompts, skills, agent definitions, rule packs, `CLAUDE.md`. They join the
+built-in `agent-control` risk row (`.claude/**`, `CLAUDE.md`, `AGENTS.md`,
+`.mcp.json`, `.github/**`), so a diff to one of them changes agent behavior,
+gets a full review and always waits for the owner at merge. Any other
+prose-only diff (docs, changelogs, READMEs) gets the `lint` depth: scripted
+checks only, no LLM review. The engine runs `graph-control depth` before each
+review leg; at `lint` no reviewer is dispatched: the engine runs the repo's
+`lint.argv` from `.claude/graph-checks.json` on each changed file it lists,
+writes `findings.json` itself and records the review receipt as its own actor.
+A diff with code in it is never `lint`. Prose is decided by file type
 (Markdown, reStructuredText, AsciiDoc, and named files such as README or
 LICENSE), never by directory: a `conf.py` under `docs/`, a `requirements.txt`
 or an MDX page is code.

@@ -29,7 +29,7 @@ rework than any other, because it is where scope creep is refused in advance.
 spiked or by becoming a stated assumption in the plan. Never by being resolved
 quietly.
 
-The next three sections are required in a product concept (`concept.md`) and
+The next three sections are required in a product concept (`<date>-<slug>-concept.md`) and
 whenever the goal carries `product-discovery: yes`; a bounded change on an
 established contract leaves them out.
 

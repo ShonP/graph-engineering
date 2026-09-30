@@ -14,7 +14,17 @@ from graph_control.preflight import read_graph
 ROOT = Path(__file__).resolve().parents[2]
 GRAPHS = {name: ROOT / "graphs" / f"{name}.md" for name in ("feature", "bug", "infra")}
 ENGINE = ROOT / "commands" / "graph-ship.md"
+ENGINE_RUN = ROOT / "docs" / "engine" / "run.md"
+ENGINE_LAND = ROOT / "docs" / "engine" / "land.md"
+ENGINE_LANES = ROOT / "docs" / "engine" / "lanes.md"
+ENGINE_PARTS = (ENGINE, ENGINE_RUN, ENGINE_LAND, ENGINE_LANES)
+ENGINE_BYTES = 8000
 PLANNER_NODES = {"goal", "plan", "report"}
+
+
+def engine_text():
+    """graph-ship.md plus the references it Reads only when a lane needs them: the whole engine."""
+    return "\n".join(path.read_text() for path in ENGINE_PARTS)
 
 
 def steps(text):
@@ -49,16 +59,47 @@ class PlaybookTests(unittest.TestCase):
                 self.assertNotIn("skills:", node_block(path.read_text(), "retro"))
 
     def test_no_em_dashes(self):
-        for path in [ENGINE, *GRAPHS.values()]:
+        for path in [*ENGINE_PARTS, *GRAPHS.values()]:
             with self.subTest(path=path.name):
                 self.assertNotIn(chr(0x2014), path.read_text())
+
+
+class EngineSplitTests(unittest.TestCase):
+    """graph-ship.md loads on every /graph-ship; only the router lives there, the rest loads by lane."""
+
+    def test_command_stays_within_its_byte_budget(self):
+        self.assertLessEqual(len(ENGINE.read_bytes()), ENGINE_BYTES)
+
+    def test_command_holds_only_the_router(self):
+        self.assertEqual(sorted(steps(ENGINE.read_text())), [1])
+        self.assertEqual(sorted(steps(ENGINE_RUN.read_text())), [2, 3, 4, 5, 6, 7, 8, 10])
+        self.assertEqual(sorted(steps(ENGINE_LAND.read_text())), [9])
+        self.assertEqual(steps(ENGINE_LANES.read_text()), {})
+
+    def test_router_names_what_each_lane_reads(self):
+        router = steps(ENGINE.read_text())[1]
+        for token in ("<plugin-root>/docs/engine/run.md", "<plugin-root>/docs/engine/land.md",
+                      "<plugin-root>/docs/engine/lanes.md", "once per run"):
+            self.assertIn(token, router)
+
+    def test_every_reference_says_where_it_belongs(self):
+        for path in ENGINE_PARTS[1:]:
+            with self.subTest(path=path.name):
+                self.assertIn("/graph-ship", path.read_text().splitlines()[0])
 
 
 class EngineDispatchTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.text = ENGINE.read_text()
+        cls.text = engine_text()
         cls.steps = steps(cls.text)
+
+    def test_review_depth_picks_the_review_leg(self):
+        step = self.steps[4]
+        for token in ("graph-control depth --root <run worktree> --base <run base> --profile <profile>",
+                      "`lint`", "no reviewer", "`single`", "`panel`", "review receipt", "`findings.json`",
+                      "lint.argv", "agent-control"):
+            self.assertIn(token, step)
 
     def test_policy_roles_is_the_single_model_source(self):
         step = self.steps[4]

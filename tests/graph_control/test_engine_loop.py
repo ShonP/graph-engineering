@@ -12,11 +12,10 @@ from pathlib import Path
 
 import helpers  # noqa: F401  (puts scripts/ on sys.path)
 from graph_control.preflight import read_graph
-from test_playbooks import node_block, steps
+from test_playbooks import ENGINE, ENGINE_LANES, ENGINE_PARTS, engine_text, node_block, steps
 from test_router import lane_block
 
 ROOT = Path(__file__).resolve().parents[2]
-ENGINE = ROOT / "commands" / "graph-ship.md"
 RESEARCH = ROOT / "graphs" / "research.md"
 CONSUMER_WORDS = ("koach", "fitness", "pnpm", "xcodegen", "xcodebuild", "supabase", "sentry",
                   "ga4", "clarity", "doppler", "hormozi", "fable", "haiku")
@@ -73,7 +72,7 @@ class RouterLaneTests(Tokens):
         self.assert_tokens(spike, ("`graph-engineering:researcher-spike`", "no run dir"))
 
     def test_investigate_lane(self):
-        lane = lane_block(self.router, "investigate")
+        lane = lane_block(self.router, "investigate") + lane_block(ENGINE_LANES.read_text(), "investigate")
         self.assert_tokens(lane, (
             "`researcher`", "`signals` mode", "fresh context", "`pulse.command`", "NEEDS_SETUP",
             "one-page digest", "aggregates", "pseudonymised ids", "only when the owner asks",
@@ -155,7 +154,10 @@ class ResearchGraphTests(Tokens):
     def test_report_has_evidence_against_and_unverified_list(self):
         block = node_block(self.text, "report")
         self.assert_tokens(block, ("## Evidence against", "## Unverified", "the spike that settles",
-                                   ".graph/research/<slug>.md"))
+                                   "<docsPath>/research/<UTC date>-<slug>.md",
+                                   "<docsPath>/research/<UTC date>-<slug>-concept.md"))
+        self.assertNotIn(".graph/research/", block)
+        self.assertNotIn(".graph/<run>/concept.md", self.text)
 
     def test_single_lookup_stays_in_answer(self):
         self.assertIn("single lookup stays in the `answer` lane", self.head)
@@ -165,7 +167,7 @@ class ClassesTests(Tokens):
     """AC-W4-EL-03: the in-run defect classes file, appended by the engine."""
 
     def test_classes_append_rule(self):
-        step = steps(ENGINE.read_text())[7]
+        step = steps(engine_text())[7]
         self.assert_tokens(step, (".graph/<run>/classes.md", "`- <class> | <finding id> | round <n>`",
                                   "blocking or important", "`rule`", "no dispatch",
                                   "every later dispatch in the run"))
@@ -176,7 +178,7 @@ class SignalsAndDigestTests(Tokens):
 
     @classmethod
     def setUpClass(cls):
-        cls.steps = steps(ENGINE.read_text())
+        cls.steps = steps(engine_text())
 
     def test_post_deploy_rechecks_short_window_signals(self):
         self.assert_tokens(self.steps[9], (
@@ -213,7 +215,7 @@ class ProductPresetTests(Tokens):
 
     def test_concept_spike_and_gate(self):
         self.assert_tokens(self.head, (
-            "ONE `planner` dispatch", "`concept.md`", "`researcher-spike`", "riskiest assumption",
+            "ONE `planner` dispatch", "-concept.md`", "`researcher-spike`", "riskiest assumption",
             "go / kill / clarify", "5-line summary", "`skipped (product run <id>)`"))
 
 
@@ -221,16 +223,16 @@ class GenericTests(unittest.TestCase):
     """AC-W4-EL-05: the plugin is generic; no consumer names, no em dashes."""
 
     def test_no_consumer_words(self):
-        for path in (ENGINE, RESEARCH):
+        for path in (*ENGINE_PARTS, RESEARCH):
             lowered = path.read_text().lower()
             for word in CONSUMER_WORDS:
-                if path == ENGINE and word in ("fable", "haiku"):
+                if path in ENGINE_PARTS and word in ("fable", "haiku"):
                     continue  # step 4 names them to forbid them
                 with self.subTest(path=path.name, word=word):
                     self.assertIsNone(re.search(rf"\b{word}\b", lowered))
 
     def test_no_em_dashes(self):
-        for path in (ENGINE, RESEARCH):
+        for path in (*ENGINE_PARTS, RESEARCH):
             with self.subTest(path=path.name):
                 self.assertNotIn(chr(0x2014), path.read_text())
 

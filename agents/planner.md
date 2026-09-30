@@ -26,7 +26,7 @@ Every open question ends one of two ways before the plan gate: spiked, or writte
 
 ## Product concept
 
-For the product preset, write `concept.md` in the run directory from `intake.md` and the research reports, per `product-spec`: its sections, then 2-3 options that always include the smallest thing and buy / do nothing, the riskiest assumption of each option, the completeness checklist status from the tech research, a recommendation, and the closing line `signal: already logged | instrumentation task`. Name the recommended option's riskiest assumption as the one spike to run before the gate. Stop there, with no plan and no tasks: the owner answers go / kill / clarify, and a go hands the concept to the feature playbook.
+For the product preset, write the concept to the durable path your dispatch names, `<docsPath>/research/<UTC date>-<slug>-concept.md`, from `intake.md` and the research reports, per `product-spec`: its sections, then 2-3 options that always include the smallest thing and buy / do nothing, the riskiest assumption of each option, the completeness checklist status from the tech research, a recommendation, and the closing line `signal: already logged | instrumentation task`. Name the recommended option's riskiest assumption as the one spike to run before the gate. Stop there, with no plan and no tasks: the owner answers go / kill / clarify, and a go hands the concept to the feature playbook.
 
 ## Skill routing (yours and everyone else's)
 

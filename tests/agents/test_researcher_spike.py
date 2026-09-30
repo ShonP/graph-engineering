@@ -86,6 +86,10 @@ class ResearcherSpikeBody(unittest.TestCase):
         self.has("BLOCKED")
         self.has("recipe")
 
+    def test_report_lands_on_a_durable_repo_path(self):
+        self.has("`<docsPath>/research/<UTC date>-spike-<slug>.md`")
+        self.assertNotIn("in the temp directory your environment names and return", self.body)
+
     def test_return_and_cleanup_contract(self):  # AC-W3-SP-02
         for needle in ("1,500 tokens", "report path", "Clean up temp files"):
             self.has(needle)

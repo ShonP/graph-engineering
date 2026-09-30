@@ -125,7 +125,13 @@ options, riskiest assumption, one spike, then a go / kill / clarify gate that
 hands a go to `feature`) and `investigate` (one `signals`-mode researcher runs
 the profile's `pulse.command` into a one-page digest of aggregates; the owner
 ranks the items once and each routes to `direct`, `quick` or `bug`). Any match against the profile's `risk:` table forces at
-least `quick`. The lane, the matched risk rows, the playbook and the reason are
+least `quick`, and so does the built-in `agent-control` row: a diff to
+`.claude/**`, `CLAUDE.md`, `AGENTS.md`, `.mcp.json`, `.github/**` or the
+profile's `instructionPaths`. Research, spike and product deliverables go to
+`<docsPath>/research/`, a durable repo path; `.graph/` keeps only working data.
+`/graph-ship` itself loads only the router; a lane that opens a run Reads
+`docs/engine/run.md` and `land.md`, and `direct` and `investigate` read
+`docs/engine/lanes.md`. The lane, the matched risk rows, the playbook and the reason are
 the first line of the run's ledger; the owner sees them at the first gate.
 
 | Playbook | Shape | For |
@@ -141,7 +147,9 @@ the first line of the run's ledger; the owner sees them at the first gate.
 A repo can opt risk classes into auto-merge on full green with
 `gates.auto_classes` (no blocking or important findings left, qa a full PASS,
 `verify` green, no class in `gates.owner_classes`); the template ships `[]`, so
-the owner merges everything until the repo opts in. `integration: pr |
+the owner merges everything until the repo opts in. `agent-control` always
+waits for the owner, even under `--auto-merge`: that diff can rewrite the
+gates themselves. `gates.plan` and `gates.merge` take only `owner`. `integration: pr |
 push-main` picks how approved work lands.
 
 `graph-control status --line` prints a status line that costs no tokens and
@@ -199,7 +207,7 @@ The full organization - eleven agents, engineering only:
 
 | Agent | Model | Job | Writes |
 |---|---|---|---|
-| `planner` | opus | spec, then task-decomposed plan with per-task sizing, `success_signals` and one brief file per task; `concept.md` for the product preset | specs only |
+| `planner` | opus | spec, then task-decomposed plan with per-task sizing, `success_signals` and one brief file per task; the product concept under `docsPath` for the product preset | specs only |
 | `researcher` | sonnet | one bounded question, six modes: ux / tech / competitor / impact (blast radius + adjacent-issue triage) / spike (dispatched as `researcher-spike`) / signals (the profile's `pulse.command`, aggregates and pseudonymised ids only) | reports only |
 | `researcher-spike` | sonnet | one falsifiable spike under a hard turn budget, launched without CLAUDE.md; returns VALIDATED, PARTIAL or INVALIDATED naming the edge case tried | reports only |
 | `ux-designer` | opus | the `design` node: captures the running UI, decides placement, shows it in the best-suited available medium (live-app capture, Storybook, HTML, Claude artifact, Claude Design), writes the experience spec with UI acceptance rows; variant exploration scored against the house rubric | mockups only |
@@ -223,7 +231,9 @@ frontmatter `maxTurns` cap. Children return at most 1,500 tokens plus artifact
 paths; the reviewer writes `findings.json` (schema v1 in `review-protocol`, a
 route on every finding) and ends with one `PASS|CHANGES-REQUESTED ... findings=<path>`
 verdict line. `graph-control depth` sets the review depth (`lint`, `single`
-or `panel`) from the diff and the profile's risk rows.
+or `panel`) from the diff and the profile's risk rows; at `lint` (prose only,
+no risk row) the engine runs the repo's configured lint itself and dispatches
+no reviewer.
 
 The engine picks the implementer by the task's `size` in the plan: `small` goes
 to `implementer-simple`, everything else to `implementer`. Every agent below its
@@ -232,7 +242,7 @@ skill floor returns `NEEDS_SETUP` instead of improvising.
 **Parallelism and nesting.** The implement node runs `plan.json` in the waves
 `graph-control waves` prints: tasks at one dependency level, at most 4
 concurrent opus writers, all dispatched in one message in the foreground.
-`graph-control host-check` runs before each wave (low disk blocks it). A wave
+`graph-control host-check` runs before each wave (free disk below the profile's `host.min_free_gb`, default 20 GB, blocks it). A wave
 with 2+ writers gives each task its own worktree, branched from the run branch
 head SHA and set up by the profile's `bootstrap:` commands; branches merge back
 in plan order and `scripts/worktree-gc.sh --apply --base <run branch> --prefix
