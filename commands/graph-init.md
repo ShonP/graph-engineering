@@ -14,7 +14,7 @@ Produces `.claude/graph-profile.yaml` from the plugin's `templates/graph-profile
 
 2. **Upgrade (`--upgrade`).** Bring the existing profile to the template's schema without regenerating it; the owner's values win.
    - Read `.claude/graph-profile.yaml` and `<plugin-root>/templates/graph-profile.yaml`.
-   - Add every block the template has and the profile is missing, in the template's position, with the template's comment and default; nested keys too (a `gates` without `owner_classes` gains it). For a missing block a detection step fills (`runtime`, `deploy`, `infra`, `api`: step 4), run that step for that block only; what it cannot find keeps the empty default and is listed as a gap.
+   - Add every block the template has and the profile is missing, in the template's position, with the template's comment and default; nested keys too (a `gates` without `owner_classes` gains it). For a missing block a detection step fills (`runtime`, `deploy`, `infra`, `api`, `bootstrap`, `lanes`: step 4), run that step for that block only; what it cannot find keeps the empty default and is listed as a gap.
    - Run step 3 and add the derived routing rows the profile lacks. Never delete a row: an existing row that routes a framework skill no manifest declares is listed in the summary for the owner to drop.
    - Never change a value the profile already sets, even where it differs from the template.
    - Remove the stale keys `content` and `gates.publication` (dropped in 0.12). Print each removed key with its old value, so nothing leaves silently.
@@ -54,6 +54,29 @@ Produces `.claude/graph-profile.yaml` from the plugin's `templates/graph-profile
    **Deploy.** Propose the `deploy` block `post-deploy-verification` reads: `wait` from an Argo CD Application that tracks the default branch (`argocd app wait <app> --sync --health --timeout 600`) or a version endpoint, `startedAt` from the same Application, `bruEnv` from a non-local Bruno environment, and `checks` from existing recording or alert rules. None found: list `deploy` as a gap in the approval summary, saying every run's post-deploy node will report `SKIPPED` until it is filled.
 
    **Runtime.** A repo with nothing to stand up - a library, a CLI, a Claude Code plugin - gets `runtime.none: "<why>"` and no other runtime field; qa then verifies through its public surface instead of blocking. Otherwise propose the `runtime` block qa will use to stand the repo up, from what is there: a `compose.yaml` / `docker-compose.yml` (propose `docker compose -p ge-${GRAPH_RUN_ID:?} up -d --wait --wait-timeout <s>` and `docker compose -p ge-${GRAPH_RUN_ID:?} down -v` - never without `-p`, or qa reuses and then deletes the developer's own volumes. Then run `qa-verification`'s `compose_isolation.sh ge-probe <-f files>`: every line it prints is shared with the developer's stack, because `-p` does not rename it. Propose a committed `compose.qa.yaml` override - block-style YAML, since `${GRAPH_RUN_ID}` inside a `{ }` flow map does not parse - that renames each to `ge-${GRAPH_RUN_ID}_<name>`, drops the externals (`!override` on the service's list, `!reset null` on the top-level entry) and replaces host networking and outside bind mounts, and add `-f compose.yaml -f compose.qa.yaml` to both commands - and check every service it starts has a `healthcheck:` - `--wait` waits on healthchecks, so a service without one is reported ready the moment it starts), a `Taskfile.yml` `dev`/`up` task, a `package.json` `dev`/`start` script, a `pyproject.toml` script or `uv run uvicorn ...`, a kind/Tilt/Skaffold config. A repo-owned harness (login, throwaway users, cleanup) goes behind `runtime.command`; the plugin ships none. Take `health.url` and `health.expect` from the health route the code actually registers (its response body), `baseUrl` and `port` from the port it binds, and `api.schema` from where the app serves its OpenAPI/GraphQL schema - none served is a gap, because `api-contract` requires one. Look for a seed script or fixture loader for `seed`. Find how a local client gets a token (a seeded fixture user, a dev-only signer, a login the seed prints) and record the variable NAMES in `runtime.env` with a comment naming the source - never a value. Every field starts empty in the template; fill only what you detected. Anything you cannot find stays empty and is listed in the approval summary as a gap - qa returns `BLOCKED` on it rather than guessing.
+
+   **Bootstrap.** Propose `bootstrap`, the commands each new task worktree runs before an agent works in it, from the lockfiles the repo commits (outside the vendored and generated trees of step 3). One command per lockfile; a lockfile below the root runs as `cd <dir> && <command>`, and a workspace installs once, at the lockfile. Install commands come before generators, which can need the installed tools.
+
+   | Found | Command |
+   |---|---|
+   | `pnpm-lock.yaml` | `pnpm install --frozen-lockfile --offline` |
+   | `package-lock.json` | `npm ci --offline` |
+   | `yarn.lock` with a `__metadata:` key (Yarn 2 and later) | `yarn install --immutable` |
+   | `yarn.lock` headed `# yarn lockfile v1` (Yarn classic) | `yarn install --frozen-lockfile` |
+   | `bun.lock` or `bun.lockb` | `bun install --frozen-lockfile` |
+   | `uv.lock` | `uv sync --frozen` |
+   | `Gemfile.lock` | `bundle install` |
+   | `go.sum` | `go mod download` |
+   | `project.yml` holding an XcodeGen spec (top-level `targets:`) | `xcodegen generate` |
+
+   The flags make a worktree install exactly what the lockfile pins and never touch the registry: with a cold store an offline install fails at once instead of fetching (spiked 2026-10-01: `pnpm install --frozen-lockfile --offline` on pnpm 10.33.3 and `npm ci --offline` on npm 11.12.1 each exit 1 in about 0.2 s on an empty store, 0 on a warm one). Read the yarn.lock header before picking its row: Yarn classic ignores `--immutable` and rewrites the lockfile (spiked on 1.22.22: exit 0, lockfile changed), while `--frozen-lockfile` there and `--immutable` on Yarn 4.9.2 both exit 1 on a drifted lockfile. Any other lockfile or generation step (`Cargo.lock`, `poetry.lock`, `Package.resolved`, a codegen script) gets no guessed command: list it as a gap in the approval summary for the owner to fill. Shown with the profile and written only on approval.
+
+   **Lanes.** Propose `lanes`, the host resources that runs must take one at a time; the engine wraps each command that uses one with `scripts/lane-run.sh <lane> --slots <n> -- <command>`. Propose a lane only on this evidence, each with 1 slot:
+   - `xcodebuild` when a `*.xcodeproj` or an XcodeGen `project.yml` exists: parallel Xcode builds contend for CPU, simulators and DerivedData.
+   - `cluster` when `infra.cluster.create` is set (above): each throwaway cluster costs memory and about 1 GB of node image.
+   - `local_db` when the command that stands the stack up (`runtime.up`, or `runtime.command` when a harness owns setup) does not contain `${GRAPH_RUN_ID`: the stack is not isolated per run, so two runs would share one database. Never when `runtime.none` is set.
+
+   No evidence, no lane: an empty `lanes` serializes nothing. Say in the approval summary why each proposed lane is there. Shown with the profile and written only on approval.
 
 5. **Detect existing agents.** List `.claude/agents/*.md`. Where a local agent plainly covers a plugin role for a stack, propose it as a `localAgents` override (it runs instead of the plugin agent); where it adds a view beside the plugin agent (a visual reviewer beside the code reviewer), propose it under `localLanes`. This is the additive contract: the engine defers to what the repo already has and supplies only the legs it lacks.
 
