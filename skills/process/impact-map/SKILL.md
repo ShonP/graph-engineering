@@ -21,7 +21,7 @@ include it, so `rg` is the default; say which you used.
 | --- | --- | --- |
 | Entry points | the files/symbols the goal changes | from the goal, confirmed to exist |
 | Callers | inbound references, two hops out | `rg -n '<symbol>\b'`, then the callers of those callers |
-| Contracts | API routes and schema, events/topics and their payloads, DB tables/columns, config keys and env vars, feature flags, public package exports | route registrations, schema files, publishers/subscribers, migrations, settings classes |
+| Contracts | API routes and schema, events/topics and their payloads, DB tables/columns, config keys and env vars, feature flags, public package exports; outbound effects (cron rows, notifiers, publishers); for any row a new predicate reads, both its producers and consumers | route registrations, schema files, publishers/subscribers, migrations, settings classes, scheduler and cron registrations, send and notify call sites; `rg` the table or column for its writers and readers |
 | Infra | manifests, charts, values, Argo apps, secrets, CI jobs that name the component | `rg` the service/image/env-var names under the repo's infra paths |
 | Tests | tests covering each entry point and contract; gaps | `rg` the symbol under test dirs; note what is untested |
 | Change types | the `definition-of-done` rows this change matches | classify from the sections above |
