@@ -3,10 +3,15 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
+import time
 import unittest
 
 HOOKS = Path(__file__).resolve().parents[1] / 'scripts'
+TEMPLATE = Path(__file__).resolve().parents[2] / 'templates' / 'graph-checks.json'
+sys.path.insert(0, str(HOOKS))
+from checks_config import load  # noqa: E402
 
 class ConfiguredChecks(unittest.TestCase):
     def setUp(self):
@@ -24,9 +29,10 @@ class ConfiguredChecks(unittest.TestCase):
     def git(self, *args):
         return subprocess.run(['git', '-C', str(self.root), *args], check=True, capture_output=True, text=True)
 
-    def configure(self, root, argv):
+    def configure(self, root, argv, timeout=10, **blocks):
+        test = {'test': {'argv': argv, 'timeout_seconds': timeout}} if argv else {}
         (root / '.claude').mkdir(exist_ok=True)
-        (root / '.claude/graph-checks.json').write_text(json.dumps({'version': 1, 'test': {'argv': argv, 'timeout_seconds': 10}}))
+        (root / '.claude/graph-checks.json').write_text(json.dumps({'version': 1, **test, **blocks}))
 
     def stop(self, cwd):
         return subprocess.run(['bash', str(HOOKS / 'test-before-stop.sh')], input=json.dumps({'cwd': str(cwd), 'stop_hook_active': False}), env=dict(os.environ, CLAUDE_PROJECT_DIR=str(self.root)), capture_output=True, text=True, timeout=20)
@@ -122,6 +128,123 @@ class ConfiguredChecks(unittest.TestCase):
         self.configure(self.root, ['sh', '-c', 'echo exercised > marker'])
         self.assertEqual(self.stop(self.root).returncode, 0)
         self.assertEqual((self.root / 'marker').read_text().strip(), 'exercised')
+
+    def test_unrelated_repository_without_opt_in_is_silent(self):
+        other = self.root.parent / 'other'
+        other.mkdir()
+        subprocess.run(['git', '-C', str(other), 'init', '-q'], check=True)
+        result = self.stop(other)
+        self.assertEqual((result.returncode, result.stderr), (0, ''))
+
+    def test_config_without_test_block_is_silent(self):
+        self.configure(self.root, None, lint={'argv': ['sh', '-c', 'touch marker', 'lint', '{file}'], 'extensions': ['.py']})
+        self.assertEqual((self.stop(self.root).returncode, (self.root / 'marker').exists()), (0, False))
+
+    def test_failed_precheck_leaves_tests_unverified(self):  # AC-W1-STOP-04
+        for argv in (['false'], ['graph-nonexistent-precheck'], ['sleep', '5']):
+            with self.subTest(precheck=argv):
+                self.configure(self.root, ['sh', '-c', 'touch marker; exit 1'], precheck={'argv': argv, 'timeout_seconds': 1})
+                started = time.monotonic()
+                result = self.stop(self.root)
+                self.assertLess(time.monotonic() - started, 3)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(f'precheck {argv[0]} failed (exit ', result.stderr)
+                self.assertIn('tests not verified', result.stderr)
+                self.assertFalse((self.root / 'marker').exists())
+
+    def test_passing_precheck_runs_tests(self):
+        self.configure(self.root, ['sh', '-c', 'echo still-red >&2; exit 1'], precheck={'argv': ['true']})
+        result = self.stop(self.root)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn('still-red', result.stderr)
+
+    def test_timeout_kills_the_process_group_without_blocking(self):  # AC-W1-STOP-05
+        self.configure(self.root, ['sh', '-c', '(sleep 5; touch marker) & wait'], timeout=1)
+        started = time.monotonic()
+        result = self.stop(self.root)
+        self.assertLess(time.monotonic() - started, 3)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stderr.strip(), 'tests not verified: sh did not finish within 1 s')
+        time.sleep(6)
+        self.assertFalse((self.root / 'marker').exists())
+
+    def test_failure_names_argv_and_keeps_a_bounded_tail(self):
+        lines = 'for i in $(seq 1 50); do echo line-$i; done; exit 3'
+        wide = 'for i in 1 2 3 4 5 6 7 8 9; do printf "%01000d\\n" $i; done; exit 1'
+        self.configure(self.root, ['sh', '-c', lines])
+        head, _, tail = self.stop(self.root).stderr.partition('\n')
+        self.assertEqual(head, f'Tests failed: sh -c {lines} in {self.root} (exit 3). '
+                               'Fix them, then finish. This check runs once per prompt.')
+        self.assertEqual(tail.split(), [f'line-{i}' for i in range(31, 51)])
+        self.configure(self.root, ['sh', '-c', wide])
+        tail = self.stop(self.root).stderr.partition('\n')[2]
+        self.assertLessEqual(len(tail.encode()), 4000)
+        self.assertIn('9'.zfill(1000), tail)
+
+    def lint(self, argv, name='a.py', timeout=30):
+        self.configure(self.root, None, lint={'argv': argv, 'extensions': ['.py'], 'timeout_seconds': timeout})
+        (self.root / name).write_text('x = 1\n')
+        result = subprocess.run([sys.executable, str(HOOKS / 'configured_check.py'), 'lint', str(self.root), str(self.root / name)],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)['hookSpecificOutput']['additionalContext'] if result.stdout else ''
+
+    def test_lint_timeout_is_reported_not_blocking(self):
+        started = time.monotonic()
+        self.assertEqual(self.lint(['sh', '-c', 'sleep 5', 'lint', '{file}'], timeout=1), 'lint not verified: sh did not finish within 1 s.')
+        self.assertLess(time.monotonic() - started, 3)
+
+    def test_lint_output_is_bounded(self):
+        context = self.lint(['sh', '-c', 'for i in $(seq 1 90); do echo finding-$i; done; exit 1', 'lint', '{file}'])
+        self.assertTrue(context.startswith('Lint on a.py reported problems (exit 1). This is information, not a block.'), context)
+        self.assertEqual([line for line in context.splitlines() if line.startswith('finding-')], [f'finding-{i}' for i in range(31, 91)])
+        self.assertEqual(self.lint(['true', '{file}']), '')
+
+
+class Schema(unittest.TestCase):  # AC-W1-CFG-01
+    def load(self, data):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / 'graph-checks.json'
+            path.write_text(data if isinstance(data, str) else json.dumps(data))
+            return load(path)
+
+    def test_rejects_invalid_shapes(self):
+        lint = {'argv': ['ruff', 'check', '{file}'], 'extensions': ['.py']}
+        invalid = {
+            'not JSON': '{', 'no version': {'test': {'argv': ['make']}}, 'version 2': {'version': 2},
+            'bool version': {'version': True}, 'unknown top key': {'version': 1, 'tests': {'argv': ['make']}},
+            'unknown block key': {'version': 1, 'test': {'argv': ['make'], 'shell': True}},
+            'block not an object': {'version': 1, 'test': ['make']}, 'empty argv': {'version': 1, 'test': {'argv': []}},
+            'empty argv element': {'version': 1, 'test': {'argv': ['make', '']}},
+            'NUL in argv': {'version': 1, 'test': {'argv': ['make\x00']}},
+            '{file} in test argv': {'version': 1, 'test': {'argv': ['pytest', '{file}']}},
+            '{file} inside a precheck element': {'version': 1, 'precheck': {'argv': ['x', '--f={file}']}},
+            'lint without {file}': {'version': 1, 'lint': {**lint, 'argv': ['ruff', 'check']}},
+            'two {file} elements': {'version': 1, 'lint': {**lint, 'argv': ['ruff', '{file}', '{file}']}},
+            'lint without extensions': {'version': 1, 'lint': {'argv': lint['argv']}},
+            'empty extensions': {'version': 1, 'lint': {**lint, 'extensions': []}},
+            'extension without dot': {'version': 1, 'lint': {**lint, 'extensions': ['py']}},
+            'timeout 0': {'version': 1, 'test': {'argv': ['make'], 'timeout_seconds': 0}},
+            'timeout 601': {'version': 1, 'test': {'argv': ['make'], 'timeout_seconds': 601}},
+            'precheck timeout 61': {'version': 1, 'precheck': {'argv': ['true'], 'timeout_seconds': 61}},
+            'lint timeout 121': {'version': 1, 'lint': {**lint, 'timeout_seconds': 121}},
+            'bool timeout': {'version': 1, 'test': {'argv': ['make'], 'timeout_seconds': True}},
+        }
+        for reason, data in invalid.items():
+            with self.subTest(reason), self.assertRaises(ValueError) as caught:
+                self.load(data)
+            self.assertNotIn('\n', str(caught.exception))
+
+    def test_defaults_and_optional_blocks(self):
+        config = self.load({'version': 1, 'test': {'argv': ['make']}, 'precheck': {'argv': ['true']},
+                            'lint': {'argv': ['ruff', '{file}'], 'extensions': ['.py']}})
+        self.assertEqual((config.test.timeout, config.precheck.timeout, config.lint.timeout), (600, 10, 60))
+        self.assertEqual(self.load({'version': 1}).test, None)
+
+    def test_template_loads(self):
+        config = load(TEMPLATE)
+        self.assertTrue(config.test and config.precheck and config.lint)
+        self.assertIn('{file}', config.lint.argv)
 
 if __name__ == '__main__':
     unittest.main()

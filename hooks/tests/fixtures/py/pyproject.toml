@@ -1,5 +1,6 @@
 # Fixture project: declares test, lint and typecheck under [project.scripts],
-# which is convention 1 of the hooks' detection order.
+# which the retired autodetection ran as `uv run <name>`. The cases opt in by
+# writing .claude/graph-checks.json with argv ["sh", "stub-scripts/<name>.sh"].
 [project]
 name = "fixture-uv-project"
 version = "0.1.0"

@@ -1,0 +1,54 @@
+### Stop, configured test fails, first stop of the prompt
+exit: 2
+stderr:
+Configured check sh failed in <tmp>/repo (exit 1).
+FAILED tests/test_math.py::test_add - assert 3 == 4
+1 failed, 12 passed
+stdout:
+
+
+### Stop, configured test fails, continuation (stop_hook_active=true)
+exit: 2
+stderr:
+Configured check sh failed in <tmp>/repo (exit 1).
+FAILED tests/test_math.py::test_add - assert 3 == 4
+1 failed, 12 passed
+stdout:
+
+
+### Stop, configured test exceeds its timeout
+exit: 2
+stderr:
+Configured check BLOCKED: Command '('sleep', '5')' timed out after 1 seconds
+stdout:
+
+
+### Stop, no graph-checks.json, package.json test script fails
+exit: 2
+stderr:
+`npm run test` failed in <tmp>/repo (exit 1). Fix the failing tests, then finish.
+stop_hook_active=false; Claude Code ends the turn after 8 consecutive blocks (hooks reference, "Stop input").
+
+
+> test
+> sh check.sh
+
+FAILED tests/test_math.py::test_add - assert 3 == 4
+1 failed, 12 passed
+stdout:
+
+
+### PostToolUse, lint reports a problem
+exit: 0
+stderr:
+
+stdout:
+{"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": "Project checks on <tmp>/repo/src/app.py reported problems. This is information, not a block.\n\nnpm run lint failed (exit 1):\n\n> lint\n> sh lint.sh <tmp>/repo/src/app.py\n\n<tmp>/repo/src/app.py:1:8: F401 [*] os imported but unused"}}
+
+### PostToolUse, lint runner not installed
+exit: 0
+stderr:
+
+stdout:
+{"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": "Project checks on <tmp>/repo/src/app.py reported problems. This is information, not a block.\n\nnpm run lint failed (exit 1):\n\n> lint\n> sh lint.sh <tmp>/repo/src/app.py\n\n<tmp>/repo/src/app.py:1:8: F401 [*] os imported but unused"}}
+

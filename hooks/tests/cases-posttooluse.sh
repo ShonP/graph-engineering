@@ -3,160 +3,139 @@
 # PostToolUse cases for hooks/scripts/lint-touched-file.sh. Sourced by
 # run-tests.sh, which owns every helper and path used here.
 #
-# The contract under test: exit 0 on every path, findings returned as
-# hookSpecificOutput.additionalContext, and no command run for a file outside
-# CLAUDE_PROJECT_DIR.
+# The contract under test: exit 0 on every path; nothing runs, not even python,
+# unless graph-checks.json has a lint key; the configured argv gets the touched
+# file relative to the root as one element, only for a listed extension and a
+# regular file strictly inside the root; findings come back as
+# hookSpecificOutput.additionalContext.
 
 echo
 echo "== PostToolUse: lint-touched-file.sh"
 
+# AC-W1-LINT-01: projects that declare lint scripts but never opted in.
+for project in py node; do
+  reset_markers
+  set_fail "$project"
+  clear_config "$FIX/$project"
+  touched="$(find "$FIX/$project/src" -name 'touched.*' | head -1)"
+  run_hook_python_trap "$LINT" "$FIX/$project" "$(post_json "$touched")"
+  check "$project: lint script, no graph-checks.json -> exit 0" 0 "$RC"
+  row "PostToolUse" "$project project, not configured" "$RC"
+  check "$project: no config prints nothing" "" "$OUT"
+  check_no_file "$project: no config, no python and no lint" \
+    "$WORK/RAN_PYTHON" "$FIX/$project/RAN_LINT" "$FIX/$project/RAN_TYPECHECK"
+done
+
+reset_markers
+write_config "$FIX/py" '{"version":1,"test":{"argv":["sh","stub-scripts/test.sh"]}}'
+run_hook_python_trap "$LINT" "$FIX/py" "$(post_json "$FIX/py/src/touched.py")"
+check "config with no lint key -> exit 0" 0 "$RC"
+row "PostToolUse" "config with a test block only" "$RC"
+check_no_file "no lint key: no python and no lint" "$WORK/RAN_PYTHON" "$FIX/py/RAN_LINT"
+
+PY_LINT='{"version":1,"lint":{"argv":["sh","stub-scripts/lint.sh","{file}"],"extensions":[".py"],"timeout_seconds":30}}'
+write_config "$FIX/py" "$PY_LINT"
+
+# AC-W1-LINT-03: a failing lint is information, returned as context.
 reset_markers
 set_fail py
 run_hook "$LINT" "$FIX/py" "$(post_json "$FIX/py/src/touched.py")"
-check "uv project, failing lint -> exit 0" 0 "$RC"
-row "PostToolUse" "uv project, lint+typecheck fail" "$RC"
-check_file "uv project ran lint" "$FIX/py/RAN_LINT"
-check_file "uv project ran typecheck" "$FIX/py/RAN_TYPECHECK"
-check "uv lint got the touched file as its only argument" \
-  "$FIX/py/src/touched.py" "$(cat "$FIX/py/RAN_LINT" 2>/dev/null)"
-case "$OUT" in
-*E501*) check "the failing lint text reaches Claude" yes yes ;;
-*) check "the failing lint text reaches Claude" yes "no: $OUT" ;;
-esac
+check "configured failing lint -> exit 0" 0 "$RC"
+row "PostToolUse" "configured lint reports problems" "$RC"
+check "the linter got the path relative to the root" "src/touched.py" "$(cat "$FIX/py/RAN_LINT" 2>/dev/null)"
 python3 -c '
 import json
 import sys
 
 data = json.load(sys.stdin)
 block = data["hookSpecificOutput"]
+assert set(data) == {"hookSpecificOutput"}, data
 assert block["hookEventName"] == "PostToolUse", block
-assert block["additionalContext"].strip(), block
-assert set(data) <= {"hookSpecificOutput", "systemMessage"}, data
+text = block["additionalContext"]
+assert text.startswith("Lint on src/touched.py reported problems (exit 1). This is information, not a block."), text
+assert "fixture lint: E501 line too long" in text, text
 ' <<<"$OUT" >/dev/null 2>&1
-JSON_SHAPE_RC=$?
-check "stdout is a PostToolUse additionalContext object" 0 "$JSON_SHAPE_RC"
+check "stdout is PostToolUse context beginning 'Lint on'" 0 $?
 
 reset_markers
 set_pass py
-run_hook "$LINT" "$FIX/py" "$(post_json "$FIX/py/src/touched.py")"
-check "uv project, clean lint -> exit 0" 0 "$RC"
-row "PostToolUse" "uv project, lint+typecheck clean" "$RC"
+run_hook "$LINT" "$FIX/py" "$(post_json "$FIX/py/src/touched.py" tool_name=Write)"
+check "configured clean lint (Write) -> exit 0" 0 "$RC"
+row "PostToolUse" "configured lint clean" "$RC"
+check_file "a Write is linted too" "$FIX/py/RAN_LINT"
 check "a clean run prints nothing" "" "$OUT"
-
-reset_markers
-set_fail node
-run_hook "$LINT" "$FIX/node" "$(post_json "$FIX/node/src/touched.ts")"
-check "pnpm project, failing lint -> exit 0" 0 "$RC"
-row "PostToolUse" "pnpm project, lint+typecheck fail" "$RC"
-check_file "pnpm project ran lint" "$FIX/node/RAN_LINT"
-check "pnpm lint got the touched file only, with no bare --" \
-  "$FIX/node/src/touched.ts" "$(cat "$FIX/node/RAN_LINT" 2>/dev/null)"
-case "$OUT" in
-*no-unused-vars*) check "the failing pnpm lint text reaches Claude" yes yes ;;
-*) check "the failing pnpm lint text reaches Claude" yes "no: $OUT" ;;
-esac
-
-reset_markers
-set_pass node
-run_hook "$LINT" "$FIX/node" "$(post_json "$FIX/node/src/touched.ts")"
-check "pnpm project, clean lint -> exit 0" 0 "$RC"
-row "PostToolUse" "pnpm project, lint+typecheck clean" "$RC"
-
-reset_markers
-run_hook "$LINT" "$FIX/taskfile" "$(post_json "$FIX/taskfile/src/touched.sh")"
-check "Taskfile project has no lint shape -> exit 0" 0 "$RC"
-row "PostToolUse" "Taskfile project (no lint/typecheck shape)" "$RC"
-check "Taskfile project prints nothing" "" "$OUT"
-
-reset_markers
-run_hook "$LINT" "$FIX/bare" "$(post_json "$FIX/bare/src/touched.py")"
-check "project with no scripts -> exit 0" 0 "$RC"
-row "PostToolUse" "project with no script of any convention" "$RC"
-check "a project with no scripts prints nothing" "" "$OUT"
-
-reset_markers
 set_fail py
-run_hook "$LINT" "$FIX/py" "$(post_json "$FIX/outside/src/touched.ts")"
-check "file_path outside CLAUDE_PROJECT_DIR -> exit 0" 0 "$RC"
-row "PostToolUse" "file_path outside CLAUDE_PROJECT_DIR" "$RC"
-check_no_file "outside path: nothing ran in the foreign project" \
-  "$FIX/outside/OUTSIDE_LINT_RAN" "$FIX/outside/OUTSIDE_TYPECHECK_RAN"
-check_no_file "outside path: nothing ran in the session project" \
-  "$FIX/py/RAN_LINT" "$FIX/py/RAN_TYPECHECK"
+
+# AC-W1-LINT-02: only listed extensions; spaces and non-ASCII stay one element.
+reset_markers
+printf 'fixture\n' >"$FIX/py/NOTES.md"
+run_hook "$LINT" "$FIX/py" "$(post_json "$FIX/py/NOTES.md")"
+check "unlisted extension -> exit 0" 0 "$RC"
+row "PostToolUse" "configured for .py, a .md edited" "$RC"
+check_no_file "unlisted extension: nothing ran" "$FIX/py/RAN_LINT"
+check "unlisted extension prints nothing" "" "$OUT"
 
 reset_markers
-run_hook "$LINT" "$FIX/py" "$(post_json "$FIX/py-evil/src/touched.py")"
-check "sibling sharing the project-dir prefix -> exit 0" 0 "$RC"
-row "PostToolUse" "sibling path sharing the project-dir prefix" "$RC"
-check_no_file "prefix sibling: nothing ran" \
-  "$FIX/py-evil/EVIL_LINT_RAN" "$FIX/py-evil/EVIL_TYPECHECK_RAN"
-
-# The upward-walk bound. The session project here has no project file of its
-# own and its PARENT does, so any walk that does not stop at
-# CLAUDE_PROJECT_DIR runs a foreign project's scripts.
-ESCAPE_MARKERS=(
-  "$FIX/escape/ESCAPED_LINT_RAN"
-  "$FIX/escape/ESCAPED_TYPECHECK_RAN"
-)
+mkdir -p "$FIX/py/src/a b"
+printf 'x = 1\n' >"$FIX/py/src/a b/ü.py"
+run_hook "$LINT" "$FIX/py" "$(post_json "$FIX/py/src/a b/ü.py")"
+check "path with a space and non-ASCII -> exit 0" 0 "$RC"
+row "PostToolUse" "path with a space and non-ASCII" "$RC"
+check "the path reached the linter as one argv element" "src/a b/ü.py" "$(cat "$FIX/py/RAN_LINT" 2>/dev/null)"
 
 reset_markers
-run_hook "$LINT" "$FIX/escape/proj" "$(post_json "$FIX/escape/proj/src/touched.py")"
-check "file under a project whose parent has package.json -> exit 0" 0 "$RC"
-row "PostToolUse" "file in a project whose parent has package.json" "$RC"
-check_no_file "the walk stopped at the project root" "${ESCAPE_MARKERS[@]}"
-
-reset_markers
-run_hook "$LINT" "$FIX/escape/proj" "$(post_json "$FIX/escape/proj")"
-check "file_path equal to CLAUDE_PROJECT_DIR -> exit 0" 0 "$RC"
-row "PostToolUse" "file_path equal to CLAUDE_PROJECT_DIR" "$RC"
-check_no_file "file_path equal to the project: nothing ran" "${ESCAPE_MARKERS[@]}"
-
-reset_markers
-run_hook "$LINT" "$FIX/escape/proj" "$(post_json "$FIX/escape/proj/sub")"
-check "file_path that is a directory -> exit 0" 0 "$RC"
-row "PostToolUse" "file_path that is a directory" "$RC"
-check_no_file "a directory path: nothing ran" "${ESCAPE_MARKERS[@]}"
-
-reset_markers
-run_hook "$LINT" "$FIX/escape/proj" "$(post_json "$FIX/escape/proj/tool/nested")"
-check "directory beside a package.json -> exit 0" 0 "$RC"
-row "PostToolUse" "directory whose parent declares lint" "$RC"
-check_no_file "a directory path: the nearest project did not run it" \
-  "$FIX/escape/proj/tool/INNER_LINT_RAN" "$FIX/escape/proj/tool/INNER_TYPECHECK_RAN"
-
-reset_markers
-run_hook "$LINT" "$FIX/escape/proj" "$(post_json "$FIX/escape/proj/tool/ghost.ts")"
-check "file_path that does not exist -> exit 0" 0 "$RC"
-row "PostToolUse" "file_path that does not exist" "$RC"
-check_no_file "a missing file: the nearest project did not run it" \
-  "$FIX/escape/proj/tool/INNER_LINT_RAN" "$FIX/escape/proj/tool/INNER_TYPECHECK_RAN"
-
-# The positive half: a real file inside the nested project is still linted by it,
-# so the bound narrows the walk without disabling it.
-reset_markers
-run_hook "$LINT" "$FIX/escape/proj" "$(post_json "$FIX/escape/proj/tool/real.ts")"
-check "real file in a nested project -> exit 0" 0 "$RC"
-row "PostToolUse" "real file in a project nested inside the bound" "$RC"
-check_file "the nested project ran lint" "$FIX/escape/proj/tool/INNER_LINT_RAN"
-check_no_file "the nested project did not reach the ancestor" "${ESCAPE_MARKERS[@]}"
+write_config "$FIX/py" '{"version":1,"lint":{"argv":["graph-absent-linter","{file}"],"extensions":[".py"]}}'
+run_hook "$LINT" "$FIX/py" "$(post_json "$FIX/py/src/touched.py")"
+check "configured lint runner missing -> exit 0" 0 "$RC"
+row "PostToolUse" "configured lint runner not installed" "$RC"
+case "$OUT" in
+*'"additionalContext": "lint skipped: graph-absent-linter not found in '*) check "a missing runner says lint skipped" yes yes ;;
+*) check "a missing runner says lint skipped" yes "no: $OUT" ;;
+esac
+# AC-W1-LINT-04: the bound. .ts is listed so the extension filter is not what
+# stops the outside file, and foreign projects carry their own opt-in bait.
+write_config "$FIX/py" '{"version":1,"lint":{"argv":["sh","stub-scripts/lint.sh","{file}"],"extensions":[".py",".ts"]}}'
+write_config "$FIX/outside" '{"version":1,"lint":{"argv":["sh","ran.sh","OUTSIDE_LINT_RAN","{file}"],"extensions":[".ts"]}}'
+write_config "$FIX/py-evil" '{"version":1,"lint":{"argv":["sh","ran.sh","EVIL_LINT_RAN","{file}"],"extensions":[".py"]}}'
+for bound_case in \
+  "file outside CLAUDE_PROJECT_DIR|$FIX/outside/src/touched.ts" \
+  "sibling sharing the project-dir prefix|$FIX/py-evil/src/touched.py" \
+  "file_path equal to CLAUDE_PROJECT_DIR|$FIX/py" \
+  "file_path that is a directory|$FIX/py/src" \
+  "directory named like a listed file|$FIX/py/src/dir.py" \
+  "file_path that does not exist|$FIX/py/src/ghost.py" \
+  "symlink inside the root to a file outside|$FIX/py/src/link.py" \
+  "relative file_path|src/touched.py"; do
+  label="${bound_case%%|*}"
+  mkdir -p "$FIX/py/src/dir.py"
+  ln -sf "$FIX/py-evil/src/touched.py" "$FIX/py/src/link.py"
+  reset_markers
+  run_hook "$LINT" "$FIX/py" "$(post_json "${bound_case#*|}")"
+  check "$label -> exit 0" 0 "$RC"
+  row "PostToolUse" "$label" "$RC"
+  check_no_file "$label: nothing ran" "$FIX/py/RAN_LINT" \
+    "$FIX/outside/OUTSIDE_LINT_RAN" "$FIX/py-evil/EVIL_LINT_RAN"
+  check "$label: prints nothing" "" "$OUT"
+done
+clear_config "$FIX/outside"
+clear_config "$FIX/py-evil"
 
 reset_markers
 run_hook "$LINT" "$FIX/py" "$(event_json PostToolUse)"
 check "input with no file_path -> exit 0" 0 "$RC"
 row "PostToolUse" "input with no tool_input.file_path" "$RC"
+check_no_file "no file_path: nothing ran" "$FIX/py/RAN_LINT"
 
 run_hook "$LINT" "$FIX/py" 'not json at all'
 check "malformed JSON on stdin -> exit 0" 0 "$RC"
 row "PostToolUse" "malformed JSON on stdin" "$RC"
-
-run_hook "$LINT" "$FIX/py" "$(post_json "relative/path.py")"
-check "a relative file_path -> exit 0" 0 "$RC"
-row "PostToolUse" "relative tool_input.file_path" "$RC"
 
 run_hook_no_project_dir "$LINT" "$(post_json "$FIX/py/src/touched.py")"
 check "CLAUDE_PROJECT_DIR unset -> exit 0" 0 "$RC"
 row "PostToolUse" "CLAUDE_PROJECT_DIR unset" "$RC"
 
 reset_markers
+clear_config "$FIX/py"
+rm -rf "$FIX/py/src/a b" "$FIX/py/src/dir.py" "$FIX/py/src/link.py" "$FIX/py/NOTES.md"
 set_fail py
 set_fail node

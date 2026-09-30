@@ -2,9 +2,13 @@
 
 Usage: make-input.py <EventName> [key=value ...]
 
-The common fields come from "Common input fields"; the event-specific fields
-come from "PostToolUse input", "Stop input" and "SessionStart input".
-https://code.claude.com/docs/en/hooks
+Keys: file_path=, tool_name= (PostToolUse); stop_hook_active=true|false and
+background=running|completed|none (Stop); source= (SessionStart); prompt_id=
+(any event). The common fields come from "Common input fields"; the
+event-specific fields from "PostToolUse input", "Stop input" and "SessionStart
+input" (https://code.claude.com/docs/en/hooks). The background_tasks entry
+carries only the fields the Stop hook reads: id, type, status, description.
+Reads argv only: no stdin, no network, no eval.
 """
 
 import json
@@ -17,9 +21,21 @@ COMMON = {
     "permission_mode": "default",
 }
 
+BACKGROUND = ("running", "completed", "none")
+
+
+def background_tasks(state):
+    if state not in BACKGROUND:
+        raise SystemExit("background must be one of: %s" % ", ".join(BACKGROUND))
+    if state == "none":
+        return []
+    return [{"id": "bg-1", "type": "shell", "status": state, "description": "fixture task"}]
+
 
 def build(event, options):
     payload = dict(COMMON, hook_event_name=event)
+    if "prompt_id" in options:
+        payload["prompt_id"] = options["prompt_id"]
 
     if event == "PostToolUse":
         file_path = options.get("file_path")
@@ -31,7 +47,7 @@ def build(event, options):
     elif event == "Stop":
         payload["stop_hook_active"] = options.get("stop_hook_active") == "true"
         payload["last_assistant_message"] = "done"
-        payload["background_tasks"] = []
+        payload["background_tasks"] = background_tasks(options.get("background", "none"))
         payload["session_crons"] = []
     elif event == "SessionStart":
         payload["source"] = options.get("source", "startup")
