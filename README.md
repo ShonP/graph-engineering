@@ -309,3 +309,21 @@ than a migration.
 
 `docs/superpowers/specs/2026-08-31-graph-engineering-plugin-design.md` records
 the decisions and, more usefully, what was rejected and why.
+
+## Efficient delivery with explicit evidence
+
+Version 0.14 adds [run controls](docs/graph-controls.md) for task dependencies,
+contract witnesses, named acceptance cases, capability preflight and exact-source
+receipts. The complete plan → implement → test → independent review → public QA
+lifecycle remains required. These are local validation tools called by the graph
+engine, not a daemon or proof that a host executed hooks automatically.
+
+Agent dispatch uses task-scoped skills, loads fallback catalogs only when needed,
+and returns compact artifact references. UX/product research runs when applicable.
+Configure project Stop gates in `.claude/graph-checks.json`; see
+[hook prerequisites and worktree binding](hooks/README.md). Python 3.11+ is required;
+`uv python install 3.12` supplies it when your system Python is older.
+
+Cache lifetimes and role model mappings belong to host settings. See
+[cost measurement](docs/cost-measurement.md) before changing them; a gateway must
+actually report one-hour cache writes before a TTL experiment counts as enabled.

@@ -39,6 +39,28 @@ commits.
   `@theme` preset flip themselves; `dark:` only for non-colour) and catalogue
   paths to `forms-i18n` (`i18n/<ns>.<lng>.json`).
 
+## [0.14.0] - 2026-09-29
+
+### Added
+
+- Local run controls for contract dependencies, named acceptance cases, real
+  witness declarations, capability preflight and source/runtime-bound receipts.
+- Explicit `.claude/graph-checks.json` argv gates, candidate worktree binding,
+  supported Python selection and visible setup failures.
+- Session usage aggregation without exporting conversation content, and a
+  provider-verified coordinator TTL trial protocol.
+- Plugin CI covering hook, control, usage and Compose-isolation regressions.
+
+### Changed
+
+- Load role catalogs only for missing routing, deduplicate preloaded skills and
+  keep coordinator handoffs compact. Route UX/product research by applicability.
+- Preserve full independent review/QA; bind final evidence to actual candidate
+  and runtime identity, cap repeated failed hypotheses, and reject empty/skipped
+  required checks. Support bounded acceptance harnesses with owned cleanup.
+- Strengthen API response/media schemas, pinned consumer contracts and stable
+  test-case IDs. Host model mappings take precedence over plugin role tiers.
+
 ## [0.13.1] - 2026-09-23
 
 ### Added

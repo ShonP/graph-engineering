@@ -48,11 +48,15 @@ set -eu
 # Drain stdin first, on every path, so Claude Code's writer never sees EPIPE.
 HOOK_INPUT="$(cat)"
 
-command -v python3 >/dev/null 2>&1 || exit 0
-
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-}"
 [ -n "$PROJECT_DIR" ] || exit 0
 [ -d "$PROJECT_DIR" ] || exit 0
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
+# shellcheck source=python-runtime.sh
+. "$SCRIPT_DIR/python-runtime.sh"
+ge_python_runtime || exit 2
+PROJECT_DIR="$(HOOK_INPUT="$HOOK_INPUT" CLAUDE_PROJECT_DIR="$PROJECT_DIR" "$GE_PYTHON" "$SCRIPT_DIR/project_root.py" --touched)" || exit 2
 
 # Resolve tool_input.file_path, enforce the project-directory bound, and find
 # the nearest project file. Prints two lines on success: the directory, then the
@@ -60,7 +64,7 @@ PROJECT_DIR="${CLAUDE_PROJECT_DIR:-}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 RESOLVED=""
 if ! RESOLVED="$(HOOK_INPUT="$HOOK_INPUT" CLAUDE_PROJECT_DIR="$PROJECT_DIR" \
-  python3 "$SCRIPT_DIR/resolve_touched_project.py" 2>/dev/null)"; then
+  "$GE_PYTHON" "$SCRIPT_DIR/resolve_touched_project.py" 2>/dev/null)"; then
   exit 0
 fi
 
@@ -72,7 +76,7 @@ PROJECT_KIND="$(printf '%s\n' "$RESOLVED" | sed -n '2p')"
 
 # Safe to re-derive: the resolver above only returns a directory when this same
 # path passed the bound and was a real file.
-TOUCHED_FILE="$(HOOK_INPUT="$HOOK_INPUT" python3 -c '
+TOUCHED_FILE="$(HOOK_INPUT="$HOOK_INPUT" "$GE_PYTHON" -c '
 import json
 import os
 print(os.path.realpath(json.loads(os.environ["HOOK_INPUT"])["tool_input"]["file_path"]))
@@ -81,7 +85,7 @@ print(os.path.realpath(json.loads(os.environ["HOOK_INPUT"])["tool_input"]["file_
 
 # has_script <kind> <dir> <name> - is that script declared in the project file?
 has_script() {
-  PROJECT_KIND="$1" PROJECT_FILE_DIR="$2" SCRIPT_NAME="$3" python3 -c '
+  PROJECT_KIND="$1" PROJECT_FILE_DIR="$2" SCRIPT_NAME="$3" "$GE_PYTHON" -c '
 import json
 import os
 import sys
@@ -174,7 +178,7 @@ esac
 
 [ -n "$FINDINGS" ] || exit 0
 
-FINDINGS="$FINDINGS" TOUCHED_FILE="$TOUCHED_FILE" python3 -c '
+FINDINGS="$FINDINGS" TOUCHED_FILE="$TOUCHED_FILE" "$GE_PYTHON" -c '
 import json
 import os
 

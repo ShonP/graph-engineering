@@ -40,13 +40,22 @@ set -eu
 # Drain stdin first, on every path, so Claude Code's writer never sees EPIPE.
 HOOK_INPUT="$(cat)"
 
-command -v python3 >/dev/null 2>&1 || exit 0
-
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-}"
 [ -n "$PROJECT_DIR" ] || exit 0
 [ -d "$PROJECT_DIR" ] || exit 0
 
-STOP_ACTIVE="$(HOOK_INPUT="$HOOK_INPUT" python3 -c '
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
+# shellcheck source=python-runtime.sh
+. "$SCRIPT_DIR/python-runtime.sh"
+ge_python_runtime || exit 2
+PROJECT_DIR="$(HOOK_INPUT="$HOOK_INPUT" CLAUDE_PROJECT_DIR="$PROJECT_DIR" "$GE_PYTHON" "$SCRIPT_DIR/project_root.py")" || exit 2
+set +e
+"$GE_PYTHON" "$SCRIPT_DIR/configured_check.py" "$PROJECT_DIR"
+CONFIGURED_STATUS=$?
+set -e
+[ "$CONFIGURED_STATUS" -eq 77 ] || exit "$CONFIGURED_STATUS"
+
+STOP_ACTIVE="$(HOOK_INPUT="$HOOK_INPUT" "$GE_PYTHON" -c '
 import json
 import os
 
@@ -63,7 +72,7 @@ cd "$PROJECT_DIR" || exit 0
 PROJECT_DIR="$(pwd -P)"
 
 has_script() { # has_script <pyproject|package> <name>
-  PROJECT_KIND="$1" SCRIPT_NAME="$2" python3 -c '
+  PROJECT_KIND="$1" SCRIPT_NAME="$2" "$GE_PYTHON" -c '
 import json
 import os
 import sys
@@ -152,10 +161,10 @@ if [ "$STATUS" -eq 0 ]; then
 fi
 
 # The backticks below are literal Markdown in the reason text, and the python
-# source must reach python3 unexpanded, so single quotes are deliberate here.
+# source must reach "$GE_PYTHON" unexpanded, so single quotes are deliberate here.
 # shellcheck disable=SC2016
 LABEL="$LABEL" STATUS="$STATUS" OUTPUT="$OUTPUT" \
-  PROJECT_DIR="$PROJECT_DIR" STOP_ACTIVE="$STOP_ACTIVE" python3 -c '
+  PROJECT_DIR="$PROJECT_DIR" STOP_ACTIVE="$STOP_ACTIVE" "$GE_PYTHON" -c '
 import os
 import sys
 

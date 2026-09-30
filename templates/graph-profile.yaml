@@ -94,6 +94,10 @@ uxEvidence:
 # rest as gaps. An empty required field is qa `BLOCKED` naming that field,
 # which is clearer than a guessed command failing.
 runtime:
+  # Optional bounded harness owns setup, public checks, reports and cleanup.
+  # If set, it replaces standalone up/seed/health/baseUrl/down below.
+  # Reports identify the candidate, isolated runtime and every named case.
+  command: ""
   up: ""
   seed: ""
   port: null
@@ -438,3 +442,9 @@ gates:
 board:
   platform: github
   project: "Graph Runs"
+
+# Required gates are bound in each run's run.json (docs/graph-controls.md).
+# Stop-hook commands belong in .claude/graph-checks.json, for example:
+# {"version":1,"test":{"argv":["make","check"],"timeout_seconds":600}}
+# This explicit argv takes precedence over script-name autodetection.
+# Put host model mappings in host/project instructions, outside plugin caches.
