@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Late success measures for a merged graph-engineering run. Stdlib only, no LLM.
 
-  measure_signals.py <run-dir> [--now ISO]           measure each signal whose window elapsed
+  measure_signals.py <run-dir> [--now ISO]           measure each elapsed signal with no measure.md row
+  measure_signals.py <run-dir> --remeasure [--now ISO]  also replace the rows of signals already measured
   measure_signals.py <run-dir> --baseline --now ISO  write post-deploy/baseline.json as of ISO
   measure_signals.py --due <repo> [--now ISO]        one line when measures are due; runs no command
 
@@ -172,7 +173,8 @@ def record_baseline(run: Path, repo: Path, items: list, env: dict[str, str]) -> 
     return 0
 
 
-def measure(run: Path, now: datetime, baseline_only: bool = False) -> int:
+def measure(run: Path, now: datetime, baseline_only: bool = False, remeasure: bool = False) -> int:
+    """Each signal once its window has passed (the set --due counts); only remeasure replaces a row."""
     repo, items = run.parent.parent, signals_of(run)
     merged = merged_at(run, repo) if items else None
     if merged is None:
@@ -183,9 +185,12 @@ def measure(run: Path, now: datetime, baseline_only: bool = False) -> int:
     if baseline_only:
         return record_baseline(run, repo, items, env)
     baseline = load_json(run / 'post-deploy' / 'baseline.json')
-    results = []
+    rows, results = read_rows(run / 'measure.md'), []
     for index, item in enumerate(items):
         goal = (clean(item.get('goal') or '') if isinstance(item, dict) else '') or f'signal {index + 1}'
+        if goal in rows and not remeasure:
+            print(f'measure: {goal}: measured {rows[goal].rsplit("|", 2)[-2].strip()}; --remeasure to replace')
+            continue
         if not valid(item):
             results.append((goal, 'no data (invalid signal)', None, ''))
             continue
@@ -196,7 +201,6 @@ def measure(run: Path, now: datetime, baseline_only: bool = False) -> int:
         results.append((goal, *evaluate(item, baseline, repo, env), clean(item['success_condition'])))
     if not results:
         return 0
-    rows = read_rows(run / 'measure.md')
     for goal, status, value, _ in results:
         rows[goal] = f'| {goal} | {status} | {shown(value)} | {stamp(now)} |'
         print(f'measure: {goal}: {status} (value {shown(value)})'
@@ -233,6 +237,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('run_dir', nargs='?', help='<repo>/.graph/<run>')
     parser.add_argument('--due', metavar='REPO', help='list due measures under REPO/.graph; runs nothing')
     parser.add_argument('--baseline', action='store_true', help='write post-deploy/baseline.json as of --now')
+    parser.add_argument('--remeasure', action='store_true', help='replace the rows of signals already measured')
     parser.add_argument('--now', type=instant, help='evaluation time, ISO 8601 (default: now)')
     args = parser.parse_args(argv)
     now = args.now or datetime.now(timezone.utc)
@@ -243,7 +248,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.error('<run-dir> must be <repo>/.graph/<run> holding a plan.json')
     if args.baseline and not args.now:
         parser.error('--baseline needs --now <deployedAt>: a baseline taken later already holds the change')
-    return measure(run, now, args.baseline)
+    return measure(run, now, args.baseline, args.remeasure)
 
 
 if __name__ == '__main__':

@@ -151,7 +151,9 @@ verified what did not run - still holds.
    relative condition (`value <= baseline * 1.5`). Post-deploy does not wait
    for `window_days`: once they pass, the SessionStart hook prints
    `graph-engineering: <n> success measure(s) due (...)`, and its command
-   writes `measure.md` (met, not met, no data) plus a ledger line per signal.
+   writes `measure.md` (met, not met, no data) plus a ledger line per signal,
+   once per signal; `--remeasure` replaces a row on purpose (a `no data`
+   retried after its adapter is fixed).
    A late `not met` is a suggested bug run, never an automatic one.
 
    **Bug runs** also re-run the `reproduce` probe, read-only, against the

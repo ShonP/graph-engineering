@@ -142,14 +142,16 @@ commits.
 - plan.json schema v2: optional `success_signals` (goal, source
   `prometheus|sentry|sql-readonly|command`, argv `command`, a
   `value <op> <number>` or `value <op> baseline * <number> [+ <number>]`
-  condition, `window_days` 1-90), or `[]` with a `success_signals_reason`. New
+  condition, `window_days` 1-90), or `[]` with a `success_signals_reason`.
+  Signal goals are unique, since measures are keyed by goal. New
   `graph-control validate-briefs <run-dir>` blocks a missing or blank brief, a
   brief over 300 lines or one over 35% fenced code. run.json, receipts and
   state stay at schema 1.
 - Success measures after merge: `scripts/measure_signals.py` checks a run's
   `success_signals` once their window has passed. Commands run as argv with a
   60 s timeout, and only a single number (or `{"value": n}`) is accepted, so
-  row-level output is never stored. Results go to `measure.md` and the ledger.
+  row-level output is never stored. Results go to `measure.md` and the ledger,
+  once per signal; `--remeasure` replaces a signal's row on purpose.
   `--baseline --now <deployedAt>` records `post-deploy/baseline.json`, and
   `--due <repo>` lists the runs whose measures are due without running
   anything. The SessionStart handoff hook prints that due line, and never starts

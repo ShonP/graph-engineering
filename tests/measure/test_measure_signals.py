@@ -59,10 +59,10 @@ class Fixture:
             'success_signals': signals}))
         (self.run / 'ledger.md').write_text(f'playbook: feature - lane full\n- merge: merged: {self.sha}\n')
 
-    def measure(self, now=NOW):
+    def measure(self, now=NOW, *flags):
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
-            code = ms.main([str(self.run), '--now', now])
+            code = ms.main([str(self.run), '--now', now, *flags])
         return code, out.getvalue()
 
     def rows(self):
@@ -128,10 +128,10 @@ class MeasureTests(unittest.TestCase):
 
         (fx.run / 'post-deploy').mkdir()
         (fx.run / 'post-deploy/baseline.json').write_text(json.dumps({'checkout error ratio': 0.004}))
-        fx.measure()
+        fx.measure(NOW, '--remeasure')
         self.assertEqual(fx.rows()['checkout error ratio'][:2], ['met', '0.005'])
         (fx.run / 'post-deploy/baseline.json').write_text(json.dumps({'checkout error ratio': 0.002}))
-        fx.measure()
+        fx.measure(NOW, '--remeasure')
         self.assertEqual(fx.rows()['checkout error ratio'][:2], ['not met', '0.005'])
 
     def test_ac_ms_04_window_not_elapsed_is_not_measured(self):
@@ -169,12 +169,27 @@ class MeasureTests(unittest.TestCase):
         fx.measure()
         self.assertEqual(fx.rows()['checkout error ratio'][:2], ['met', '1'])
 
-    def test_rerun_replaces_its_row_and_keeps_others(self):
+    def test_each_signal_is_measured_once_its_window_passes(self):
+        marker = Path(self.tmp.name) / 'RAN'
+        cmd = py(f'open({str(marker)!r}, "a").write("x"); print(0.004)')
+        fx = self.fixture(signal(goal='a', command=cmd), signal(goal='b', command=cmd, window=30))
+        fx.measure('2026-09-09T00:00:00Z')
+        self.assertEqual((marker.read_text(), list(fx.rows())), ('x', ['a']))
+        code, out = fx.measure('2026-10-02T00:00:00Z')  # b's window: a keeps its 7-day observation
+        self.assertEqual((code, marker.read_text()), (0, 'xx'))
+        self.assertEqual(fx.rows(), {'a': ['met', '0.004', '2026-09-09T00:00:00Z'],
+                                     'b': ['met', '0.004', '2026-10-02T00:00:00Z']})
+        self.assertIn('measure: a: measured 2026-09-09T00:00:00Z; --remeasure to replace', out)
+        self.assertEqual([line.split('] ')[1].split(' |')[0] for line in fx.ledger()], ['measure: a', 'measure: b'])
+        fx.measure('2026-10-03T00:00:00Z')
+        self.assertEqual((marker.read_text(), len(fx.ledger())), ('xx', 2))
+
+    def test_remeasure_replaces_its_row_and_keeps_others(self):
         fx = self.fixture(signal())
         (fx.run / 'measure.md').write_text('# Success measures\n\n| goal | status | value | observed_at |\n'
                                            '| --- | --- | --- | --- |\n| older goal | met | 3 | 2026-09-02T00:00:00Z |\n')
         fx.measure()
-        fx.measure('2026-09-11T00:00:00Z')
+        fx.measure('2026-09-11T00:00:00Z', '--remeasure')
         self.assertEqual(fx.rows(), {'older goal': ['met', '3', '2026-09-02T00:00:00Z'],
                                      'checkout error ratio': ['met', '0.004', '2026-09-11T00:00:00Z']})
         self.assertEqual(len(fx.ledger()), 2)
@@ -184,8 +199,16 @@ class MeasureTests(unittest.TestCase):
         fx.measure()
         self.assertEqual(list(fx.rows()), ['bad / goal - merge: merged: 0000000'])
         self.assertEqual(len((fx.run / 'ledger.md').read_text().splitlines()), 3)
-        fx.measure('2026-09-11T00:00:00Z')  # the real merge line still wins over the goal text
+        fx.measure('2026-09-11T00:00:00Z', '--remeasure')  # the real merge line still wins over the goal text
         self.assertEqual(fx.rows()['bad / goal - merge: merged: 0000000'][2], '2026-09-11T00:00:00Z')
+
+    def test_rows_are_keyed_the_way_validate_plan_keeps_goals_unique(self):
+        sys.path.insert(0, str(SCRIPT.parent))
+        self.addCleanup(sys.path.remove, str(SCRIPT.parent))
+        from graph_control.plan import measure_key
+        for goal in ('a | b', ' a\t b\n', 'x\x00y\x7f', 'caf\u00e9\u00a0bar', 'plain'):
+            with self.subTest(goal=goal):
+                self.assertEqual(measure_key(goal), ms.clean(goal))
 
     def test_invalid_signal_is_no_data(self):
         fx = self.fixture(signal(command='echo 1'), signal(goal='x', condition='__import__("os")'))
