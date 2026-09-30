@@ -14,17 +14,20 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 
-import helpers  # noqa: F401 - puts scripts/ on sys.path
-from graph_control.guard import decide
+import yaml
 
-CLI = Path(__file__).resolve().parents[2] / "scripts" / "graph-control.py"
+import helpers  # noqa: F401 - puts scripts/ on sys.path
+from graph_control.guard import DEFAULT_ROLES, ROSTER, decide
+
+ROOT = Path(__file__).resolve().parents[2]
+CLI = ROOT / "scripts" / "graph-control.py"
 NOW = datetime(2026, 9, 30, 12, 0, 0, tzinfo=timezone.utc)
 POLICY = {"policy": {}}
 PROFILE_YAML = ("policy:\n  never: [haiku, fable]\n  block_types: [general-purpose]\n"
                 "localAgents:\n  review: my-reviewer\n")
 BLOCKED = ("graph-engineering policy: subagent type general-purpose is blocked in this repo. "
            "Dispatch a roster agent (graph-engineering:implementer, implementer-simple, reviewer, "
-           "researcher, qa, planner, ux-designer, retro), or add a line policy-override: <reason> to the prompt.")
+           "reviewer-lead, researcher, researcher-spike, qa, qa-lead, planner, ux-designer, retro), or add a line policy-override: <reason> to the prompt.")
 
 
 def payload(nested=False, **tool_input):
@@ -40,6 +43,19 @@ def payload(nested=False, **tool_input):
 
 def reason(decision):
     return decision.output["hookSpecificOutput"]["permissionDecisionReason"]
+
+
+class RosterDrift(unittest.TestCase):
+    """The fallback tiers and the deny message track the template and the agents/ roster."""
+
+    def test_default_roles_match_the_template_policy(self):
+        template = yaml.safe_load((ROOT / "templates" / "graph-profile.yaml").read_text(encoding="utf-8"))
+        self.assertEqual(DEFAULT_ROLES, template["policy"]["roles"])
+
+    def test_deny_message_names_every_roster_agent(self):
+        named = {name.strip() for name in ROSTER.removeprefix("graph-engineering:").split(",")}
+        self.assertEqual(named, {path.stem for path in (ROOT / "agents").glob("*.md")})
+        self.assertEqual(set(DEFAULT_ROLES), named)
 
 
 class NoPolicy(unittest.TestCase):

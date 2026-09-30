@@ -11,7 +11,8 @@ from typing import Any
 
 PREFIX = "graph-engineering:"
 DEFAULT_ROLES = {"planner": "opus", "ux-designer": "opus", "implementer": "opus", "reviewer": "opus",
-                 "implementer-simple": "sonnet", "researcher": "sonnet", "qa": "sonnet", "retro": "sonnet"}
+                 "reviewer-lead": "opus", "implementer-simple": "sonnet", "researcher": "sonnet",
+                 "researcher-spike": "sonnet", "qa": "sonnet", "qa-lead": "sonnet", "retro": "sonnet"}
 DEFAULT_NEVER = ("haiku", "fable")
 DEFAULT_BLOCK_TYPES = ("general-purpose",)
 # The host runs general-purpose when an Agent call names no subagent_type.
@@ -20,7 +21,8 @@ HOST_FALLBACK_TYPE = "general-purpose"
 LEG_ROLES = {"plan": "planner", "design": "ux-designer", "implement": "implementer", "review": "reviewer",
              "research": "researcher", "verify": "qa"}
 OVERRIDE = re.compile(r"^policy-override: (.+)$", re.MULTILINE)
-ROSTER = "graph-engineering:implementer, implementer-simple, reviewer, researcher, qa, planner, ux-designer, retro"
+ROSTER = ("graph-engineering:implementer, implementer-simple, reviewer, reviewer-lead, researcher, "
+          "researcher-spike, qa, qa-lead, planner, ux-designer, retro")
 
 
 @dataclass(frozen=True)

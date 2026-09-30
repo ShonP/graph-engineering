@@ -1,6 +1,6 @@
 # Deterministic run controls
 
-Use `uv run scripts/graph-control.py …` from the plugin checkout. The PEP 723 entry point requires Python ≥3.11 and pins PyYAML 6.0.2. The controls inspect files, executable availability and Git state. They **never execute configured project commands, start a runtime, call a model or make network requests**. `uv` may install its pinned runtime/dependency when first invoked; provision it before offline use.
+Use `uv run scripts/graph-control.py …` from the plugin checkout. The PEP 723 entry point requires Python ≥3.11 and pins PyYAML 6.0.2. The controls inspect files, executable availability and Git state. They **never execute configured project commands, start a runtime, call a model or make network requests**, with one exception: `host-check` runs `docker info` (5 s timeout) when the profile's runtime names docker or compose, and that call reaches whatever daemon `DOCKER_HOST` points at, a remote one included. `uv` may install its pinned runtime/dependency when first invoked; provision it before offline use.
 
 Successful commands return JSON `{"status":"PASS",…}` and exit 0. Invalid, missing, stale or incomplete evidence returns `{"status":"BLOCKED","reason":"…"}` and exit 1. Parser errors use argparse's exit 2. There is no N/A/skip route for required checks. Every check declared in the run is required; keep optional diagnostics outside this gate manifest.
 
@@ -165,9 +165,12 @@ policy:
     ux-designer: opus
     implementer: opus
     reviewer: opus
+    reviewer-lead: opus
     implementer-simple: sonnet
     researcher: sonnet
+    researcher-spike: sonnet
     qa: sonnet
+    qa-lead: sonnet
     retro: sonnet
   never: [haiku, fable]           # replaces the default when present
   block_types: [general-purpose]  # replaces the default when present
@@ -178,7 +181,7 @@ Semantics, first match wins:
 1. No profile, a profile that is not a mapping, or no `policy` mapping: no decision. A repo without the block is untouched.
 2. The type is `tool_input.subagent_type` with a leading `graph-engineering:` stripped. A call with no type counts as `general-purpose`, because that is what the host runs for it. A roster type takes its `roles` tier. A name among the values of `localAgents` takes the tier of the role its key names, either a role (`qa`) or a playbook leg (`plan`, `design`, `implement`, `review`, `research`, `verify`); a value may be one name or a stack-to-name mapping. Anything else (`Explore`, `Plan`, `other-plugin:x`, a `visual` leg) has no tier.
 3. A prompt line matching `^policy-override: (.+)$` skips enforcement and appends one ledger line (below). This is the escape hatch for a deliberate exception.
-4. A type in `block_types`: deny with `graph-engineering policy: subagent type <t> is blocked in this repo. Dispatch a roster agent (graph-engineering:implementer, implementer-simple, reviewer, researcher, qa, planner, ux-designer, retro), or add a line policy-override: <reason> to the prompt.`
+4. A type in `block_types`: deny with `graph-engineering policy: subagent type <t> is blocked in this repo. Dispatch a roster agent (graph-engineering:implementer, implementer-simple, reviewer, reviewer-lead, researcher, researcher-spike, qa, qa-lead, planner, ux-designer, retro), or add a line policy-override: <reason> to the prompt.`
 5. A `tool_input.model` in `never`: deny with `graph-engineering policy: model <m> is not allowed here (policy.never). Omit model or use <tier>.`, or just `Omit model.` for a type with no tier.
 6. A tier with `model` absent or different: allow, with `updatedInput` set to the complete original `tool_input` plus `model: <tier>`. The host replaces the whole input with `updatedInput` (spike j, CLI 2.1.285, and the hooks reference), so every other field is copied unchanged; an omitted model is an absent key.
 7. Otherwise no decision.
