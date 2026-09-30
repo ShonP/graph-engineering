@@ -1,0 +1,3 @@
+# Synthetic fixture: its presence is what print-handoff.sh checks. Every value
+# here is invented.
+name: fixture
