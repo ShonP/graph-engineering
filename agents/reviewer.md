@@ -48,7 +48,7 @@ Deduplicate findings that two lenses both raised. Verify by running where you ca
 
 ## Report
 
-Write each surviving finding to the findings path your dispatch names as `severity | file:line | failure scenario | rule reference | confidence`, ordered blocking, then important, then nit. No path named: return the findings inline and write `findings=inline`.
+Write `findings.json` with the Write tool at the path your dispatch names, in the schema of `review-protocol`'s `## Findings file` section: one object per surviving finding, ordered blocking, then important, then nit, each with its `route` from `## Routes`. Run `graph-control findings <path>` as that section says and rewrite the file until it exits 0. On a re-review, your input and the file you write follow `## Re-review`. No path named: return the same JSON inline and write `findings=inline`.
 
 Return at most 1,500 tokens: the `lenses:` line, one short title per blocking or important finding (the file holds the detail), and last exactly one line, `PASS|CHANGES-REQUESTED blocking=<n> important=<m> findings=<path>`. PASS when no blocking or important finding survives.
 
