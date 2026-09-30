@@ -1,13 +1,7 @@
-"""Zero-token status: live subagents, open decisions and token cost of one Claude Code session.
+"""Zero-token status, stdlib only: `PYTHONPATH=<plugin>/scripts python3 -m graph_control.status [--line]`.
 
-    PYTHONPATH=<plugin>/scripts python3 -m graph_control.status [--line] [--root DIR] [--session ID]
-
-Stdlib only (no uv start). Session: `--session`, else (with --line) the status-line JSON on stdin,
-else the newest `*.jsonl` of the project (session.py); root --root or the cwd. Keys and the live rule
-follow the witness in tests/graph_control/fixtures/sessions/README.md. Never writes transcripts, never prints
-prompt or response text. The view is cached 5 s in $TMPDIR with per-file byte offsets, so a
-refresh parses only the rows appended since the last one.
-"""
+Flags as in commands/status.py; transcript keys and the live rule as in tests/graph_control/fixtures/sessions/README.md.
+Prints no prompt or response text; caches the view 5 s in $TMPDIR by byte offset; never reads ledger.md."""
 
 import argparse
 import hashlib
@@ -19,20 +13,17 @@ import tempfile
 import time
 from pathlib import Path
 
-from .session import locate, read_hint, session_id
+from .session import locate
 
-LIVE, STALLED, TTL = 15 * 60, 10 * 60, 5.0
-LINE_MAX, LINES_MAX, VERSION = 120, 40, "v1"
-RUN = re.compile(r"([0-9A-Za-z]{8}):(\S+)")
-FAMILY = re.compile(r"claude-([a-z]+)")
+LIVE, STALLED, TTL, LINE_MAX, LINES_MAX, VERSION = 15 * 60, 10 * 60, 5.0, 120, 40, "v1"
+RUN, FAMILY = re.compile(r"([0-9A-Za-z]{8}):(\S+)"), re.compile(r"claude-([a-z]+)")
 USAGE = ("output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")
 
 
 def scan(path: Path, size: int, entry: dict | None) -> dict:
     """Fold the complete rows appended after `entry["offset"]` into the entry's totals."""
     if entry is None or size < entry["offset"]:
-        entry = {"offset": 0, "requests": 0, "tokens": [0, 0, 0], "id": None, "last": [0, 0, 0],
-                 "model": None, "final": False}
+        entry = dict(offset=0, requests=0, tokens=[0, 0, 0], id=None, last=[0, 0, 0], model=None, final=False)
     if size > entry["offset"]:
         with path.open("rb") as stream:
             stream.seek(entry["offset"])
@@ -48,10 +39,8 @@ def scan(path: Path, size: int, entry: dict | None) -> dict:
 def _fold(entry: dict, raw: bytes) -> None:
     """One assistant row. A message streamed over consecutive rows (same id) counts once, at its max."""
     try:
-        row = json.loads(raw)
-        message = row["message"]
-        usage = message.get("usage") or {}
-        counts = [max(int(usage.get(key) or 0), 0) for key in USAGE]
+        message = (row := json.loads(raw))["message"]
+        counts = [max(int((message.get("usage") or {}).get(key) or 0), 0) for key in USAGE]
         key, model, content = message.get("id"), message.get("model"), message.get("content")
     except (ValueError, KeyError, TypeError, AttributeError):
         return
@@ -69,12 +58,13 @@ def _fold(entry: dict, raw: bytes) -> None:
     entry["final"] = message.get("stop_reason") == "end_turn" or "StructuredOutput" in tools
 
 
-def _meta(path: Path) -> dict:
+def _json(path: Path) -> object:
+    """The JSON in a file this user owns, else None: a shared /tmp must not feed the status."""
     try:
-        data = json.loads(path.with_suffix(".meta.json").read_text())
+        owned = not hasattr(os, "getuid") or path.stat().st_uid == os.getuid()
+        return json.loads(path.read_text()) if owned else None
     except (OSError, ValueError):
-        return {}
-    return data if isinstance(data, dict) else {}
+        return None
 
 
 def compute(session: Path, now: float, files: dict) -> tuple[dict, dict]:
@@ -87,14 +77,13 @@ def compute(session: Path, now: float, files: dict) -> tuple[dict, dict]:
             entry = scan(path, info.st_size, files.get(str(path)))
         except OSError:
             continue
-        if "role" not in entry:
-            entry["role"] = "main" if path == main else str(_meta(path).get("agentType") or "unknown")
+        meta = {} if path == main else _json(path.with_suffix(".meta.json"))
+        meta = meta if isinstance(meta, dict) else {}
+        role = entry.setdefault("role", "main" if path == main else str(meta.get("agentType") or "unknown"))
         state[str(path)] = entry
-        totals = cost.setdefault(entry["role"], [0, 0, 0, 0])
-        for index, value in enumerate([entry["requests"], *entry["tokens"]]):
-            totals[index] += value
+        cost[role] = [a + b for a, b in zip(cost.get(role, [0] * 4), [entry["requests"], *entry["tokens"]])]
         age = max(now - info.st_mtime, 0.0)
-        if path == main or age > LIVE or entry["final"] or (meta := _meta(path)).get("stoppedByUser"):
+        if path == main or age > LIVE or entry["final"] or meta.get("stoppedByUser"):
             continue
         run = RUN.match(str(meta.get("description") or ""))
         family = FAMILY.match(entry["model"] or "")
@@ -106,9 +95,10 @@ def compute(session: Path, now: float, files: dict) -> tuple[dict, dict]:
     return view, state
 
 
-def cache_path(session: Path) -> Path:
-    digest = hashlib.sha256(str(session).encode()).hexdigest()[:16]
-    return Path(os.environ.get("TMPDIR") or tempfile.gettempdir()) / f"graph-engineering-status-{digest}.json"
+def _tmp(name: str, key: Path) -> Path:
+    """`$TMPDIR/graph-engineering-status-<name>`, `{}` in the name standing for a hash of `key`."""
+    digest = hashlib.sha256(str(key).encode()).hexdigest()[:16]
+    return Path(os.environ.get("TMPDIR") or tempfile.gettempdir()) / f"graph-engineering-status-{name.format(digest)}"
 
 
 def snapshot(root: Path, now: float, session: str | None = None, hint: dict | None = None) -> dict | None:
@@ -116,14 +106,8 @@ def snapshot(root: Path, now: float, session: str | None = None, hint: dict | No
     session = locate(root, session, hint)
     if session is None:
         return None
-    target = cache_path(session)
-    try:
-        if hasattr(os, "getuid") and target.stat().st_uid != os.getuid():
-            raise OSError("cache owned by another user")  # a shared /tmp must not feed the status line
-        cache = json.loads(target.read_text())
-        cache = cache if isinstance(cache, dict) and cache.get("session") == f"{VERSION}:{session}" else {}
-    except (OSError, ValueError):
-        cache = {}
+    cache = _json(target := _tmp("{}.json", session))
+    cache = cache if isinstance(cache, dict) and cache.get("session") == f"{VERSION}:{session}" else {}
     if "view" in cache and 0 <= now - cache.get("at", float("-inf")) < TTL:
         return cache["view"]
     view, state = compute(session, now, cache.get("files") or {})
@@ -131,7 +115,7 @@ def snapshot(root: Path, now: float, session: str | None = None, hint: dict | No
     return view
 
 
-def _store(target: Path, data: dict) -> None:
+def _store(target: Path, data: object) -> None:
     try:
         handle, temp = tempfile.mkstemp(dir=target.parent, prefix=target.name, suffix=".tmp")
     except OSError:
@@ -158,19 +142,15 @@ def render_line(view: dict | None) -> str:
     """`ge <run8>: <n> live · <type>(<model>) <age>... · out <tokens>`, at most 120 chars, most idle first."""
     if not view or not view["live"]:
         return ""
-    tail = f" · out {human(view['out'])}"
     for shown in range(len(view["live"]), -1, -1):
         groups: dict[str, list] = {}
         for index, agent in enumerate(view["live"]):
             group = groups.setdefault(agent["run"] or "other", [0, [], 0])
-            group[0] += 1
-            if index < shown:
-                group[1].append(_kind(agent))
-            else:
-                group[2] += 1
+            group[0], group[2] = group[0] + 1, group[2] + (index >= shown)
+            group[1] += [_kind(agent)] if index < shown else []
         text = "ge " + " | ".join(
             f"{run}: {count} live · " + " ".join(tokens + ([f"+{hidden}"] if hidden else []))
-            for run, (count, tokens, hidden) in groups.items()) + tail
+            for run, (count, tokens, hidden) in groups.items()) + f" · out {human(view['out'])}"
         if len(text) <= LINE_MAX:
             return text
     return text[:LINE_MAX]
@@ -184,20 +164,52 @@ def decisions(root: Path) -> list[str]:
             lines = path.read_text(errors="replace").splitlines()
         except OSError:
             continue
-        cards += [f"  {path.parent.name[:8]}: {line.strip()[6:].strip()}"[:LINE_MAX]
+        cards += [f"  {path.parent.name[:8]}: {line.strip()[6:].strip()}"
                   for line in lines if line.strip().startswith("- [ ]")]
     return cards
 
 
+def progress(root: Path, now: float) -> tuple[list[str], list[str]]:
+    """DONE rows (tasks passing since the look stored in `$TMPDIR/graph-engineering-status-seen-<root hash>`) and
+    NEXT rows (each run's first plan level with open tasks). A case passes when each check's latest receipt for this
+    run.json that lists it passes it with no blocking or important findings, and a task from the receipt that made
+    all its cases pass. Stores this look when a run has a plan."""
+    from . import common, state  # lazy, as the three below: the status line never needs them
+    from .identity import timestamp
+    from .plan import Plan
+    from .receipts import Receipt
+    plans, seen, done, upcoming = sorted(root.glob(".graph/*/plan.json")), _tmp("seen-{}", root), [], []
+    last = stored if type(stored := _json(seen)) in (int, float) else 0.0
+    for path in plans:
+        run, store, name = path.parent / "run.json", path.parent / "receipts.json", path.parent.name[:8]
+        try:
+            plan, own = Plan.parse(common.load(path)), common.fingerprint(common.load(run)) if run.exists() else None
+            items = list(map(Receipt.parse, state.store_items(store))) if store.exists() else []
+            ordered = sorted((timestamp(r.observed_at), n, r) for n, r in enumerate(items) if r.run_sha256 == own)
+        except (OSError, ValueError):
+            continue
+        checks, since = {}, {}
+        for at, _, receipt in ordered:
+            checks[receipt.check_id] = {case.id: case.status == "PASS" and not (receipt.blocking or receipt.important)
+                                        for case in receipt.cases}
+            passing = {key for key in set().union(*checks.values()) if all(c.get(key, True) for c in checks.values())}
+            since = {task.id: since.get(task.id, (at, receipt.candidate.sources[0].revision[:8]))
+                     for task in plan.tasks if set(task.case_ids) <= passing}
+        done += [(at, f"  {name}: {key} at {rev}") for key, (at, rev) in since.items() if at.timestamp() > last]
+        waves = [[key for key in level if key not in since] for level in plan.levels()]  # the open tasks of each
+        upcoming += [f"  {name}: wave {i}/{len(waves)}: {', '.join(ids)}" for i, ids in enumerate(waves, 1) if ids][:1]
+    if plans:
+        _store(seen, now)
+    return [row for _, row in sorted(done, key=lambda pair: pair[0])], upcoming
+
+
 def _section(title: str, rows: list[str], limit: int, head: tuple[str, ...] = ()) -> list[str]:
-    if not rows:
-        return [title, "  none"]
     more = [f"  ... {len(rows) - limit} more"] if len(rows) > limit else []
-    return [title, *head, *rows[:limit], *more]
+    return [title, *head, *(row[:LINE_MAX] for row in rows[:limit]), *more] if rows else [title, "  none"]
 
 
-def render_full(view: dict | None, root: Path) -> str:
-    """RUNNING, NEEDS YOU and COST, at most 40 lines."""
+def render_full(view: dict | None, root: Path, now: float) -> str:
+    """RUNNING, DONE since last look, NEEDS YOU, NEXT and COST, at most 40 lines."""
     live = view["live"] if view else []
     header = (f"graph-engineering status · session {view['session']} · out {human(view['out'])}"
               if view else "graph-engineering status · no session found for this directory")
@@ -208,40 +220,29 @@ def render_full(view: dict | None, root: Path) -> str:
     table = [f"  {role:<{width}} {row[0]:>8} {human(row[1]):>8} {human(row[2]):>12} {human(row[3]):>12}"
              for role, row in cost]
     head = (f"  {'type':<{width}} {'requests':>8} {'out':>8} {'cache reads':>12} {'cache writes':>12}",)
-    cards = decisions(root)
-    lines = [header, *_section(f"RUNNING ({len(live)})", running, 12),
-             *_section(f"NEEDS YOU ({len(cards)})", cards, 10), *_section("COST", table, 9, head)]
+    (done, upcoming), asks = progress(root, now), decisions(root)
+    lines = [header, *_section(f"RUNNING ({len(live)})", running, 8),
+             *_section(f"DONE since last look ({len(done)})", done, 4), *_section(f"NEEDS YOU ({len(asks)})", asks, 6),
+             *_section(f"NEXT ({len(upcoming)})", upcoming, 3), *_section("COST", table, 7, head)]
     return "\n".join(lines[:LINES_MAX])
-
-
-def add_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--line", action="store_true", help="one status-line row; empty when nothing is live")
-    parser.add_argument("--root", type=Path, help="project dir the session started in (default: the cwd)")
-    parser.add_argument("--session", type=_session_arg, help="session id to read (default: the status-line "
-                        "stdin with --line, else the newest session of --root)")
-
-
-def _session_arg(value: str) -> str:
-    try:
-        return session_id(value)
-    except ValueError as error:
-        raise argparse.ArgumentTypeError(str(error)) from None
 
 
 def render(line: bool, root: Path | None, now: float | None = None, session: str | None = None,
            hint: dict | None = None) -> str:
-    root = (root or Path.cwd()).resolve()
-    view = snapshot(root, time.time() if now is None else now, session, hint)
-    text = render_line(view) if line else render_full(view, root)
+    root, now = (root or Path.cwd()).resolve(), time.time() if now is None else now
+    view = snapshot(root, now, session, hint)
+    text = render_line(view) if line else render_full(view, root, now)
     return text + "\n" if text else ""
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n", 1)[0])
-    add_arguments(parser)
-    args = parser.parse_args(argv)
-    hint = read_hint(sys.stdin) if args.line and args.session is None else None
-    sys.stdout.write(render(args.line, args.root, session=args.session, hint=hint))
+    from .commands import status as command  # the flags and the run step of `graph-control status`
+    parser = argparse.ArgumentParser(description=command.HELP)
+    command.add_arguments(parser)
+    try:
+        sys.stdout.write(command.run(parser.parse_args(argv)).text)
+    except ValueError as error:  # a --session that is not a bare id: a usage error, exit 2
+        parser.error(str(error))
     return 0
 
 
