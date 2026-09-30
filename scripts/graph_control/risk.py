@@ -18,11 +18,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
-from wcmatch import glob
-
 from .common import array, obj, require, strings, text, unique
 
-FLAGS = glob.GLOBSTAR | glob.BRACE | glob.DOTGLOB
 CONTROL = "agent-control"
 CONTROL_PATHS = ("**/.claude/**", "**/CLAUDE.md", "**/AGENTS.md", "**/.mcp.json", ".github/**")
 
@@ -34,9 +31,14 @@ class Row:
     keywords: tuple[str, ...]
 
 
-def matcher(globs: Iterable[str]) -> glob.WcMatcher:
-    """One compiled matcher for a glob list; an empty list matches nothing."""
-    return glob.compile(list(globs), flags=FLAGS)
+def matcher(globs: Iterable[str]) -> Any:
+    """One compiled wcmatch matcher for a glob list; an empty list matches nothing.
+
+    wcmatch (the PEP 723 pin) is imported here, on first match, so the row
+    constants and load_rows stay importable where only PyYAML is (doctor)."""
+    from wcmatch import glob
+
+    return glob.compile(list(globs), flags=glob.GLOBSTAR | glob.BRACE | glob.DOTGLOB)
 
 
 def load_rows(profile: dict[str, Any]) -> tuple[Row, ...]:

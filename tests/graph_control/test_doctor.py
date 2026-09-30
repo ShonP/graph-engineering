@@ -15,6 +15,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -185,6 +186,18 @@ class Gates(unittest.TestCase):  # AC-W2-DR-03
         [finding] = diagnose(fixture.root, PLUGIN, quick=False)
         self.assertIn("gates.merge", finding.message)
         self.assertIn("auto_classes", finding.fix)
+
+    def test_full_mode_needs_no_wcmatch(self):
+        """doctor runs where only PyYAML is installed: wcmatch is the glob matcher's pin, not doctor's."""
+        fixture = Fixture(self)
+        fixture.profile(CLEAN.replace("auto_classes: [none]", "auto_classes: [none, agent-control]"))
+        probe = ("import sys; sys.modules['wcmatch'] = None; sys.path.insert(0, sys.argv[1]); "
+                 "from pathlib import Path; from graph_control.doctor import diagnose; "
+                 "print(sorted(f.id for f in diagnose(Path(sys.argv[2]), Path(sys.argv[3]), quick=False)))")
+        result = subprocess.run([sys.executable, "-c", probe, str(PLUGIN / "scripts"), str(fixture.root), str(PLUGIN)],
+                                capture_output=True, text=True, timeout=60)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("gates-control", result.stdout)
 
     def test_none_is_accepted_without_any_risk_table(self):
         fixture = Fixture(self)

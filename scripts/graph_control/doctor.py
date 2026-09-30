@@ -17,6 +17,7 @@ from typing import Any
 
 from .common import load
 from .preflight import read_profile
+from .risk import CONTROL
 
 LEVELS = ("error", "warn", "info")
 TIERS = ("opus", "sonnet")
@@ -113,8 +114,6 @@ def _risk_ids(risk: Any) -> set[str]:
 
 
 def _gates(profile: dict[str, Any]) -> list[Finding]:
-    from .risk import CONTROL  # imports wcmatch; full mode only
-
     findings = []
     if CONTROL in _risk_ids(profile.get("risk")):
         findings.append(Finding("error", "risk-reserved", f"the risk table defines `{CONTROL}`, a built-in reserved row",
