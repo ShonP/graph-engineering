@@ -24,9 +24,11 @@ The engine does not know what a feature is. It reads a playbook and runs the
 nodes it finds, which is why a bug workflow and an infra workflow are new
 markdown files rather than new branches in the engine.
 
-Four playbooks ship: `feature`, `bug`, `infra` and `quick` (the small-ask lane). The feature playbook:
-
-![feature playbook](docs/img/playbook.png)
+Five playbooks ship: `feature`, `bug`, `infra`, `quick` (the small-ask lane)
+and `research` (a decision from evidence, no code). Each one is drawn in
+[docs/playbooks.md](docs/playbooks.md), which `graph-control render --write`
+generates from `graphs/*.md`; `render --check` is the drift gate the test suite
+runs. The feature playbook, with the agent on each node:
 
 ```mermaid
 flowchart LR
@@ -113,10 +115,16 @@ Then restart the session to apply.
 /graph-ship "<goal>" --lane quick  # or the lane
 ```
 
-The router sizes each ask into one of five lanes: `answer` (no code), `direct`
+The router sizes each ask into one of eight lanes: `answer` (no code), `direct`
 (one small diff, at most 2 files, one `implementer-simple`, no run dir),
 `quick` (`graphs/quick.md`, at most 5 files), `full` (the playbook the ask type
-picks) and `spike`. Any match against the profile's `risk:` table forces at
+picks), `spike`, `research` (`graphs/research.md`: 1, 3 or 6 researcher leaves
+behind a brief-only firewall, claims to `claims.jsonl`, a report with an
+`Evidence against` section), `product` (the research playbook's product preset:
+options, riskiest assumption, one spike, then a go / kill / clarify gate that
+hands a go to `feature`) and `investigate` (one `signals`-mode researcher runs
+the profile's `pulse.command` into a one-page digest of aggregates; the owner
+ranks the items once and each routes to `direct`, `quick` or `bug`). Any match against the profile's `risk:` table forces at
 least `quick`. The lane, the matched risk rows, the playbook and the reason are
 the first line of the run's ledger; the owner sees them at the first gate.
 
@@ -126,6 +134,7 @@ the first line of the run's ledger; the owner sees them at the first gate.
 | `bug` | report -> reproduce (a **failing test**, by qa) -> diagnose (`systematic-debugging`) -> sibling search (same bug shape elsewhere, Semgrep) -> **plan gate** -> implement -> review ∥ qa -> fix -> **merge gate** -> post-deploy -> retro | existing behaviour that is wrong |
 | `infra` | goal -> research tech / impact -> **plan gate** -> implement -> review ∥ verify (render, validate CRDs too, rendered diff, apply to a throwaway cluster) -> fix -> **merge gate** -> post-deploy -> retro | Helm, kustomize, Argo CD, manifests, gateway and policy config |
 | `quick` | intake -> impact -> design (UI goals only) -> **plan gate** (goal and plan as one exhibit) -> implement -> review ∥ qa -> fix (≤3) -> **merge gate** -> post-deploy -> retro | a defined intent on at most 5 files, or any risk-row match on a small ask |
+| `research` | brief -> research (1 / 3 / 6 leaves, or the product preset) -> verify (deep only) -> **report gate** | a comparison, a decision, "is this worth building"; writes no code |
 
 `/graph-ship --resume <run-id>` picks a run back up from its ledger.
 `/graph-ship --auto-merge` relaxes only the merge gate, only for that run.
@@ -139,7 +148,23 @@ push-main` picks how approved work lands.
 lists the live subagents per `<run8>:<node>`, with model and idle age; plain
 `graph-control status` adds NEEDS YOU decision cards and cost by agent type.
 Pipe the host's status-line JSON into `--line` (or pass `--session <id>`) so
-each session shows its own agents when several share one checkout.
+each session shows its own agents when several share one checkout. The full
+status also lists what finished since you last looked and what runs next, from
+`plan.json`, `run.json` and the receipts.
+
+`graph-control digest --root <worktree> --base <ref> [--plan] [--profile]`
+prints the merge exhibit's change digest from git alone, at most 60 lines: a
+stat grouped by plan task for a small diff; for a large one, size without the
+profile's `digest.exclude` globs, new public surfaces, the top churn x size
+hotspots and the ux evidence. `graph-control validate-briefs <run-dir>` blocks a
+task brief that is missing, over 300 lines or over 35% fenced code.
+
+**Success signals.** A plan (`plan.json` schema v2) names the outcome each run
+should move: `success_signals`, each an argv command that prints one aggregate,
+a `value <op> ...` condition and a window of 1-90 days, or `[]` with a reason.
+Post-deploy records the baseline; `scripts/measure_signals.py` measures each
+signal once its window has passed, writes `measure.md` and a ledger line, and a
+`not met` becomes a suggested bug run, never an automatic one.
 
 ## Hooks
 
@@ -154,7 +179,7 @@ lists). Read this before enabling it on a repo you did not write.
 | before a `Bash` command that pushes, removes a remote, runs `rm` or `docker` | the destructive-command guard (a bash filter; python only on a match) | Claude Code asks the owner, showing the evidence it gathered (force push without a lease, remote removal, Docker volume delete, recursive `rm` of a protected path). It never denies |
 | before an `Agent` call | the policy guard, only when the profile has a `policy:` block | `general-purpose` and `policy.never` models are denied; each role runs on its `policy.roles` tier; a `policy-override: <reason>` line in the prompt skips it and is logged |
 | after Claude stops, `asyncRewake` | `test.argv` from `graph-checks.json`, after an optional `precheck` | Claude is woken with the failure, at most once per prompt. A precheck failure or timeout reports "not verified" and does not wake it. An unchanged tree replays its stored verdict instead of rerunning; `GRAPH_CHECKS_NO_MEMO=1` turns that off |
-| at session start (`startup`, `clear`, `compact`) | the first 40 lines of `docs/HANDOFF.md`, when that file exists, and the reply contract when the repo has a profile; silent on resume, fork and `--agent` sessions | a warning line when `HANDOFF.md` is over 150 lines |
+| at session start (`startup`, `clear`, `compact`) | the first 40 lines of `docs/HANDOFF.md`, when that file exists, the reply contract when the repo has a profile, and one line when a run's success measures are due (python starts only when `.graph/*/plan.json` exists); silent on resume, fork and `--agent` sessions | a warning line when `HANDOFF.md` is over 150 lines |
 | at session start (`startup` only, cached) | the doctor's quick checks | up to 3 finding lines, or a `/graph-init` hint in a git repo with a stack marker and no profile; silent when clean |
 
 **0.15 breaks 0.14 autodetect.** The `pyproject.toml`, `package.json` and
@@ -174,8 +199,8 @@ The full organization - eleven agents, engineering only:
 
 | Agent | Model | Job | Writes |
 |---|---|---|---|
-| `planner` | opus | spec, then task-decomposed plan with per-task sizing | specs only |
-| `researcher` | sonnet | one bounded question, five modes: ux / tech / competitor / impact (blast radius + adjacent-issue triage) / spike (dispatched as `researcher-spike`) | reports only |
+| `planner` | opus | spec, then task-decomposed plan with per-task sizing, `success_signals` and one brief file per task; `concept.md` for the product preset | specs only |
+| `researcher` | sonnet | one bounded question, six modes: ux / tech / competitor / impact (blast radius + adjacent-issue triage) / spike (dispatched as `researcher-spike`) / signals (the profile's `pulse.command`, aggregates and pseudonymised ids only) | reports only |
 | `researcher-spike` | sonnet | one falsifiable spike under a hard turn budget, launched without CLAUDE.md; returns VALIDATED, PARTIAL or INVALIDATED naming the edge case tried | reports only |
 | `ux-designer` | opus | the `design` node: captures the running UI, decides placement, shows it in the best-suited available medium (live-app capture, Storybook, HTML, Claude artifact, Claude Design), writes the experience spec with UI acceptance rows; variant exploration scored against the house rubric | mockups only |
 | `implementer` | opus | one non-trivial task, test-first, with spine-named skills | yes |
@@ -184,7 +209,7 @@ The full organization - eleven agents, engineering only:
 | `reviewer-lead` | opus | panel review of a diff over ~2,000 changed lines or ~120k tokens: at most 4 slices, one opus reviewer leaf each in one message, then merges, dedupes and reproduces every blocker into one `findings.json` | `findings.json` only |
 | `qa` | sonnet | acceptance criteria verified on a RUNNING system once per merge unit or wave, evidence per criterion; rows end `VERIFIED`, `FAILED` or `BLOCKED`, the verdict is `PASS`, `FAIL INCOMPLETE: <row ids>` or `INCOMPLETE: <row ids>`, and findings go to `qa-findings.json` | tests only |
 | `qa-lead` | sonnet | qa for a merge unit spanning 2 lanes, 2+ platforms, or ~8+ criteria across 3+ lanes: stands the runtime up once, runs up to 4 `qa` leaves in parallel, merges their reports into `qa.md` and `qa-findings.json`, tears the runtime down | reports only |
-| `retro` | sonnet | the `retro` node when a finding leaked past its gate: leak table and proposed rule diffs, never applied | `retro.md` only |
+| `retro` | sonnet | the `retro` node when a finding leaked past its gate: leak table, then guard first - a recurring class becomes a test fixture, semgrep rule or lint config before any prose rule; proposed diffs, never applied | `retro.md` only |
 
 The model column is the default tier in the agent's frontmatter. The profile's
 `policy:` block is the single source of tiers: the engine passes
@@ -350,7 +375,14 @@ standing rules and every agent carries them:
   read-only, and on FAIL hands the owner a filled-in rollback, never running it
   (`post-deploy-verification`) - and `retro`, a blameless leak table (what each
   gate caught, what got past the gate that should have) turned into proposed
-  rule diffs the owner applies or declines (`retro`).
+  guards (a test fixture, a semgrep rule or a lint config such as
+  `scripts/lint-no-plan-numbers.sh`) before any prose rule, which the owner
+  applies or declines (`retro`).
+- **Mutation witnesses.** A new guard or validation ships with a receipt from
+  `skills/process/review-protocol/scripts/mutate-witness.sh`, which applies one
+  mutant in a throwaway detached worktree, never the working tree, and records
+  whether the test killed it. The reviewer treats a surviving mutant, or a new
+  guard with no receipt, as Important.
 - **Prior art.** No ask starts from priors. At the start of every task, and
   again at every mid-task fork, look at what others do - reuse candidates
   first (an existing skill, plugin or library), then competitors, open source,

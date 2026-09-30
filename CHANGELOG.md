@@ -139,6 +139,43 @@ commits.
   since CLAUDE.md is omitted, VALIDATED/PARTIAL/INVALIDATED verdicts naming the
   edge case tried, and a never-bypass-owner-guards rule. No token saving is
   claimed until measured.
+- plan.json schema v2: optional `success_signals` (goal, source
+  `prometheus|sentry|sql-readonly|command`, argv `command`, a
+  `value <op> <number>` or `value <op> baseline * <number> [+ <number>]`
+  condition, `window_days` 1-90), or `[]` with a `success_signals_reason`. New
+  `graph-control validate-briefs <run-dir>` blocks a missing or blank brief, a
+  brief over 300 lines or one over 35% fenced code. run.json, receipts and
+  state stay at schema 1.
+- Success measures after merge: `scripts/measure_signals.py` checks a run's
+  `success_signals` once their window has passed. Commands run as argv with a
+  60 s timeout, and only a single number (or `{"value": n}`) is accepted, so
+  row-level output is never stored. Results go to `measure.md` and the ledger.
+  `--baseline --now <deployedAt>` records `post-deploy/baseline.json`, and
+  `--due <repo>` lists the runs whose measures are due without running
+  anything. The SessionStart handoff hook prints that due line, and never starts
+  Python in a repo with no `.graph/*/plan.json`. `post-deploy-verification`
+  checks take `source: prometheus | sentry | sql-readonly | command`, and bug
+  runs re-probe the reproduce request when `vet_smoke.py` passes it.
+- `graph-control digest --root --base [--plan] [--profile]`: a read-only,
+  git-only change digest of at most 60 lines of markdown. A small diff gets a
+  stat grouped by plan task; a large one gets LOC without `digest.exclude`, new
+  public surfaces, top-5 churn x LOC hotspots and ux evidence. The full
+  `graph-control status` now shows DONE since last look and NEXT, read from
+  plan.json, run.json and receipts.json.
+- **`graph-control render`** generates `docs/playbooks.md` from `graphs/*.md`:
+  one Mermaid `flowchart LR` per playbook, with gate nodes as hexagons and
+  `when:` labels on conditional edges. `render --check` returns BLOCKED on
+  drift, and the test suite runs it. `docs/img/playbook.png` is removed.
+- Mutation witnesses now go through
+  `skills/process/review-protocol/scripts/mutate-witness.sh`. It tests one
+  mutant in a throwaway `git worktree add --detach` of HEAD, never the working
+  tree. It refuses a dirty tree, requires the test to pass on HEAD first, caps
+  each run and kills the test's whole process group, and writes a JSON receipt.
+  Implementers list a receipt for each new guard or validation. Reviewers treat
+  a surviving mutant, or a new guard with no receipt, as Important.
+- `scripts/lint-no-plan-numbers.sh [--base <ref>] [paths...]` bans plan, task,
+  wave and ADR numbers in code comments across stacks (comments found by file
+  extension; string literals and prose skipped).
 
 ### Changed
 
@@ -249,6 +286,28 @@ commits.
   agents; a test pins them to the template's `policy.roles` and the `agents/`
   directory. `docs/graph-controls.md` notes that `host-check`'s `docker info`
   can reach a remote `DOCKER_HOST`.
+- **`/graph-ship` has three new lanes**: investigate (a signals-mode researcher
+  writes a one-page pulse digest, the owner ranks items once, and each chosen
+  item routes to direct, quick or bug), research (the new `graphs/research.md`,
+  with quick/standard/deep presets of 1/3/6 leaves, a firewall, a
+  `claims.jsonl` file and an Evidence against section), and a slim product
+  preset that ends at a go / kill / clarify gate. The engine also appends
+  finding classes to `classes.md` after each round, re-checks `success_signals`
+  at post-deploy against `baseline.json`, measures due long-window signals at
+  the start of the next run, and puts the change digest in the merge exhibit.
+- Researcher: a `signals` mode runs the profile's `pulse.command` exactly as
+  written and writes a one-page digest of aggregates and pseudonymised ids.
+  Research leaves get a brief-only firewall, per-leaf tool and turn budgets,
+  claims appended to `research/claims.jsonl` every 5 items, and Evidence against
+  / Unverified sections. Planner: `concept.md` for the product preset,
+  `success_signals` (or `[]` plus `success_signals_reason`) in plan.json v2, the
+  contract task first, and task briefs capped at 300 lines and 35% fenced code.
+  product-spec gains Options, Riskiest assumption, Completeness checklist and a
+  Signal line. The profile template adds `pulse.command` and `digest.exclude`.
+- Retro is guard-first: engine fast path, `.graph/<run>/classes.md` input,
+  recurring classes promoted as a test fixture, semgrep rule or lint config
+  before any prose line, prose retired once guarded, and a reported lint-tier
+  share.
 
 ## [0.14.0] - 2026-09-29
 

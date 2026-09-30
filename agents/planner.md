@@ -55,11 +55,14 @@ version range without product-specific evidence.
 
 **Success signals.** `plan.json` is schema v2 and carries `success_signals`, one
 row per success metric in `goal.md` that production can measure, for example
-`{"goal": "checkout errors stay rare", "source": "prometheus", "command": ["promtool", "query", "instant", "<prometheus-url>", "job:checkout_errors:ratio_rate1d"], "success_condition": "value <= 0.01", "window_days": 7}`.
+`{"goal": "checkout errors stay rare", "source": "prometheus", "command": ["scripts/signals/checkout-error-ratio"], "success_condition": "value <= 0.01", "window_days": 7}`.
 `source` is `prometheus`, `sentry`, `sql-readonly` or `command` (a committed
-script). `command` is an argv array that returns one aggregate number (a count,
-rate, ratio or percentile over the window); row-level and per-user queries are
-rejected. `success_condition` is an expression over `value` and `baseline` (the
+script). `command` is an argv array, run with no shell from the repo root, that
+prints one aggregate number (a count, rate, ratio or percentile over the window
+ending at `GRAPH_MEASURE_AT`), bare or as `{"value": <number>}`; row-level and
+per-user queries are rejected. Raw tool output is rejected too (`promtool query
+instant` prints `{} => 0.003 @[...]`), so the command is the repo's own adapter
+around the query; a missing adapter is a task in this plan. `success_condition` is an expression over `value` and `baseline` (the
 same command over the window before the change), such as `value <= 0.01` or
 `value >= baseline * 1.1 + 5`. `window_days` is 1-90. Prefer a metric the goal's
 `signal:` line says is already logged; an `instrumentation task` line puts that

@@ -128,7 +128,8 @@ runtime:
 # This is a SHARED environment: everything qa runs here is read-only - Bruno
 # requests tagged `smoke` (GETs, or writes into `testTenant` only) and PromQL.
 # qa never rolls back; `rollback` is the text it fills in for the owner. Leave
-# `wait` empty and the post-deploy node reports SKIPPED; retro still runs.
+# `wait` empty and the deploy checks report SKIPPED (the whole node too when the
+# plan has no `success_signals`); retro still runs.
 #   wait        blocks until the merged commit serves, e.g.
 #               argocd app wait <app> --sync --health --timeout 600
 #   startedAt   prints (RFC3339) when the merged revision ${SHA} started rolling
@@ -141,10 +142,15 @@ runtime:
 #   env         NAMES of credential variables (never values)
 #   testTenant  the tenant smoke writes may touch - a write runs only if
 #               `{{testTenant}}` is a segment of its URL path; "" = reads only
-#   checks      AnalysisTemplate-shaped PromQL checks, compared with the
-#               window before the deploy (an absolute threshold alone lets a
-#               0.1% -> 0.9% error ratio pass):
+#   checks      AnalysisTemplate-shaped checks, compared with the window
+#               before the deploy (an absolute threshold alone lets a
+#               0.1% -> 0.9% error ratio pass). `source` is prometheus
+#               (default, reads `query`), or sentry, sql-readonly or command,
+#               which read a `command` argv instead: the repo's own adapter,
+#               run with no shell, printing one number or {"value": <n>} for
+#               the window ending at $GRAPH_MEASURE_AT; rows are rejected:
 #               - name: error-ratio
+#                 source: prometheus
 #                 query: '<ratio over [10m]>'
 #                 initialDelay: 10m     # >= the query window
 #                 interval: 60s
