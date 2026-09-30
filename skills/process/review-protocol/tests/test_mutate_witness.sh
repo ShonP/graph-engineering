@@ -52,8 +52,8 @@ unchanged() { # the main tree, its worktree list and the scratch TMPDIR are as b
   [ -z "$(ls -A "$SCRATCH")" ] || note "left behind in TMPDIR: $(ls -A "$SCRATCH")"
 }
 
-hang_test() { # a test that parks on the HANG mutant and passes otherwise
-  printf '%s\n' 'if grep -q HANG guard.sh; then echo $$ > "$1"; exec sleep 60; fi' 'exec sh test_guard.sh' > "$WORK/hang.sh"
+hang_test() { # a test that parks on the HANG mutant in a grandchild, and passes otherwise
+  printf '%s\n' 'if grep -q HANG guard.sh; then sleep 60 & echo $! > "$1"; wait; fi' 'exec sh test_guard.sh' > "$WORK/hang.sh"
 }
 
 # AC-W4-MW-01: a killed mutant gives a receipt and leaves the main tree alone.
