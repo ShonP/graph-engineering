@@ -68,11 +68,17 @@ Produces `.claude/graph-profile.yaml` from the plugin's `templates/graph-profile
    | Found | Block | argv | extensions |
    |---|---|---|---|
    | `pyproject.toml` with `test` under `[project.scripts]` | test | `["uv", "run", "test"]` | |
+   | pytest configured (`[tool.pytest.ini_options]` in `pyproject.toml`, `pytest.ini`, `[tool:pytest]` in `setup.cfg`, or `pytest` in a dependency group), no `poetry.lock` | test | `["uv", "run", "pytest"]` | |
+   | pytest configured, `poetry.lock` | test | `["poetry", "run", "pytest"]` | |
    | `package.json` with `scripts.test` | test | `["<pm>", "run", "test"]` | |
    | `Taskfile.yml` with a `test` task | test | `["task", "test"]` | |
    | `Makefile` with a `test` or `check` target | test | `["make", "<target>"]` | |
    | `go.mod` | test | `["go", "test", "./..."]` | |
    | `Cargo.toml` | test | `["cargo", "test"]` | |
+   | `Package.swift` | test | `["swift", "test"]` | |
+   | `gradlew` wrapper | test | `["./gradlew", "test"]` | |
+   | `mvnw` wrapper | test | `["./mvnw", "test"]` | |
+   | `pom.xml`, no `mvnw` | test | `["mvn", "test"]` | |
    | eslint configured, pm pnpm | lint | `["pnpm", "exec", "eslint", "{file}"]` | `[".ts", ".tsx", ".js", ".jsx"]` |
    | eslint configured, pm npm | lint | `["npm", "exec", "--no", "--", "eslint", "{file}"]` | `[".ts", ".tsx", ".js", ".jsx"]` |
    | eslint configured, pm yarn | lint | `["yarn", "run", "eslint", "{file}"]` | `[".ts", ".tsx", ".js", ".jsx"]` |
@@ -81,7 +87,7 @@ Produces `.claude/graph-profile.yaml` from the plugin's `templates/graph-profile
    | swiftlint configured (`.swiftlint.yml`) | lint | `["swiftlint", "lint", "{file}"]` | `[".swift"]` |
    | `runtime` uses docker or compose | precheck | `["docker", "info"]` | |
 
-   A linter is configured when its config file exists and, for eslint and ruff, the manifest declares it. `lint.argv` holds exactly one `{file}` element and `lint.extensions` is required. npm assumes `--yes` when stdin is not a terminal, and the hooks close stdin, so a bare `npm exec eslint` would fetch and run eslint from the registry wherever it is not installed; `--no` makes it fail instead. `pnpm exec` and `bun run` only run local binaries (spiked 2026-09-30 on npm 11.12.1, pnpm 10.33.3, bun 1.3.6: each ran a local eslint with the file and none fetched a missing one). Leave `timeout_seconds` at the defaults unless the suite is known to run longer.
+   A linter is configured when its config file exists and, for eslint and ruff, the manifest declares it. Go gets no `lint` row: `go vet` and golangci-lint check a package, not a file, so a per-file run reports the package's other files as missing; `go test ./...` already runs a subset of `go vet`. `lint.argv` holds exactly one `{file}` element and `lint.extensions` is required. npm assumes `--yes` when stdin is not a terminal, and the hooks close stdin, so a bare `npm exec eslint` would fetch and run eslint from the registry wherever it is not installed; `--no` makes it fail instead. `pnpm exec` and `bun run` only run local binaries (spiked 2026-09-30 on npm 11.12.1, pnpm 10.33.3, bun 1.3.6: each ran a local eslint with the file and none fetched a missing one). Leave `timeout_seconds` at the defaults unless the suite is known to run longer.
 
 10. **Propose `.claude/settings.json` additions.** Merge into the existing file, keeping every key and rule already there, and show the diff:
 

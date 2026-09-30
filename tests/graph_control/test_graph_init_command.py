@@ -29,6 +29,9 @@ PROPOSED = {
     ("test", ("make", "<target>")), ("test", ("go", "test", "./...")), ("test", ("cargo", "test")),
     ("lint", ("uv", "run", "ruff", "check", "{file}")), ("lint", ("swiftlint", "lint", "{file}")),
     ("lint", ("pnpm", "exec", "eslint", "{file}")), ("precheck", ("docker", "info")),
+    # the default runner of every stack the routing table claims: Python, Swift, Gradle, Maven
+    ("test", ("uv", "run", "pytest")), ("test", ("poetry", "run", "pytest")), ("test", ("swift", "test")),
+    ("test", ("./gradlew", "test")), ("test", ("./mvnw", "test")), ("test", ("mvn", "test")),
 }
 
 
@@ -106,6 +109,11 @@ class GraphInitCommandTests(unittest.TestCase):
                 path.write_text(json.dumps(config))
                 with self.subTest(block=block, argv=argv):
                     checks_config.load(path)
+
+    def test_pytest_is_detected_from_its_config_not_only_a_console_script(self):
+        checks = section("**Propose `.claude/graph-checks.json`")
+        for needle in ("[tool.pytest.ini_options]", "pytest.ini", "dependency group", "poetry.lock", "gradlew", "mvnw"):
+            self.assertIn(needle, checks, needle)
 
     def test_npm_eslint_never_fetches_from_the_registry(self):
         checks = section("**Propose `.claude/graph-checks.json`")
