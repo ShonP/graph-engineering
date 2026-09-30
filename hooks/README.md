@@ -13,7 +13,7 @@ hook: agents call it by path to wait on a long suite (see wait-run below).
 | `PreToolUse`, `Bash` | `scripts/guard-destructive.sh` | sync, timeout 10, three handlers gated by `if` | Asks before a destructive command, with evidence. Never denies |
 | `PreToolUse`, `Agent\|Task` | `scripts/guard-agent.sh` | sync, timeout 15 | Enforces the profile's `policy:` block on subagent calls |
 | `Stop`, no matcher | `scripts/test-before-stop.sh` | `asyncRewake`, timeout 620 | Runs the configured test after the turn ends and wakes Claude only when it fails. On an unchanged tree it replays the stored verdict instead (`<git common dir>/graph-engineering/checks-state.json`); any nonempty `GRAPH_CHECKS_NO_MEMO` turns that off |
-| `SessionStart`, `startup\|clear\|compact` | `scripts/print-handoff.sh` | sync, timeout 15 | Prints the head of `docs/HANDOFF.md` into the new context, a warning when that file is over 150 lines, and the reply contract when the repo has a profile. Silent on resume, fork and `--agent` sessions. Exit `0` always |
+| `SessionStart`, `startup\|clear\|compact` | `scripts/print-handoff.sh` | sync, timeout 15 | Prints the head of `docs/HANDOFF.md` into the new context, a warning when that file is over 150 lines, the reply contract when the repo has a profile, and one line when a run's success measures are due. Silent on resume, fork and `--agent` sessions. Exit `0` always |
 | `SessionStart`, `startup` | `scripts/doctor-on-start.sh` | sync, timeout 5 | Cached setup check: up to 3 lines of doctor findings, or a `/graph-init` hint. Silent when clean. Exit `0` always |
 
 ## Claude Code versions
@@ -163,6 +163,32 @@ setup is broken, and says nothing otherwise. It always exits `0`: any failure
   misses it. A run with findings is never cached, so they repeat until fixed.
   Delete the file to force a check.
 
+## SessionStart: due success measures
+
+A merged run can promise `success_signals` in its `plan.json` (schema 2): a
+goal, an argv `command` that prints one aggregate, a `success_condition` and a
+`window_days`. Long windows end days after the run, in a session that knows
+nothing about it, so `print-handoff.sh` is the lazy trigger. After everything
+else it prints, it may add
+
+```
+graph-engineering: <n> success measure(s) due (<run ids>). Run: python3 <plugin>/scripts/measure_signals.py .graph/<run>
+```
+
+- Only when a bash glob finds `.graph/*/plan.json` under `CLAUDE_PROJECT_DIR`.
+  Without one no interpreter starts, so every repo that never ran a plan pays
+  one glob.
+- Then one Python call, `measure_signals.py --due <project dir>`, counts the
+  signals whose window has elapsed since the ledger's `merged: <sha>` (the
+  commit time from `git show -s --format=%cI`) and that have no row in that
+  run's `measure.md`. It reads files and asks git for one date per run; it
+  never runs a signal's command. No Python 3.11+, a malformed plan or an
+  unmerged run: silent.
+- Measuring is a separate, deliberate step: the owner or `/graph-ship` runs the
+  printed command for a run, which writes `measure.md` and the ledger lines. The
+  contract (sources, the aggregate-only output rule, `baseline.json`) is in the
+  `post-deploy-verification` skill.
+
 ## wait-run: a bounded wait for long suites
 
 Spike f (2.1.285): a foreground subagent's background jobs are killed when it
@@ -219,13 +245,17 @@ call runs through
   automatically in that repo. `SessionStart` also reads `docs/HANDOFF.md` into
   context. Treat that the way you treat opening any untrusted repo: a repo whose
   checks you would not run by hand is a repo whose hooks you turn off first.
+- The due-measures line reads `.graph/<run>/plan.json`, `measure.md` and
+  `ledger.md` and runs `git show` for a commit date. A signal's `command` runs
+  only when someone runs `scripts/measure_signals.py` by hand or from a run.
 
 ## Dependencies
 
 `bash` and a Python 3.11+ interpreter, found on `PATH` or among interpreters uv
 has already installed. Hooks never download one, and in a repo that opted in an
 unavailable interpreter fails visibly instead of skipping a check; a repo that did
-not opt in never needs one. No `jq`, no packages to install. The agent guard and
+not opt in never needs one. The due-measures line needs one only when the repo
+has a `.graph/*/plan.json`, and is silent without it. No `jq`, no packages to install. The agent guard and
 the SessionStart doctor also need `uv`, and skip silently without it.
 Whatever the configured argv lists name (a linter, a build tool) is the repo's own
 dependency, not the plugin's.
@@ -259,6 +289,7 @@ python3 hooks/tests/test_configured_checks.py
 python3 hooks/tests/test_hooks_registration.py
 python3 hooks/tests/test_doctor_on_start.py
 python3 hooks/tests/test_wait_run.py
+python3 -m unittest discover -s tests/measure
 ```
 
 `run-tests.sh` needs only `bash` and `python3`. It copies `hooks/tests/fixtures/`

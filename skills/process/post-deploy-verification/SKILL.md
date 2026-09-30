@@ -1,6 +1,6 @@
 ---
 name: post-deploy-verification
-description: Use after a run's change is merged and deployed - waits for the merged commit to serve, runs vetted read-only smoke requests and baseline-compared PromQL checks against the deployed environment, and reports PASS / FAIL / BLOCKED / SKIPPED with a rollback recommendation. Never mutates shared data, never rolls back on its own, never feeds the fix loop.
+description: Use after a run's change is merged and deployed - waits for the merged commit to serve, runs vetted read-only smoke requests and baseline-compared metric checks against the deployed environment, and reports PASS / FAIL / BLOCKED / SKIPPED with a rollback recommendation. Never mutates shared data, never rolls back on its own, never feeds the fix loop.
 ---
 
 # Post-deploy verification
@@ -103,17 +103,30 @@ verified what did not run - still holds.
    smoke requests exits 2. All of it is pinned by `tests/test_vet_smoke.py`.
    Keep smoke requests declarative: `assert` blocks for checks, an `auth:*`
    block reading a `--env-var` for credentials.
-3. **Metrics against a baseline.** Each `deploy.checks` entry has `query` (a
-   rate or ratio over a window, e.g. `[10m]`), `initialDelay`, `interval`,
-   `count`, `failureLimit` (default 0, as in Argo) and `successCondition` over
-   `result[0]` and `baseline[0]`, e.g. `result[0] <= baseline[0] * 1.5 + 0.001`.
-   - **Baseline once, at `deployedAt`:** an instant query evaluated AT the
+3. **Metrics against a baseline.** Each `deploy.checks` entry has
+   `source: prometheus | sentry | sql-readonly | command` (default `prometheus`),
+   `initialDelay`, `interval`, `count`, `failureLimit` (default 0, as in Argo)
+   and `successCondition` over `result[0]` and `baseline[0]`, e.g.
+   `result[0] <= baseline[0] * 1.5 + 0.001`.
+   - **`prometheus`** reads `query`, a rate or ratio over a window (e.g. `[10m]`).
+   - **Every other source** reads a `command` argv instead: spawned with no
+     shell from the repo root, killed after 60 s, with `GRAPH_MEASURE_AT` (UTC
+     ISO 8601) set to the moment its window must end. It prints one aggregate,
+     a number or `{"value": <number>}`, and that is `result[0]`. Anything else,
+     rows included, is `no data (rejected: non-aggregate output)`: the check
+     is BLOCKED and the output goes nowhere near the report. `sentry` and
+     `sql-readonly` say what the command reads, so review can check its
+     credential (a Sentry stats call; a `COUNT` or `avg` under a read-only
+     database role); the command is the repo's own adapter, run the same way
+     for all three.
+   - **Baseline once, at `deployedAt`:** for `prometheus`, an instant query evaluated AT the
      moment the rollout started - `/api/v1/query?query=<query>&time=<deployedAt
      as unix seconds or RFC3339>` - so its window ends at the deploy and covers
      only the old version. Without `time=` Prometheus evaluates at "now", after
      the smoke run, and the baseline already contains new-version traffic. That value is `baseline[0]`
      for every measurement; no offset arithmetic, nothing in the profile to
-     rewrite.
+     rewrite. For a `command` source, the same argv with
+     `GRAPH_MEASURE_AT=<deployedAt>`; each later measurement sets it to now.
    - **Then wait `initialDelay`**, counted from when `wait` returned, at least the query's window (Argo has the
      same field for the same reason): measured earlier, the window still
      averages in old-version traffic and dilutes a regression below the
@@ -123,6 +136,30 @@ verified what did not run - still holds.
 
    The `baseline` operand is this skill's extension of Argo's shape - Argo's
    own conditions see only `result`.
+
+   **Success signals.** When the run's `plan.json` has `success_signals`,
+   record their baseline as of `deployedAt`:
+
+   ```bash
+   python3 "<plugin-root>/scripts/measure_signals.py" "$REPO_ROOT/.graph/<run>" --baseline --now <deployedAt>
+   ```
+
+   It runs each signal's `command` under the rules above, with
+   `GRAPH_MEASURE_AT=<deployedAt>`, and writes `post-deploy/baseline.json`
+   (`{goal: value}`) with clean aggregates only; the agent never reads a raw
+   output. A goal left out reads later as `no data (no baseline)` for a
+   relative condition (`value <= baseline * 1.5`). Post-deploy does not wait
+   for `window_days`: once they pass, the SessionStart hook prints
+   `graph-engineering: <n> success measure(s) due (...)`, and its command
+   writes `measure.md` (met, not met, no data) plus a ledger line per signal.
+   A late `not met` is a suggested bug run, never an automatic one.
+
+   **Bug runs** also re-run the `reproduce` probe, read-only, against the
+   deployed URL, and only when `vet_smoke.py` lists it as `RUN` (a Bruno
+   request tagged `smoke`, vetted with the rest of the collection in step 2).
+   It must now pass; a failure means the bug is live, a FAIL. A probe that is
+   not a Bruno request, or that the vet refuses, is reported `not re-probed:
+   <reason>` and is never edited to get past the vet.
 4. **Verdict**: `PASS` when every vetted smoke request and every check passed;
    `FAIL` with the failing evidence and the filled-in rollback recommendation;
    `BLOCKED` when the deploy never landed, a check could not run, or a refused
