@@ -104,10 +104,7 @@ def compute(session: Path, now: float, files: dict) -> tuple[dict, dict]:
         for index, value in enumerate([entry["requests"], *entry["tokens"]]):
             totals[index] += value
         age = max(now - info.st_mtime, 0.0)
-        if path == main or age > LIVE or entry["final"]:
-            continue
-        meta = _meta(path)
-        if meta.get("stoppedByUser"):
+        if path == main or age > LIVE or entry["final"] or (meta := _meta(path)).get("stoppedByUser"):
             continue
         run = RUN.match(str(meta.get("description") or ""))
         family = FAMILY.match(entry["model"] or "")
@@ -131,6 +128,8 @@ def snapshot(root: Path, now: float) -> dict | None:
         return None
     target = cache_path(session)
     try:
+        if hasattr(os, "getuid") and target.stat().st_uid != os.getuid():
+            raise OSError("cache owned by another user")  # a shared /tmp must not feed the status line
         cache = json.loads(target.read_text())
         cache = cache if isinstance(cache, dict) and cache.get("session") == f"{VERSION}:{session}" else {}
     except (OSError, ValueError):

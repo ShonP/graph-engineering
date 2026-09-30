@@ -202,6 +202,18 @@ class PrivacyAndCacheTests(unittest.TestCase):
         self.assertEqual(done["cost"]["graph-engineering:reviewer"], [2, 8500, 40000, 40000])
         self.assertEqual([agent["type"] for agent in done["live"]], ["implementer", "qa"])
 
+    def test_cache_owned_by_another_user_is_ignored(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            space = Workspace(tmp)
+            now = time.time()
+            with mock.patch.dict(os.environ, space.env):
+                first = status.snapshot(space.repo, now)
+                shutil.rmtree(space.project / SESSION)
+                with mock.patch.object(status.os, "getuid", create=True, return_value=os.getuid() + 1):
+                    second = status.snapshot(space.repo, now + 1)
+        self.assertEqual(len(first["live"]), 3)
+        self.assertEqual(second["live"], [])
+
     def test_agent_stopped_by_user_is_not_live(self):
         with tempfile.TemporaryDirectory() as tmp:
             space = Workspace(tmp)
