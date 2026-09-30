@@ -126,3 +126,16 @@ flowchart LR
   merge --> post-deploy
   post-deploy --> retro
 ```
+
+## [research](../graphs/research.md)
+
+```mermaid
+flowchart LR
+  brief["brief (engine)"]
+  research["research (researcher)"]
+  verify["verify (researcher)"]
+  report{{"report (engine)"}}
+  brief --> research
+  research -->|"deep"| verify
+  verify --> report
+```
