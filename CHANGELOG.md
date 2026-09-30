@@ -10,6 +10,15 @@ commits.
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-09-30
+
+Efficiency, a front door, parallelism and the full loop. `/graph-ship` routes
+every ask into a lane sized to it and loads only its router; the Stop and lint
+hooks are opt-in and run at most once per prompt; waves and nested leads run in
+parallel; research, success signals and a guard-first retro close the loop.
+Opus replaces fable everywhere: the profile's `policy:` block is the one source
+of model tiers, and haiku, fable and `general-purpose` are blocked.
+
 ### Added
 
 - **Three frontend competencies in `skills/react/`**, written from pinned vendor
@@ -310,6 +319,53 @@ commits.
   recurring classes promoted as a test fixture, semgrep rule or lint config
   before any prose line, prose retired once guarded, and a reported lint-tier
   share.
+- **`/graph-ship` loads only the router.** `commands/graph-ship.md` is step 1
+  (7.3 KB, a tested 8,000-byte budget, down from 34 KB on every call). Steps
+  2-8 and 10 are `docs/engine/run.md`, read once per run by the lanes that open
+  a run dir; step 9 is `docs/engine/land.md`, read at a merge gate and when a
+  `direct` change lands; the `direct` and `investigate` rules are
+  `docs/engine/lanes.md`. Step numbers are unchanged.
+- **The `lint` review depth is used.** The engine runs `graph-control depth`
+  before each review leg: at `lint` (prose only, no risk row) it runs the
+  repo's configured `lint.argv` on the changed files, writes `findings.json`
+  and records the review receipt itself, and dispatches no reviewer; `single`
+  is one reviewer; `panel` keeps the lead rule.
+- **BREAKING: the agent control plane is always owner-gated.** A built-in,
+  reserved `agent-control` risk row covers `**/.claude/**`, `**/CLAUDE.md`,
+  `**/AGENTS.md`, `**/.mcp.json`, `.github/**` and the profile's
+  `instructionPaths`. `graph-control depth` always reports it, so such a diff
+  is never class `none` or depth `lint` (a CLAUDE.md edit is now `panel`); it
+  never auto-merges, even under `--auto-merge`, and the router forces at least
+  `quick`. A profile `risk:` row with that id is rejected.
+- **BREAKING: `gates.plan` and `gates.merge` take only `owner`.** The template
+  no longer documents `auto`, which nothing honoured; merges open on their own
+  only through `gates.auto_classes`. `/graph-doctor` warns on any other value,
+  on `agent-control` in `auto_classes` and on a redefined `agent-control` row.
+- Research, spike and product deliverables go to
+  `<docsPath>/research/<date>-<slug>.md` (with `-concept.md` and
+  `spike-<slug>.md`), a durable repo path; `.graph/` keeps only briefs, leaf
+  reports and claims, and the report gate names the files for the owner to
+  commit.
+- `graph-control host-check`'s free-disk floor is the profile's
+  `host.min_free_gb` (template 20; `/graph-init` proposes 5 for a
+  `runtime.none` library or CLI), `--min-free-gb` overrides it for one call,
+  and the BLOCKED fix names the key.
+
+### Fixed
+
+- `graph-control --help` and `-h` no longer crash: a bare `%` in the
+  `validate-briefs` help was read by argparse as a format spec. Tests render the
+  top-level help, every subcommand's help and the entry point's `--help`.
+- The Stop and lint hooks run a monorepo package's own
+  `.claude/graph-checks.json` when `CLAUDE_PROJECT_DIR` is that package (Claude
+  Code sets it to the launch directory). The nearest config to the cwd, then
+  the project dir (Stop) or to the edited file (lint) wins, never one above the
+  bound root, and runs from its own directory; a package directory maps into
+  the linked worktree Claude works in. Before, the bash pre-filter found the
+  package's file and the Python side read only the git toplevel's, so both
+  gates were silently off while doctor reported the file as fine. The memo keys
+  a package config by its path too, and `check --reuse` accepts the package
+  directory.
 
 ## [0.14.0] - 2026-09-29
 
