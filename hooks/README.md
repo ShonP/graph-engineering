@@ -1,7 +1,7 @@
 # Plugin hooks
 
-Five scripts ship with `graph-engineering`, registered in `hooks/hooks.json` as
-seven handlers. They are generic: nothing in them names a repo, a stack or a
+Six scripts ship with `graph-engineering`, registered in `hooks/hooks.json` as
+eight handlers. They are generic: nothing in them names a repo, a stack or a
 package manager. What to run is declared by the project in
 `.claude/graph-checks.json`; how agents are tiered is declared in the project's
 `.claude/graph-profile.yaml`.
@@ -13,6 +13,7 @@ package manager. What to run is declared by the project in
 | `PreToolUse`, `Agent\|Task` | `scripts/guard-agent.sh` | sync, timeout 15 | Enforces the profile's `policy:` block on subagent calls |
 | `Stop`, no matcher | `scripts/test-before-stop.sh` | `asyncRewake`, timeout 620 | Runs the configured test after the turn ends and wakes Claude only when it fails |
 | `SessionStart`, `startup\|clear\|compact` | `scripts/print-handoff.sh` | sync, timeout 15 | Prints the head of `docs/HANDOFF.md` into the new context. Exit `0` always |
+| `SessionStart`, `startup` | `scripts/doctor-on-start.sh` | sync, timeout 5 | Cached setup check: up to 3 lines of doctor findings, or a `/graph-init` hint. Silent when clean. Exit `0` always |
 
 ## Claude Code versions
 
@@ -133,6 +134,34 @@ the start source. `resume` and `fork` keep their existing context, so printing t
 handoff again would only add a stale copy; a fresh session, a `/clear` and a
 compaction lose it, so those three print.
 
+The doctor entry is `startup` alone: setup does not change on a resume, a `/clear`
+or a compaction, so checking once per fresh session is enough.
+
+## SessionStart doctor
+
+`doctor-on-start.sh` tells a fresh session when this repo's graph-engineering
+setup is broken, and says nothing otherwise. It always exits `0`: any failure
+(no `uv`, no Python 3.11+, a doctor error, output it cannot read) is silent.
+
+- `CLAUDE_PROJECT_DIR` without a `.git`: silent, so home and scratch sessions
+  pay nothing.
+- No `.claude/graph-profile.yaml`: one line pointing the owner at `/graph-init`,
+  but only when the project root holds a stack marker (`package.json`,
+  `pyproject.toml`, `go.mod`, `Cargo.toml`, `Package.swift`, `build.gradle`,
+  `build.gradle.kts`, `pom.xml`, `Gemfile`). Otherwise silent.
+- A profile: runs `graph-control.py doctor --root <dir> --quick`, the subset of
+  `/graph-doctor` that starts no process (no profile, an unreadable profile,
+  `schema_version`, removed keys, missing `.claude/graph-checks.json`, plugin version differs from the
+  installed one), and prints at most 3 lines,
+  `graph-engineering doctor: <message> - fix: <fix>`, errors first. Run
+  `/graph-doctor` for the full list.
+- A clean result is cached in `$(git rev-parse --git-common-dir)/graph-engineering/doctor-cache`,
+  one line per project directory (linked worktrees share the file), keyed by the
+  plugin version and the mtimes of the profile and `.claude/graph-checks.json`. A
+  hit exits before starting `uv`; editing either file or updating the plugin
+  misses it. A run with findings is never cached, so they repeat until fixed.
+  Delete the file to force a check.
+
 ## Scope and least privilege
 
 - The only commands these hooks run are the argv arrays committed in
@@ -141,6 +170,9 @@ compaction lose it, so those three print.
 - Nothing is taken from the contents of an edited file.
 - Linked Git worktrees resolve through their common Git directory, including nested
   worktrees. A different repository in a Stop event fails with a binding error.
+- `doctor-on-start.sh` runs only the plugin's own pinned helper, which reads the
+  profile and `.claude/graph-checks.json` and executes neither; it writes only
+  its cache file inside the repo's Git directory.
 - Enabling this plugin therefore means a repo's own committed checks run
   automatically in that repo. `SessionStart` also reads `docs/HANDOFF.md` into
   context. Treat that the way you treat opening any untrusted repo: a repo whose
@@ -151,7 +183,8 @@ compaction lose it, so those three print.
 `bash` and a Python 3.11+ interpreter, found on `PATH` or among interpreters uv
 has already installed. Hooks never download one, and in a repo that opted in an
 unavailable interpreter fails visibly instead of skipping a check; a repo that did
-not opt in never needs one. No `jq`, no packages to install.
+not opt in never needs one. No `jq`, no packages to install. The agent guard and
+the SessionStart doctor also need `uv`, and skip silently without it.
 Whatever the configured argv lists name (a linter, a build tool) is the repo's own
 dependency, not the plugin's.
 
@@ -182,6 +215,7 @@ runs every suite in the repo. The hook suites on their own:
 bash hooks/tests/run-tests.sh
 python3 hooks/tests/test_configured_checks.py
 python3 hooks/tests/test_hooks_registration.py
+python3 hooks/tests/test_doctor_on_start.py
 ```
 
 `run-tests.sh` needs only `bash` and `python3`. It copies `hooks/tests/fixtures/`

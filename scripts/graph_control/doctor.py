@@ -1,0 +1,218 @@
+"""Read-only health findings for a repo's graph-engineering setup and the executing plugin.
+
+diagnose() reads the repo's .claude/graph-profile.yaml and .claude/graph-checks.json,
+the plugin's own manifest and the host's installed-plugin record. It never runs a
+configured command: the only process it starts is `git check-ignore`, and quick
+mode (the cached SessionStart check) starts none.
+"""
+
+import importlib.util
+import json
+import os
+import re
+import subprocess
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+from .common import load
+from .preflight import read_profile
+
+LEVELS = ("error", "warn", "info")
+TIERS = ("opus", "sonnet")
+CLASS_KEYS = ("owner_classes", "auto_classes")
+SKILL_KEYS = {"impl", "review", "qa", "design"}
+SKILL_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+UPGRADE = "run /graph-init --upgrade"
+
+
+@dataclass(frozen=True)
+class Finding:
+    level: str  # error | warn | info
+    id: str
+    message: str
+    fix: str
+
+
+def diagnose(root: Path, plugin_root: Path, quick: bool) -> list[Finding]:
+    """Every finding for `root`, errors first. quick=True runs only the checks that spawn nothing."""
+    manifest = load(plugin_root / ".claude-plugin" / "plugin.json")
+    findings: list[Finding] = []
+    profile_path = root / ".claude" / "graph-profile.yaml"
+    if not profile_path.is_file():
+        findings.append(Finding("info", "no-profile", "this repo has no .claude/graph-profile.yaml",
+                                "the owner runs /graph-init"))
+    else:
+        try:
+            profile: dict[str, Any] | None = read_profile(profile_path)
+        except (ValueError, OSError) as error:
+            profile = None
+            findings.append(Finding("error", "profile-invalid", f".claude/graph-profile.yaml cannot be read: {error}",
+                                    "fix the YAML, or regenerate it with /graph-init --force"))
+        if profile is not None:
+            findings += _schema(profile) + _stale(profile)
+            if not quick:
+                findings += _runtime(profile) + _policy(profile) + _gates(profile)
+                findings += _routing(profile, root, plugin_root, str(manifest.get("name", "")))
+        findings += _checks(root, plugin_root, quick)
+        if not quick:
+            findings += _ignored(root)
+    findings += _version(manifest)
+    return sorted(findings, key=lambda finding: LEVELS.index(finding.level))
+
+
+def _schema(profile: dict[str, Any]) -> list[Finding]:
+    value = profile.get("schema_version")
+    if type(value) is int and value >= 2:
+        return []
+    shown = "missing" if value is None else repr(value)
+    return [Finding("warn", "schema-version", f"profile schema_version is {shown}; this plugin reads version 2",
+                    UPGRADE)]
+
+
+def _stale(profile: dict[str, Any]) -> list[Finding]:
+    stale = ["content"] if "content" in profile else []
+    gates = profile.get("gates")
+    if isinstance(gates, dict) and "publication" in gates:
+        stale.append("gates.publication")
+    return [Finding("warn", "stale-key", f"profile key `{key}` was removed in 0.12 and is ignored",
+                    f"delete `{key}`, or {UPGRADE}") for key in stale]
+
+
+def _runtime(profile: dict[str, Any]) -> list[Finding]:
+    if isinstance(profile.get("runtime"), dict):
+        return []
+    return [Finding("error", "runtime-missing", "profile has no `runtime` block, so preflight blocks every run",
+                    f"add `runtime` (or `runtime.none` with the public-surface reason); {UPGRADE} fills it")]
+
+
+def _policy(profile: dict[str, Any]) -> list[Finding]:
+    policy = profile.get("policy")
+    if not isinstance(policy, dict):
+        return []
+    findings = []
+    roles = policy.get("roles")
+    for role, model in (roles.items() if isinstance(roles, dict) else ()):
+        if not (isinstance(model, str) and model in TIERS):
+            findings.append(Finding("warn", "policy-model", f"policy.roles.{role} is {model!r}; tiers are opus or sonnet",
+                                    f"set policy.roles.{role} to opus or sonnet"))
+    never = policy.get("never")
+    if isinstance(never, list) and "haiku" not in never:
+        findings.append(Finding("warn", "policy-never", "policy.never does not list haiku",
+                                "add haiku to policy.never"))
+    return findings
+
+
+def _risk_ids(risk: Any) -> set[str]:
+    if isinstance(risk, dict):
+        return {key for key in risk if isinstance(key, str)}
+    if isinstance(risk, list):
+        rows = (row.get("id") if isinstance(row, dict) else row for row in risk)
+        return {row for row in rows if isinstance(row, str)}
+    return set()
+
+
+def _gates(profile: dict[str, Any]) -> list[Finding]:
+    gates = profile.get("gates")
+    if not isinstance(gates, dict):
+        return []
+    known = _risk_ids(profile.get("risk")) | {"none"}
+    findings = []
+    for key in CLASS_KEYS:
+        value = gates.get(key)
+        if value is None:
+            continue
+        items = value if isinstance(value, list) else [value]
+        unknown = [repr(item) for item in items if not (isinstance(item, str) and item in known)]
+        if unknown:
+            findings.append(Finding("error", "gates-risk",
+                                    f"gates.{key} names risk ids the risk table does not define: {', '.join(unknown)}",
+                                    "add a `risk` row with that id, or remove it (`none` is always valid)"))
+    return findings
+
+
+def _skill_names(node: Any) -> set[str]:
+    """Names in every impl/review/qa/design list under `routing`, at any depth."""
+    if isinstance(node, dict):
+        names: set[str] = set()
+        for key, value in node.items():
+            if key in SKILL_KEYS and isinstance(value, list):
+                names |= {item for item in value if isinstance(item, str)}
+            else:
+                names |= _skill_names(value)
+        return names
+    if isinstance(node, list):
+        return set().union(*map(_skill_names, node)) if node else set()
+    return set()
+
+
+def _routing(profile: dict[str, Any], root: Path, plugin_root: Path, plugin: str) -> list[Finding]:
+    missing = []
+    for name in sorted(_skill_names(profile.get("routing"))):
+        prefix, _, bare = name.rpartition(":")
+        if prefix and prefix != plugin:
+            continue  # another plugin's skill: not resolvable from here
+        found = SKILL_NAME.fullmatch(bare) and (
+            any(plugin_root.glob(f"skills/*/{bare}/SKILL.md")) or (root / ".claude" / "skills" / bare / "SKILL.md").is_file())
+        if not found:
+            missing.append(name)
+    if not missing:
+        return []
+    return [Finding("warn", "routing-skill",
+                    f"routing names skills that resolve to no plugin or repo skill: {', '.join(missing)}",
+                    "correct the names, or add .claude/skills/<name>/SKILL.md")]
+
+
+def _checks(root: Path, plugin_root: Path, quick: bool) -> list[Finding]:
+    path = root / ".claude" / "graph-checks.json"
+    if not path.is_file():
+        return [Finding("warn", "checks-missing",
+                        ".claude/graph-checks.json is missing, so the Stop and lint hooks do nothing (opt-in since 0.15)",
+                        "copy the plugin's templates/graph-checks.json to .claude/graph-checks.json and set this repo's commands")]
+    if quick:
+        return []
+    spec = importlib.util.spec_from_file_location("ge_checks_config", plugin_root / "hooks" / "scripts" / "checks_config.py")
+    if spec is None or spec.loader is None:
+        return []
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    try:
+        module.load(path)  # parses and validates; runs nothing
+    except (ValueError, OSError) as error:
+        return [Finding("error", "checks-invalid", f".claude/graph-checks.json is invalid: {error}",
+                        "correct it against the plugin's templates/graph-checks.json")]
+    return []
+
+
+def _ignored(root: Path) -> list[Finding]:
+    try:
+        result = subprocess.run(["git", "-C", str(root), "check-ignore", "-q", ".graph/x"],
+                                capture_output=True, timeout=10, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return []
+    if result.returncode != 1:  # 0 ignored, 128 not a repository
+        return []
+    return [Finding("warn", "graph-not-ignored", ".graph/ (run state and ledgers) is not ignored by git",
+                    "add .graph/ to .gitignore")]
+
+
+def _version(manifest: dict[str, Any]) -> list[Finding]:
+    name, running = manifest.get("name"), manifest.get("version")
+    config = Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude")
+    try:
+        plugins = json.loads((config / "plugins" / "installed_plugins.json").read_text()).get("plugins")
+    except (OSError, ValueError, AttributeError):
+        plugins = None
+    records = [record for key, value in (plugins.items() if isinstance(plugins, dict) else ())
+               if isinstance(key, str) and key.split("@", 1)[0] == name
+               for record in (value if isinstance(value, list) else [value]) if isinstance(record, dict)]
+    installed = sorted({record["version"] for record in records if isinstance(record.get("version"), str)})
+    if not installed:
+        return [Finding("info", "cannot-determine",
+                        f"cannot determine the installed {name} version: installed_plugins.json has no record of it",
+                        "none needed; restart the session after any plugin update")]
+    if running in installed:
+        return []
+    return [Finding("warn", "version-mismatch",
+                    f"this session runs {name} {running}, but {' or '.join(installed)} is installed",
+                    "restart the session so it loads the installed version")]
