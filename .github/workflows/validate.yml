@@ -17,12 +17,5 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - uses: astral-sh/setup-uv@v6
-      - name: Hook regressions
-        run: |
-          bash hooks/tests/run-tests.sh
-          python3 hooks/tests/test_configured_checks.py
-          python3 -m unittest discover -s tests/usage -v
-      - name: Control regressions
-        run: uv run --with PyYAML==6.0.2 python -m unittest discover -s tests/graph_control -v
-      - name: Compose isolation regressions
-        run: bash skills/process/qa-verification/tests/test_compose_isolation.sh
+      - name: Run all tests
+        run: bash scripts/run-all-tests.sh
