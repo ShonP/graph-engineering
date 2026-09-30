@@ -25,7 +25,8 @@ FRAMEWORK_PREFIXES = ("tanstack-", "compose-")
 
 POLICY = {
     "roles": {"planner": "opus", "ux-designer": "opus", "implementer": "opus", "reviewer": "opus",
-              "implementer-simple": "sonnet", "researcher": "sonnet", "qa": "sonnet", "retro": "sonnet"},
+              "reviewer-lead": "opus", "implementer-simple": "sonnet", "researcher": "sonnet",
+              "researcher-spike": "sonnet", "qa": "sonnet", "qa-lead": "sonnet", "retro": "sonnet"},
     "never": ["haiku", "fable"],
     "block_types": ["general-purpose"],
 }
