@@ -1,11 +1,13 @@
 #!/bin/sh
 # TEST STUB, not uv. run-tests.sh copies this to <sandbox>/bin/uv so the hooks
-# find it on PATH. It implements only the one form the hooks use:
+# find it on PATH, as bait: the hooks no longer autodetect `uv run`, and a case
+# fails if this stub's scripts run without graph-checks.json. It implements only:
 #
 #   uv run <script> [args...]
 #
 # It checks that <script> is declared under [project.scripts] in ./pyproject.toml,
-# the same condition the hook checks, then runs ./stub-scripts/<script>.sh.
+# the same condition the retired autodetection checked, then runs
+# ./stub-scripts/<script>.sh.
 # The real behaviour it stands in for is documented at
 # https://docs.astral.sh/uv/concepts/projects/run/ ("Running commands | uv"):
 # "Presuming the project provides `example-cli`" ... `uv run example-cli foo`.
