@@ -25,6 +25,19 @@ for project in py node taskfile; do
   check "$project: no config prints nothing" "" "$OUT$ERR"
 done
 
+# AC-W1-STOP-01 on a host without Python 3.11+ (stock macOS ships 3.9): a repo
+# that never opted in stays silent and spawns no interpreter. The trap python3
+# is first on PATH, so it stands in for the old system one and marks any call.
+reset_markers
+saved_path="$HOOK_PATH"
+HOOK_PATH="$PY_TRAP:/usr/bin:/bin"
+run_hook_python_trap "$STOP" "$FIX/bare" "$(stop_json false)"
+HOOK_PATH="$saved_path"
+check "no config, no Python 3.11+ on PATH -> exit 0" 0 "$RC"
+row "Stop" "no config, no supported python" "$RC"
+check "no config, no runtime prints nothing" "" "$OUT$ERR"
+check_no_file "no config: decided in bash, no python spawned" "$WORK/RAN_PYTHON"
+
 CONFIGURED_TEST='{"version":1,"test":{"argv":["sh","stub-scripts/test.sh"],"timeout_seconds":30}}'
 TESTS_FAILED="Tests failed: sh stub-scripts/test.sh in $FIX/py (exit 1). Fix them, then finish. This check runs once per prompt."
 

@@ -94,6 +94,57 @@ class ConfiguredChecks(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn('workspace-candidate-failed', result.stderr)
 
+    def hook(self, script, payload, project_dir, path=None):
+        env = dict(os.environ, CLAUDE_PROJECT_DIR=str(project_dir))
+        if path is not None:
+            env.pop('GE_PYTHON', None)
+            env['PATH'] = path
+        return subprocess.run(['bash', str(HOOKS / script)], input=json.dumps(payload), env=env,
+                              capture_output=True, text=True, timeout=20)
+
+    def edit(self, project_dir, file):
+        file.write_text('x = 1\n')
+        result = self.hook('lint-touched-file.sh', {'hook_event_name': 'PostToolUse', 'tool_name': 'Edit',
+                                                    'tool_input': {'file_path': str(file)}}, project_dir)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)['hookSpecificOutput']['additionalContext'] if result.stdout else ''
+
+    def test_workspace_lint_uses_contained_repo_config(self):  # AC-W1-STOP-06, lint side
+        self.configure(self.root, None, lint={'argv': ['sh', '-c', 'echo ws-finding; exit 1', 'lint', '{file}'],
+                                              'extensions': ['.py']})
+        context = self.edit(self.root.parent, self.root / 'a.py')
+        self.assertTrue(context.startswith('Lint on a.py reported problems (exit 1).'), context)
+        self.assertIn('ws-finding', context)
+
+    def test_lint_config_only_on_the_worktree_branch(self):
+        candidate = self.root.parent / 'candidate'
+        self.git('worktree', 'add', '-qb', 'candidate', str(candidate))
+        self.configure(candidate, None, lint={'argv': ['sh', '-c', 'echo wt-finding; exit 1', 'lint', '{file}'],
+                                              'extensions': ['.py']})
+        context = self.edit(self.root, candidate / 'a.py')
+        self.assertIn('wt-finding', context)
+
+    def fake_old_python(self):
+        binaries = self.root.parent / 'old-python'
+        binaries.mkdir(exist_ok=True)
+        python = binaries / 'python3'
+        python.write_text('#!/bin/sh\nexit 1\n')
+        python.chmod(0o755)
+        return f'{binaries}:/usr/bin:/bin'
+
+    def test_missing_runtime_is_silent_without_opt_in(self):
+        (self.root / 'go.mod').write_text('module example.invalid/cli\n')
+        result = self.hook('test-before-stop.sh', {'cwd': str(self.root), 'stop_hook_active': False},
+                           self.root, path=self.fake_old_python())
+        self.assertEqual((result.returncode, result.stderr), (0, ''))
+
+    def test_missing_runtime_is_visible_to_an_opted_in_workspace_repo(self):
+        self.configure(self.root, ['true'])
+        result = self.hook('test-before-stop.sh', {'cwd': str(self.root), 'stop_hook_active': False},
+                           self.root.parent, path=self.fake_old_python())
+        self.assertEqual(result.returncode, 2)
+        self.assertIn('Python 3.11+', result.stderr)
+
     def test_unsupported_python_is_visible(self):
         binaries = self.root / 'bin'
         binaries.mkdir()

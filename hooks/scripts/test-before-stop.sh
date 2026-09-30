@@ -2,7 +2,10 @@
 #
 # Stop hook: run the tests a repository opted into in .claude/graph-checks.json,
 # at most once per user prompt. No config, or a config with no test block:
-# exit 0 in silence. Nothing is autodetected.
+# exit 0 in silence. Nothing is autodetected. Whether any config can apply is
+# decided in bash first (opt-in.sh: the project dir, the input cwd and their
+# ancestors), so a repo that never opted in starts no Python and is not told
+# that Python is missing.
 #
 # Contract (Claude Code 2.1.285, spiked 2026-09-30; hooks reference
 # https://code.claude.com/docs/en/hooks). Registered with asyncRewake: exit 2
@@ -28,7 +31,21 @@ PROJECT_DIR="${CLAUDE_PROJECT_DIR:-}"
 ACTIVE='"stop_hook_active"[[:space:]]*:[[:space:]]*true'
 [[ $HOOK_INPUT =~ $ACTIVE ]] && exit 0
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
+case "$0" in
+  */*) SCRIPT_DIR="${0%/*}" ;;
+  *) SCRIPT_DIR=. ;;
+esac
+# shellcheck source=opt-in.sh
+. "$SCRIPT_DIR/opt-in.sh"
+STATUS=0
+ge_input_path "$HOOK_INPUT" cwd || STATUS=$?
+case $STATUS in
+  0) ge_opted_in "" "$PROJECT_DIR" "$GE_INPUT_PATH" || exit 0 ;;
+  2) ;; # an escaped cwd: Python decodes it and decides
+  *) ge_opted_in "" "$PROJECT_DIR" || exit 0 ;;
+esac
+
+SCRIPT_DIR="$(cd "$SCRIPT_DIR" && pwd -P)"
 # shellcheck source=python-runtime.sh
 . "$SCRIPT_DIR/python-runtime.sh"
 ge_python_runtime || exit 2

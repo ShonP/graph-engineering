@@ -62,9 +62,11 @@ commits.
   `.claude/graph-checks.json` (`test`, `precheck`, `lint` with `{file}` and
   `extensions`; template at `templates/graph-checks.json`). The Stop check runs
   at most once per prompt and waits while background tasks run. Timeouts report
-  "not verified" instead of blocking. Script autodetection (`pyproject.toml`,
-  `package.json`, `Taskfile.yml`) and the whole-project typecheck on every edit
-  are removed.
+  "not verified" instead of blocking. Both hooks find the file from the edited
+  file or the session cwd upward, so workspace repos and linked worktrees use
+  their own, and a repo without one starts no Python. Script autodetection
+  (`pyproject.toml`, `package.json`, `Taskfile.yml`) and the whole-project
+  typecheck on every edit are removed.
 - hooks: `hooks.json` registers async lint, the three-handler destructive-command
   guard (`Bash(git *)`, so `git -C <dir> push -f` is reached), the Agent|Task
   policy guard, an `asyncRewake` Stop gate, and SessionStart limited to

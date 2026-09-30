@@ -44,6 +44,12 @@ A complete example is at `templates/graph-checks.json`; copy it to
 
 **Without the file, both hooks do nothing. This breaks 0.14 autodetect (removed in 0.15).**
 
+Where the hooks look: in the directory of the edited file (lint) or of the
+session's working directory and `CLAUDE_PROJECT_DIR` (Stop), and in every parent
+of it. A nested repo in a multi-repo workspace and a linked worktree therefore use
+their own file. When no file is found the hook exits in bash before starting
+Python, so a repo that never opted in is never told that Python 3.11+ is missing.
+
 Removed in 0.15: the `uv run test` and `package.json` script lookups and the Taskfile lookup.
 A repo that relied on them has to add the file to keep the Stop gate and the lint.
 
@@ -143,8 +149,9 @@ compaction lose it, so those three print.
 ## Dependencies
 
 `bash` and a Python 3.11+ interpreter, found on `PATH` or among interpreters uv
-has already installed. Hooks never download one, and an unavailable interpreter
-fails visibly instead of skipping a check. No `jq`, no packages to install.
+has already installed. Hooks never download one, and in a repo that opted in an
+unavailable interpreter fails visibly instead of skipping a check; a repo that did
+not opt in never needs one. No `jq`, no packages to install.
 Whatever the configured argv lists name (a linter, a build tool) is the repo's own
 dependency, not the plugin's.
 

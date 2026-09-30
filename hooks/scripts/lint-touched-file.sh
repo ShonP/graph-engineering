@@ -3,8 +3,11 @@
 # PostToolUse hook, matcher Edit|Write, registered async: lint the one file
 # Claude just wrote with the argv a repository opted into in
 # .claude/graph-checks.json ("lint": {"argv": [..., "{file}"], "extensions":
-# [".py"]}). Nothing is autodetected, and without a lint key nothing but bash
-# runs. It informs and never blocks: exit 0 on every path.
+# [".py"]}). Nothing is autodetected. The config is looked up where it can
+# apply: the edited file's directory and its ancestors (opt-in.sh), so a nested
+# repo in a multi-repo workspace and a linked worktree use their own file. With
+# no lint key on that path nothing but bash runs. It informs and never blocks:
+# exit 0 on every path.
 #
 # Contract (Claude Code 2.1.285, spiked 2026-09-30; hooks reference
 # https://code.claude.com/docs/en/hooks): an async hook's exit code is ignored;
@@ -19,11 +22,22 @@ set -u
 HOOK_INPUT="$(cat)"
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-}"
-CONFIG="$PROJECT_DIR/.claude/graph-checks.json"
-[ -n "$PROJECT_DIR" ] && [ -f "$CONFIG" ] || exit 0
-grep -q '"lint"' "$CONFIG" 2>/dev/null || exit 0
+[ -n "$PROJECT_DIR" ] || exit 0
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
+case "$0" in
+  */*) SCRIPT_DIR="${0%/*}" ;;
+  *) SCRIPT_DIR=. ;;
+esac
+# shellcheck source=opt-in.sh
+. "$SCRIPT_DIR/opt-in.sh" || exit 0
+ge_input_path "$HOOK_INPUT" file_path
+case $? in
+  0) ge_opted_in lint "${GE_INPUT_PATH%/*}" || exit 0 ;;
+  2) ;; # an escaped path: Python decodes it and decides
+  *) exit 0 ;;
+esac
+
+SCRIPT_DIR="$(cd "$SCRIPT_DIR" && pwd -P)" || exit 0
 # shellcheck source=python-runtime.sh
 . "$SCRIPT_DIR/python-runtime.sh"
 ge_python_runtime 2>/dev/null || exit 0

@@ -177,7 +177,7 @@ for script in "$LINT" "$STOP" "$HANDOFF"; do
 done
 "$GE_PYTHON" -m json.tool "$HOOKS_DIR/hooks.json" >/dev/null 2>&1
 check "hooks.json parses as JSON" 0 $?
-for script in "$LINT" "$STOP" "$HANDOFF"; do
+for script in "$LINT" "$STOP" "$HANDOFF" "$HOOKS_DIR/scripts/opt-in.sh"; do
   bash -n "$script" 2>/dev/null
   check "parses as bash: $(basename "$script")" 0 $?
 done
