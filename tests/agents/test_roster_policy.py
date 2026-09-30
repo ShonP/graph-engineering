@@ -15,15 +15,20 @@ SKILLS = ROOT / "skills"
 TIERS = {
     "implementer": "opus",
     "reviewer": "opus",
+    "reviewer-lead": "opus",
     "planner": "opus",
     "ux-designer": "opus",
     "implementer-simple": "sonnet",
     "researcher": "sonnet",
+    "researcher-spike": "sonnet",
     "qa": "sonnet",
     "qa-lead": "sonnet",
     "retro": "sonnet",
 }
-MAX_TURNS = {"implementer": 200, "implementer-simple": 60, "qa": 250, "qa-lead": 150, "retro": 40}
+MAX_TURNS = {
+    "implementer": 200, "implementer-simple": 60, "qa": 250, "qa-lead": 150, "retro": 40,
+    "researcher-spike": 25, "reviewer-lead": 120,
+}
 # Fields a plugin agent honors, minus isolation (it branches from the default
 # branch, not the run branch). permissionMode, hooks, mcpServers and
 # initialPrompt are ignored for plugin agents, so they are rejected here too.
@@ -40,7 +45,9 @@ SHARED_BLOCK = (
     "with an explicit timeout (at most 600000 ms). Never end your turn while you "
     "still need a result."
 )
-SHARED_BLOCK_AGENTS = ("implementer", "implementer-simple", "qa", "researcher")
+SHARED_BLOCK_AGENTS = (
+    "implementer", "implementer-simple", "qa", "researcher", "researcher-spike",
+)
 REVIEWER_LENSES = {
     "review-protocol": "# Review protocol",
     "security-review": "# Security review",
