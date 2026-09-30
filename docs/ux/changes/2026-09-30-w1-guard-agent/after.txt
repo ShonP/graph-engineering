@@ -1,0 +1,43 @@
+# after: branch ge-t-w1-guard-agent, synthetic PreToolUse(Agent) payloads through hooks/scripts/guard-agent.sh
+# profile: 'policy: {}' (plugin defaults) plus localAgents {review: my-reviewer}
+
+## general-purpose -> deny (roster + override line)
+stdin tool_input: {"subagent_type":"general-purpose","description":"d","prompt":"p"}
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "graph-engineering policy: subagent type general-purpose is blocked in this repo. Dispatch a roster agent (graph-engineering:implementer, implementer-simple, reviewer, researcher, qa, planner, ux-designer, retro), or add a line policy-override: <reason> to the prompt."}}
+exit=0
+
+## omitted subagent_type (host runs general-purpose) -> deny
+stdin tool_input: {"description":"d","prompt":"p"}
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "graph-engineering policy: subagent type general-purpose is blocked in this repo. Dispatch a roster agent (graph-engineering:implementer, implementer-simple, reviewer, researcher, qa, planner, ux-designer, retro), or add a line policy-override: <reason> to the prompt."}}
+exit=0
+
+## reviewer asking for haiku -> deny (never)
+stdin tool_input: {"subagent_type":"graph-engineering:reviewer","model":"haiku","description":"d","prompt":"p"}
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "graph-engineering policy: model haiku is not allowed here (policy.never). Omit model or use opus."}}
+exit=0
+
+## Explore asking for fable -> deny (never, no tier)
+stdin tool_input: {"subagent_type":"Explore","model":"fable","description":"d","prompt":"p"}
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "graph-engineering policy: model fable is not allowed here (policy.never). Omit model."}}
+exit=0
+
+## local my-reviewer, no model -> rewrite to opus
+stdin tool_input: {"subagent_type":"my-reviewer","description":"d","prompt":"p","run_in_background":true}
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow", "permissionDecisionReason": "graph-engineering policy: my-reviewer runs on opus (policy.roles)", "updatedInput": {"subagent_type": "my-reviewer", "description": "d", "prompt": "p", "run_in_background": true, "model": "opus"}}}
+exit=0
+
+## implementer-simple asking for opus -> rewrite to sonnet
+stdin tool_input: {"subagent_type":"graph-engineering:implementer-simple","model":"opus","description":"d","prompt":"p"}
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow", "permissionDecisionReason": "graph-engineering policy: implementer-simple runs on sonnet (policy.roles)", "updatedInput": {"subagent_type": "graph-engineering:implementer-simple", "model": "sonnet", "description": "d", "prompt": "p"}}}
+exit=0
+
+## Explore, no model -> no output
+stdin tool_input: {"subagent_type":"Explore","description":"d","prompt":"p"}
+exit=0
+
+## override line -> no output, one ledger line
+stdin tool_input: {"subagent_type":"general-purpose","description":"d","prompt":"spike\npolicy-override: owner approved a one-off spike"}
+exit=0
+
+## .graph/ledger.md after the override (timestamp normalised)
+- <UTC ISO> policy-override: type=general-purpose model=default agent=main reason=owner approved a one-off spike

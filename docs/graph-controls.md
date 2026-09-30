@@ -13,6 +13,7 @@ uv run scripts/graph-control.py record-receipt /absolute/run/run.json /absolute/
 uv run scripts/graph-control.py verify /absolute/run/run.json --store /absolute/run/receipts.json
 uv run scripts/graph-control.py validate-attempts /absolute/run/attempts.json
 uv run scripts/graph-control.py event /absolute/run/event.json --state /absolute/run/events.json
+uv run scripts/graph-control.py guard-agent --profile /absolute/repo/.claude/graph-profile.yaml --root /absolute/repo < hook-input.json
 ```
 
 `preflight --readiness-only` is for the stage before implementation/runtime startup: it checks configuration, plan, tools, models and baseline source, but does not require the runtime observation file yet. Its `phase: readiness` result cannot authorize completion. Use a planned runtime artifact path and placeholder fingerprint until the runner reports actual identity, then refresh the candidate manifest. Recording and verification never accept readiness-only mode.
@@ -133,10 +134,64 @@ Run this validator before every fix dispatch. Rounds are consecutive per task an
 
 An event is `{"task_id":"T1","sequence":1,"kind":"progress","summary":"tests running"}`. Kinds are progress/yielded/completed/failed/decision. Per-task sequence strictly increases. State retains only the latest event per task; only completed/failed/decision returns `wake:true`. The engine/host must honor this signal; the helper does not intercept native notifications.
 
+## Command modules
+
+Every subcommand beyond the eight built-ins above (`guard-agent` included) is a plug-in: one module under `scripts/graph_control/commands/`, discovered at startup, so a new subcommand is a new file and `cli.py` is not edited. A module defines:
+
+- `NAME: str`, the subcommand name. A NAME that collides with an existing subcommand, built-in or plug-in, raises at startup.
+- `HELP: str`, one line for `--help`.
+- `add_arguments(parser)`, which adds its argparse arguments.
+- `run(args) -> dict | Output`.
+
+`iter_commands()` imports every module in the package with `pkgutil`, in name order, and raises `TypeError` for a module missing any of the four, so a broken module fails loudly instead of vanishing. Modules whose name starts with `_` are private helpers and are skipped. Import heavy dependencies such as PyYAML inside `run`, never at module top, so discovery stays cheap for every other subcommand.
+
+Result handling in `cli.py`: a dict prints `{"status":"PASS",...}` with sorted keys and exits 0, exactly like the built-ins. An `Output(text, exit_code=0)` (frozen dataclass) prints `text` verbatim, with no added newline, and exits `exit_code`; use it when stdout belongs to another protocol, such as hook JSON. `Invalid`, `ValueError` and `OSError` print the BLOCKED JSON and exit 1. Plug-ins keep this tool's contract: they read files and never execute project commands.
+
+## guard-agent
+
+The body of the PreToolUse hook for `Agent|Task`, `hooks/scripts/guard-agent.sh`. It reads the hook payload on stdin and the profile's `policy:` block, prints hook JSON or nothing, and exits 0. Every key of the block is optional; these are the plugin defaults:
+
+```yaml
+policy:
+  roles:            # agent type -> model alias; entries override these defaults one type at a time
+    planner: opus
+    ux-designer: opus
+    implementer: opus
+    reviewer: opus
+    implementer-simple: sonnet
+    researcher: sonnet
+    qa: sonnet
+    retro: sonnet
+  never: [haiku, fable]           # replaces the default when present
+  block_types: [general-purpose]  # replaces the default when present
+```
+
+Semantics, first match wins:
+
+1. No profile, a profile that is not a mapping, or no `policy` mapping: no decision. A repo without the block is untouched.
+2. The type is `tool_input.subagent_type` with a leading `graph-engineering:` stripped. A call with no type counts as `general-purpose`, because that is what the host runs for it. A roster type takes its `roles` tier. A name among the values of `localAgents` takes the tier of the role its key names, either a role (`qa`) or a playbook leg (`plan`, `design`, `implement`, `review`, `research`, `verify`); a value may be one name or a stack-to-name mapping. Anything else (`Explore`, `Plan`, `other-plugin:x`, a `visual` leg) has no tier.
+3. A prompt line matching `^policy-override: (.+)$` skips enforcement and appends one ledger line (below). This is the escape hatch for a deliberate exception.
+4. A type in `block_types`: deny with `graph-engineering policy: subagent type <t> is blocked in this repo. Dispatch a roster agent (graph-engineering:implementer, implementer-simple, reviewer, researcher, qa, planner, ux-designer, retro), or add a line policy-override: <reason> to the prompt.`
+5. A `tool_input.model` in `never`: deny with `graph-engineering policy: model <m> is not allowed here (policy.never). Omit model or use <tier>.`, or just `Omit model.` for a type with no tier.
+6. A tier with `model` absent or different: allow, with `updatedInput` set to the complete original `tool_input` plus `model: <tier>`. The host replaces the whole input with `updatedInput` (spike j, CLI 2.1.285, and the hooks reference), so every other field is copied unchanged; an omitted model is an absent key.
+7. Otherwise no decision.
+
+Output shape: `{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny" | "allow", "permissionDecisionReason": "...", "updatedInput": {...}}}`, with `updatedInput` on a rewrite only. `agent_id` and `agent_type` are present only on calls made inside a subagent, so both are optional.
+
+Observability: an override appends one line to `<root>/.graph/ledger.md`, creating the directory:
+
+```
+- 2026-09-30T12:00:00+00:00 policy-override: type=general-purpose model=default agent=main reason=owner approved a one-off spike
+```
+
+`agent` is the calling subagent's `agent_id`, or `main`. Control characters in a field collapse to spaces and each field is capped at 200 characters, so a payload cannot forge ledger lines; the prompt itself is never logged.
+
+Fail-open, on purpose: a broken policy must never block every dispatch in a repo. An unreadable payload or profile (missing, invalid YAML, duplicate keys through `preflight.read_profile`) gives no decision; a ledger write failure warns on stderr and keeps the decision. The wrapper drains stdin and exits 0 with no output when `CLAUDE_PROJECT_DIR` is unset, the profile is missing, it has no top-level `policy:` line (checked with `grep`, so such repos never start uv), `uv` is not on PATH, or the helper exits nonzero. The cost is that a broken profile silently disables enforcement; `preflight` still rejects that profile when a run starts. Rollback: delete the `policy:` block, which makes the hook a no-op, or revert. Claim: subagent type and model are enforced; delegation itself is only guided.
+
 ## Regression suite
 
 ```
 uv run --python 3.12 --with PyYAML==6.0.2 python -m unittest discover -s tests/graph_control -v
 ```
 
-Fixtures cover the audited FE3→FE4 missing edge, unavailable planned count, synthetic-as-real evidence, composed workflow transitions, missing QA graph/runtime, missing models/skills, lint-only false gates, exact source/dirty/runtime freshness, log drift, zero/skipped cases, later failures, repair limits, event coalescing, and a public CLI record→verify→wrong-candidate failure sequence. Semantic witness truth and meaningful oracle quality remain model-review/evaluation cases rather than parser claims.
+Fixtures cover the command-module registry, guard-agent policy semantics, the audited FE3→FE4 missing edge, unavailable planned count, synthetic-as-real evidence, composed workflow transitions, missing QA graph/runtime, missing models/skills, lint-only false gates, exact source/dirty/runtime freshness, log drift, zero/skipped cases, later failures, repair limits, event coalescing, and a public CLI record→verify→wrong-candidate failure sequence. Semantic witness truth and meaningful oracle quality remain model-review/evaluation cases rather than parser claims.
