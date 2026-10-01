@@ -141,6 +141,8 @@ CASES = {
                                           {("warn", "routing-bare")}),
     "risk keyword is an invalid regex": (swap(LIST_ROW, '  - {id: db-schema, paths: ["migrations/**"], keywords: ["re:("]}\n'),
                                          {("error", "risk-keyword")}),
+    "risk keyword nests quantifiers": (swap(LIST_ROW, '  - {id: db-schema, paths: ["migrations/**"], keywords: ["re:(a+)+$"]}\n'),
+                                       {("warn", "risk-nested")}),
     ".graph not ignored": (lambda f: (f.root / ".gitignore").write_text("node_modules/\n"), {("warn", "graph-not-ignored")}),
     "installed version differs": (lambda f: f.installed(installed("0.0.1")), {("warn", "version-mismatch")}),
     "installed_plugins.json absent": (lambda f: f.installed(None), {("info", "cannot-determine")}),

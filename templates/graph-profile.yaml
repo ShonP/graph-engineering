@@ -595,7 +595,9 @@ policy:
 # (the routing glob dialect) or an added line contains one of `keywords`
 # (literal and case-sensitive: write them the way the code spells them). A
 # keyword starting with `re:` is a Python regex, e.g. for lowercase SQL. Keywords
-# never read prose files (*.md, README, CHANGELOG and the like). A risk match
+# never read prose files (*.md, README, CHANGELOG and the like). A `re:` pattern
+# has no nested quantifiers like (a+)+ and runs per added line; lines over 4,096
+# characters skip it, and depth BLOCKS past 5 s naming the row. A risk match
 # forces at least the `quick` lane. These lists are starting points kept
 # deliberately tight; tune them to this repo, since every extra keyword is a
 # false positive that costs an owner gate.
@@ -639,8 +641,10 @@ risk:
     paths: ["**/{billing,payments}/**"]
     keywords: ["stripe.", "Stripe("]
   - id: destructive
-    # Uppercase SQL, plus one regex for lowercase SQL in code. Bare `truncate`
-    # is a CSS class and "Delete from" is UI copy, so neither matches.
+    # Uppercase SQL, plus regexes for lowercase SQL in code: a statement opens
+    # a line or follows a quote, paren or `;`. `SHOULD_TRUNCATE`, the CSS class
+    # `truncate`, and copy like "Drag and drop column headers" or "Delete from
+    # favorites" do not match.
     paths: []
     keywords:
       - "DROP TABLE"
@@ -649,9 +653,11 @@ risk:
       - "DROP COLUMN"
       - "DROP VIEW"
       - "DROP INDEX"
-      - "TRUNCATE "
       - "DELETE FROM"
-      - 're:\b(?i:drop|truncate)\s+(?i:table|database|schema|column|view|index)\b'
+      - 're:\bTRUNCATE\s+(?:TABLE\b|ONLY\b|[A-Za-z_"])'
+      - 're:(?:^|["''`(;])\s*(?:drop|truncate)\s+(?:table|database|schema|view|index)\b'
+      - 're:(?:^|["''`(;])\s*delete\s+from\s+\S'
+      - 're:\balter\s+table\s+\S+\s+drop\s+column\b'
   - id: credentials-and-access
     paths: [".sops.yaml", "**/*.enc.{yaml,yml}", "**/.env*"]
     keywords: []

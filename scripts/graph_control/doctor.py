@@ -17,7 +17,7 @@ from typing import Any
 
 from .common import Invalid, load
 from .preflight import read_profile
-from .risk import CONTROL, BadPattern, parse_rows
+from .risk import CONTROL, BadPattern, nested, parse_rows
 
 LEVELS = ("error", "warn", "info")
 TIERS = ("opus", "sonnet")
@@ -107,13 +107,18 @@ def _policy(profile: dict[str, Any]) -> list[Finding]:
 def _risk(profile: dict[str, Any]) -> tuple[list[Finding], set[str] | None]:
     """The risk table read by the reader depth uses; None ids when its shape is wrong."""
     try:
-        return [], {row.id for row in parse_rows(profile.get("risk"))}
+        rows = parse_rows(profile.get("risk"))
     except BadPattern as error:
         return [Finding("error", "risk-keyword", str(error), "fix the regex after `re:`, or drop `re:` to match "
                         "the keyword literally")], None
     except Invalid as error:
         return [Finding("error", "risk-shape", str(error), "write `risk:` as a list of `- id: <name>` rows with "
                         "`paths` and `keywords`, as templates/graph-profile.yaml does")], None
+    ids, slow = {row.id for row in rows}, nested(rows)  # slow is advisory: depth stops it at its time budget
+    if not slow:
+        return [], ids
+    return [Finding("warn", "risk-nested", f"risk keywords nest quantifiers, so one line can backtrack for seconds: "
+                    f"{', '.join(slow)}", "rewrite without the outer quantifier, e.g. (a+)+ as a+")], ids
 
 
 def _gates(profile: dict[str, Any]) -> list[Finding]:

@@ -26,8 +26,10 @@ RISK = [
     ("outbound-messaging", ["**/{email,emails,mailers,notifications,notifier*}/**"], []),
     ("spend", ["**/{billing,payments}/**"], ["stripe.", "Stripe("]),
     ("destructive", [], ["DROP TABLE", "DROP DATABASE", "DROP SCHEMA", "DROP COLUMN", "DROP VIEW", "DROP INDEX",
-                         "TRUNCATE ", "DELETE FROM",
-                         r"re:\b(?i:drop|truncate)\s+(?i:table|database|schema|column|view|index)\b"]),
+                         "DELETE FROM", r're:\bTRUNCATE\s+(?:TABLE\b|ONLY\b|[A-Za-z_"])',
+                         r"""re:(?:^|["'`(;])\s*(?:drop|truncate)\s+(?:table|database|schema|view|index)\b""",
+                         r"""re:(?:^|["'`(;])\s*delete\s+from\s+\S""",
+                         r"re:\balter\s+table\s+\S+\s+drop\s+column\b"]),
     ("credentials-and-access", [".sops.yaml", "**/*.enc.{yaml,yml}", "**/.env*"], []),
     ("outside-the-run", [], []),
 ]
@@ -89,7 +91,8 @@ class SchemaV2Tests(unittest.TestCase):
     def test_risk_comment_names_the_built_in_control_plane_row(self):
         text = comment_before("risk:")
         for token in ("agent-control", ".claude/**", "CLAUDE.md", "AGENTS.md", ".mcp.json", ".github/**",
-                      "instructionPaths", "reserved", "case-sensitive", "`re:`", "never read prose files"):
+                      "instructionPaths", "reserved", "case-sensitive", "`re:`", "never read prose files",
+                      "nested quantifiers", "4,096"):
             with self.subTest(token=token):
                 self.assertIn(token, text)
         self.assertNotIn("case-insensitive", text)

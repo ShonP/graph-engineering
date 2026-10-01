@@ -5,6 +5,8 @@ profile template names, wcmatch GLOBSTAR | BRACE | DOTGLOB.
 """
 
 import importlib.util
+import threading
+import time
 import unittest
 from pathlib import Path
 
@@ -16,7 +18,8 @@ if importlib.util.find_spec("wcmatch") is None:  # the PEP 723 pin; scripts/run-
     raise unittest.SkipTest("needs wcmatch: uv run --with PyYAML==6.0.2 --with wcmatch==11.0.1")
 
 from graph_control.common import Invalid  # noqa: E402
-from graph_control.risk import SHAPE, BadPattern, Row, classify, load_rows  # noqa: E402
+from graph_control.risk import (LONG_LINE, SHAPE, BadPattern, Overrun, Row, classify, load_rows,  # noqa: E402
+                                 nested, skipped_lines)
 
 TEMPLATE = Path(__file__).resolve().parents[2] / "templates" / "graph-profile.yaml"
 
@@ -84,13 +87,16 @@ class PlaceholderRows(unittest.TestCase):
         rows = load_rows(yaml.safe_load(TEMPLATE.read_text()))
         self.assertIn("public-copy", [row.id for row in rows])
         self.assertIn("outside-the-run", [row.id for row in rows])
+        self.assertEqual(nested(rows), [])  # no shipped regex backtracks exponentially
 
     def test_template_destructive_keywords_catch_sql_in_code(self):
         rows = load_rows(yaml.safe_load(TEMPLATE.read_text()))
-        for line in ('cur.execute("TRUNCATE audit_log")', "ALTER TABLE users DROP COLUMN email",
-                     "conn.execute('drop table x')", "TRUNCATE TABLE users;", "DELETE FROM users WHERE id = 1;",
+        for line in ('cur.execute("TRUNCATE audit_log")', "TRUNCATE TABLE x", "ALTER TABLE users DROP COLUMN email",
+                     'cur.execute("drop table x")', "conn.execute('drop table x')", "TRUNCATE TABLE users;",
+                     'cur.execute("delete from users where 1=1")', 'cur.execute(f"delete from {table}")',
+                     "alter table users drop column email", "DELETE FROM users WHERE id = 1;",
                      "DROP DATABASE app;", "DROP SCHEMA app CASCADE;", "DROP VIEW v;", "DROP INDEX i;",
-                     "op.execute('truncate table audit')"):
+                     "op.execute('truncate table audit')", "knex.raw(`drop table x`)", "    drop table x;"):
             with self.subTest(line=line):
                 self.assertIn("destructive", classify(["src/db.py"], line, rows))
 
@@ -100,6 +106,10 @@ class PlaceholderRows(unittest.TestCase):
                            ("web/src/Card.tsx", "onDrop={() => drop(item)}"),
                            ("web/src/Card.tsx", "<p>Drag and drop the file</p>"),
                            ("web/src/locales/en.json", '"remove": "Delete from favorites",'),
+                           ("web/src/locales/en.json", '"hint": "Drag and drop column headers",'),
+                           ("web/src/flags.ts", "export const SHOULD_TRUNCATE = true;"),
+                           ("src/config.py", 'TRUNCATE = "truncate"'),
+                           ("web/src/Card.tsx", 'className="truncate text-sm"'),
                            ("web/src/Table.tsx", '<table className="table-striped" />'),
                            ("web/src/Pay.tsx", "// recharge, surcharge, discharge"),
                            ("src/pay.py", "# Payments are processed by Stripe.")):
@@ -162,6 +172,49 @@ class RegexKeywords(unittest.TestCase):
             self.assertIn("destructive", str(caught.exception))
             self.assertIn(repr(keyword), str(caught.exception))
         self.assertTrue(issubclass(BadPattern, Invalid))
+
+
+class RegexBounds(unittest.TestCase):
+    """A `re:` keyword runs on backtracking `re`: long lines are skipped and one call has a time budget."""
+
+    def rows(self, *keywords):
+        return load_rows({"risk": [{"id": "slow", "keywords": list(keywords)}]})
+
+    def test_a_runaway_regex_on_one_short_line_is_cut_off_naming_the_row(self):
+        start = time.monotonic()
+        with self.assertRaises(Overrun) as caught:  # about 40 s uncut on CPython 3.12
+            classify(["src/x.py"], "a" * 30 + "!", self.rows("re:(a+)+$"), budget=0.2)
+        self.assertLess(time.monotonic() - start, 2)
+        self.assertIn("risk row slow", str(caught.exception))
+        self.assertTrue(issubclass(Overrun, Invalid))
+
+    def test_off_the_main_thread_the_budget_is_checked_between_lines(self):
+        caught = []
+
+        def scan():
+            try:
+                classify(["src/x.py"], "\n".join(["a" * 16 + "!"] * 400), self.rows("re:(a+)+$"), budget=0.05)
+            except Overrun as error:
+                caught.append(error)
+
+        worker = threading.Thread(target=scan)
+        worker.start()
+        worker.join(10)
+        self.assertFalse(worker.is_alive())
+        self.assertEqual(len(caught), 1)
+
+    def test_regex_keywords_skip_lines_over_the_limit_and_count_them(self):
+        rows = self.rows(r"re:drop\s+table", "API_KEY")
+        line = "drop table x  # " + "y" * LONG_LINE
+        self.assertEqual(classify(["src/db.py"], line, rows), [])
+        self.assertEqual(skipped_lines(line + "\nshort", rows), 1)
+        self.assertEqual(classify(["src/db.py"], line[:LONG_LINE], rows), ["slow"])  # at the limit: read
+        self.assertEqual(classify(["src/db.py"], "API_KEY " + "y" * LONG_LINE, rows), ["slow"])  # literals: read
+        self.assertEqual(skipped_lines(line, self.rows("API_KEY")), 0)  # nothing skipped without a regex
+
+    def test_nested_quantifiers_are_flagged_for_doctor(self):
+        rows = self.rows("re:(a+)+$", r"re:(\w*)*x", r"re:drop\s+table", "(a+)+")
+        self.assertEqual(nested(rows), ["slow 're:(a+)+$'", "slow 're:(\\\\w*)*x'"])
 
 
 class GlobDialect(unittest.TestCase):

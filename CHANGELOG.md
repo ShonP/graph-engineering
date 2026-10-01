@@ -380,8 +380,17 @@ of model tiers, and haiku, fable and `general-purpose` are blocked.
   `risk-keyword` and BLOCKS depth with the same message. Keywords never read
   added lines of prose files (the `lint` file types), so README and CHANGELOG
   mentions raise no owner class. The template's `destructive` row covers
-  `DROP TABLE|DATABASE|SCHEMA|COLUMN|VIEW|INDEX`, `TRUNCATE `, `DELETE FROM`
-  and one regex for lowercase `drop`/`truncate` statements in code.
+  `DROP TABLE|DATABASE|SCHEMA|COLUMN|VIEW|INDEX` and `DELETE FROM`, a
+  word-bounded `TRUNCATE` followed by a table (so `SHOULD_TRUNCATE` and
+  `TRUNCATE = "x"` do not match), and lowercase-only regexes for `drop`,
+  `truncate` and `delete from` statements that open a line or follow a quote,
+  paren or `;`, plus `alter table ... drop column`; UI copy such as "Drag and
+  drop column headers" and "Delete from favorites" does not match.
+- **`re:` keywords cannot hang depth.** They run per added line and skip lines
+  over 4,096 characters (`regex_skipped_long_lines` in the depth output); one
+  classify has a 5 s budget, enforced between lines and by SIGALRM inside a
+  runaway search on the POSIX main thread, and an overrun is BLOCKED naming the
+  row. doctor warns `risk-nested` on nested quantifiers such as `(a+)+`.
 - `graph-control --help` and `-h` no longer crash: a bare `%` in the
   `validate-briefs` help was read by argparse as a format spec. Tests render the
   top-level help, every subcommand's help and the entry point's `--help`.

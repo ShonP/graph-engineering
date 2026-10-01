@@ -21,7 +21,9 @@ the result says so. Precedence, first match wins:
 4. single otherwise
 
 Size and seams do not lift prose to panel: a long doc or a README in two stacks
-is still prose. A rename counts as one file; both its paths are matched.
+is still prose. A rename counts as one file; both its paths are matched. A `re:`
+keyword skips added lines over risk.LONG_LINE characters, counted as
+`regex_skipped_long_lines`, and matching past `budget` seconds is Invalid.
 """
 
 import os
@@ -31,7 +33,7 @@ from typing import Any
 from .common import Invalid, array, integer, require, strings
 from .identity import git
 from .plan import Plan
-from .risk import Row, classify, control_row, load_rows, matcher
+from .risk import BUDGET, Row, classify, control_row, load_rows, matcher, skipped_lines
 
 PROSE_NAMES = "README,CHANGELOG,CHANGES,HISTORY,NEWS,AUTHORS,CONTRIBUTORS,CONTRIBUTING,LICENSE,LICENCE,NOTICE,COPYING"
 PROSE = ("**/*.{md,markdown,rst,adoc}", f"**/{{{PROSE_NAMES}}}{{,.txt}}")
@@ -112,20 +114,21 @@ def _outside(paths: list[str], rows: tuple[Row, ...], plan: Any) -> list[str]:
     return [path for path in paths if not owned.match(path)]
 
 
-def decide(root: Path, base: str, profile: dict[str, Any], plan: Any = None) -> dict[str, Any]:
+def decide(root: Path, base: str, profile: dict[str, Any], plan: Any = None, budget: float = BUDGET) -> dict[str, Any]:
     panel_lines = integer(_mapping(profile.get("review"), "review").get("panel_lines", PANEL_LINES), 1)
     rows = (*load_rows(profile), control_row(strings(profile.get("instructionPaths", []))))
     seams = _seams(profile)
     commit = _commit(root, base)
     lines, files, paths = _numstat(git(root, *DIFF, "--numstat", "-z", commit, "--"))
     prose = matcher(PROSE)
-    risk_rows = classify(paths, _added(git(root, *DIFF, "--unified=0", commit, "--"), prose), rows)
+    added = _added(git(root, *DIFF, "--unified=0", commit, "--"), prose)
+    risk_rows, skipped = classify(paths, added, rows, budget), skipped_lines(added, rows)
     outside = _outside(paths, rows, plan)
     risk_rows = sorted({*risk_rows, OUTSIDE}) if outside else risk_rows
 
     def result(depth: str, reasons: list[str]) -> dict[str, Any]:
         return {"depth": depth, "changed_lines": lines, "files": files, "risk_rows": risk_rows,
-                "reasons": reasons, "untracked_excluded": True}
+                "reasons": reasons, "untracked_excluded": True, "regex_skipped_long_lines": skipped}
 
     reasons = [f"risk rows: {', '.join(risk_rows)}"] if risk_rows else []
     if outside:

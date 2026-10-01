@@ -24,7 +24,7 @@ from graph_control.preflight import read_profile  # noqa: E402
 
 CLI = Path(__file__).resolve().parents[2] / "scripts" / "graph-control.py"
 TEMPLATE = Path(__file__).resolve().parents[2] / "templates" / "graph-profile.yaml"
-KEYS = {"depth", "changed_lines", "files", "risk_rows", "reasons", "untracked_excluded"}
+KEYS = {"depth", "changed_lines", "files", "risk_rows", "reasons", "untracked_excluded", "regex_skipped_long_lines"}
 LINT = ("prose only: every changed file is *.md, *.markdown, *.rst, *.adoc or a named prose file "
         "(README, CHANGELOG, LICENSE and the like) and none matches instructionPaths")
 RISK = {"risk": [{"id": "db-schema", "paths": ["**/{migrations,schemas}/**"]},
@@ -84,7 +84,7 @@ class Lint(Fixture):
         self.append("README.md", "more prose\n")
         result = self.decide()
         self.assertEqual(result, {"depth": "lint", "changed_lines": 1, "files": 1, "risk_rows": [],
-                                  "reasons": [LINT], "untracked_excluded": True})
+                                  "reasons": [LINT], "untracked_excluded": True, "regex_skipped_long_lines": 0})
 
     def test_claude_md_is_never_lint_even_without_instruction_paths(self):
         self.append("CLAUDE.md", "a new rule\n")
@@ -318,6 +318,35 @@ class TemplateKeywords(Fixture):
         self.append("src/app.py", "cur.execute('DELETE FROM users')\n")
         self.assertEqual(decide(self.repo, self.base, self.profile)["risk_rows"], ["destructive"])
 
+    def test_sql_in_code_matches_destructive(self):
+        for line in ('cur.execute("TRUNCATE audit_log")', "TRUNCATE TABLE x", "ALTER TABLE users DROP COLUMN email",
+                     'cur.execute("drop table x")', 'cur.execute("delete from users where 1=1")',
+                     "alter table users drop column email"):
+            with self.subTest(line):
+                git(self.repo, "checkout", "-q", "--", ".")
+                self.append("src/app.py", line + "\n")
+                self.assertIn("destructive", decide(self.repo, self.base, self.profile)["risk_rows"])
+
+    def test_code_and_copy_that_share_sql_words_do_not_match(self):
+        self.append("web/page.ts", 'export const SHOULD_TRUNCATE = true;\nTRUNCATE = "truncate"\n'
+                                   '<span className="truncate text-sm" />\n')
+        self.write("web/locales/en.json", '{"hint": "Drag and drop column headers", "remove": "Delete from favorites"}\n',
+                   track=True)
+        self.append("README.md", "Payments are processed by Stripe.\n")
+        result = decide(self.repo, self.base, self.profile)
+        self.assertEqual((result["depth"], result["risk_rows"]), ("single", []))
+
+    def test_a_long_added_line_skips_regex_keywords_and_is_counted(self):
+        self.append("src/app.py", 'cur.execute("drop table x")  # ' + "y" * 5000 + "\nprint('short')\n")
+        result = decide(self.repo, self.base, self.profile)
+        self.assertEqual((result["risk_rows"], result["regex_skipped_long_lines"]), ([], 1))
+
+    def test_a_runaway_regex_blocks_naming_the_row(self):
+        self.append("src/app.py", "a" * 30 + "!\n")
+        with self.assertRaises(Invalid) as caught:
+            decide(self.repo, self.base, {"risk": [{"id": "slow", "keywords": ["re:(a+)+$"]}]}, budget=0.2)
+        self.assertIn("risk row slow", str(caught.exception))
+
     def test_ui_copy_in_an_i18n_file_does_not_match_destructive(self):
         self.write("web/locales/en.json", '{"remove": "Delete from favorites", "cell": "truncate text-sm"}\n', track=True)
         result = decide(self.repo, self.base, self.profile)
@@ -355,7 +384,7 @@ class Cli(Fixture):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(json.loads(result.stdout), {
             "status": "PASS", "depth": "panel", "changed_lines": 1, "files": 1, "risk_rows": ["db-schema"],
-            "reasons": ["risk rows: db-schema"], "untracked_excluded": True})
+            "reasons": ["risk rows: db-schema"], "untracked_excluded": True, "regex_skipped_long_lines": 0})
 
     def test_cli_decides_with_the_shipped_template_profile(self):
         self.append("README.md", "more prose\n")
