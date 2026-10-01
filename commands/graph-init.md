@@ -16,7 +16,8 @@ Produces `.claude/graph-profile.yaml` from the plugin's `templates/graph-profile
    - Read `.claude/graph-profile.yaml` and `<plugin-root>/templates/graph-profile.yaml`.
    - Add every block the template has and the profile is missing, in the template's position, with the template's comment and default; nested keys too (a `gates` without `owner_classes` gains it). For a missing block a detection step fills (`runtime`, `deploy`, `infra`, `api`, `bootstrap`, `lanes`, `host`: step 4), run that step for that block only; what it cannot find keeps the empty default and is listed as a gap.
    - Run step 3 and add the derived routing rows the profile lacks. Never delete a row: an existing row that routes a framework skill no manifest declares is listed in the summary for the owner to drop.
-   - Never change a value the profile already sets, even where it differs from the template.
+   - Never change a value the profile already sets, even where it differs from the template, except the rewrite below.
+   - Qualify bare skill names (doctor's `routing-bare`). In every routing row (`impl`, `review`, `qa`, `design`), in `always` and in the review lists, rewrite a bare name to `graph-engineering:<name>` when `<plugin-root>/skills/*/<name>/SKILL.md` exists, the same rule `check-routing-resolves` uses. A name with no plugin skill (a repo-local one under `.claude/skills/`) is left bare, and another plugin's qualified name is left as written. Each rewrite shows in the diff below and is written only on approval.
    - Remove the stale keys `content` and `gates.publication` (dropped in 0.12). Print each removed key with its old value, so nothing leaves silently.
    - Set `schema_version: 2` as the first key.
    - Edit the file as text. A YAML load-and-dump drops every comment the owner wrote.

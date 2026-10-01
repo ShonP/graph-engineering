@@ -85,6 +85,14 @@ class GraphInitCommandTests(unittest.TestCase):
                        "schema_version: 2", "unified diff", "approv", "comment"):
             self.assertIn(needle, up, needle)
 
+    def test_upgrade_qualifies_bare_plugin_skill_names_in_routing(self):
+        up = section("**Upgrade")
+        for needle in ("bare", "`graph-engineering:<name>`", "`always`", "review", "skills/*/<name>/SKILL.md",
+                       "check-routing-resolves", "routing-bare", ".claude/skills/", "left bare"):
+            self.assertIn(needle, up, needle)
+        rewrite = next(line for line in up.split("\n") if "routing-bare" in line)
+        self.assertRegex(rewrite, r"\bdiff\b")  # the rewrite shows in the upgrade diff, written only on approval
+
     def test_routing_is_dependency_derived_from_the_single_table(self):
         routing = section("**Derive routing")
         for manifest in MANIFESTS:
