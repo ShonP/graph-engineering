@@ -1,0 +1,18 @@
+# after: branch ge-t-w4-measure (hook change on 6817dd2), `bash capture.sh <plugin-root>`
+
+### repo with no .graph/*/plan.json
+hooks/scripts/print-handoff.sh: exit 0
+(no output)
+
+### one merged run, 7-day window elapsed, no measure.md
+hooks/scripts/print-handoff.sh: exit 0
+graph-engineering: 1 success measure(s) due (01a0d000-0000-7000-8000-000000000001). Run: python3 <plugin>/scripts/measure_signals.py .graph/<run>
+
+### one merged run, window not elapsed
+hooks/scripts/print-handoff.sh: exit 0
+(no output)
+
+### two merged runs, one already measured
+hooks/scripts/print-handoff.sh: exit 0
+graph-engineering: 1 success measure(s) due (01a0d000-0000-7000-8000-000000000003). Run: python3 <plugin>/scripts/measure_signals.py .graph/<run>
+

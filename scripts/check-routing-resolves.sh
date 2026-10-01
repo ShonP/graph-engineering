@@ -15,7 +15,10 @@
 #
 # A name resolves when exactly one `skills/*/<name>/SKILL.md` exists (the
 # same layout `check-skill-frontmatter.sh` walks). Zero or more than one is a
-# failure.
+# failure. Routing names a plugin skill qualified, `graph-engineering:<name>`:
+# a bare one fails naming that form, since a bare name can resolve to a host
+# built-in and the skill receipt counts only the identical qualified name.
+# Another plugin's qualified name is skipped: it cannot resolve from here.
 #
 # Usage: scripts/check-routing-resolves.sh [root]     (default: the repo root)
 # Exit 0 when every name resolves, 1 on any failure.
@@ -88,10 +91,18 @@ def agent_skill_names(path):
     return [n.split(":", 1)[1] if n.startswith("graph-engineering:") else n for n in names]
 
 
-refs = {}  # name -> set of referencing files, relative to root
+PLUGIN = "graph-engineering"
+refs = {}  # bare name -> set of referencing files, relative to root
+bare_routing = {}  # routing names written without the plugin prefix -> files
 
 for name in routing_names(template_path):
-    refs.setdefault(name, set()).add(os.path.relpath(template_path, root))
+    prefix, _, skill = name.rpartition(":")
+    rel = os.path.relpath(template_path, root)
+    if prefix and prefix != PLUGIN:
+        continue
+    if not prefix:
+        bare_routing.setdefault(name, set()).add(rel)
+    refs.setdefault(skill, set()).add(rel)
 
 if os.path.isdir(agents_dir):
     for fname in sorted(os.listdir(agents_dir)):
@@ -118,6 +129,12 @@ for name in sorted(refs):
         failures.append(
             f"FAIL {name}: {len(matches)} matches ({rels}) (referenced by {files})"
         )
+
+for name in sorted(bare_routing):
+    if len(skill_dirs.get(name, [])) == 1:
+        files = ", ".join(sorted(bare_routing[name]))
+        failures.append(f"FAIL {name}: bare plugin skill in routing; write {PLUGIN}:{name}, since a bare name "
+                        f"can resolve to a host built-in (referenced by {files})")
 
 for f in failures:
     print(f)

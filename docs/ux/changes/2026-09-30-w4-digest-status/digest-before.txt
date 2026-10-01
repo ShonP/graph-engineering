@@ -1,0 +1,6 @@
+# before: base ge-next eb22099
+$ uv run scripts/graph-control.py digest --help
+usage: graph-control.py [-h]
+                        {validate-plan,validate-attempts,fingerprint,snapshot,preflight,record-receipt,verify,event,check,depth,doctor,findings,guard-agent,host-check,status,waves}
+                        ...
+graph-control.py: error: argument command: invalid choice: 'digest' (choose from validate-plan, validate-attempts, fingerprint, snapshot, preflight, record-receipt, verify, event, check, depth, doctor, findings, guard-agent, host-check, status, waves)

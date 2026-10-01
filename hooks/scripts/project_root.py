@@ -44,6 +44,35 @@ def project_root(payload: dict, original: Path, *, touched: bool = False) -> Pat
     return original
 
 
+def within(root: Path, start: Path) -> Path | None:
+    """`start` as a directory inside `root`: itself, or its place in root's worktree when it sits in
+    another worktree of the same repository (a package CLAUDE_PROJECT_DIR while Claude works in a
+    linked worktree). None when it is neither."""
+    start = start.resolve()
+    if start.is_relative_to(root):
+        return start if start.is_dir() else None
+    common = git_path(root, '--git-common-dir')
+    if not start.is_dir() or common is None or common != git_path(start, '--git-common-dir'):
+        return None
+    prefix = subprocess.run(['git', '-C', str(start), 'rev-parse', '--show-prefix'],
+                            capture_output=True, text=True, check=False).stdout.strip()
+    mapped = (root / prefix).resolve()
+    return mapped if prefix and mapped.is_relative_to(root) and mapped.is_dir() else None
+
+
+def checks_dir(root: Path, starts: list[Path], config: str) -> Path | None:
+    """The directory holding the `config` nearest the first start that has one, walking up to `root` and
+    never above it: the nearest config wins, the way linters find theirs, so a package in a monorepo
+    keeps its own checks. `root` itself is the last start."""
+    for start in (*starts, root):
+        here = within(root, start)
+        while here is not None:
+            if (here / config).is_file():
+                return here
+            here = here.parent if here != root else None
+    return None
+
+
 def main() -> int:
     try:
         try:

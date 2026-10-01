@@ -1,0 +1,26 @@
+# before: base commit 7593295, `bash capture.sh <plugin-root>`
+
+### git repo with package.json, no .claude/graph-profile.yaml
+hooks/scripts/print-handoff.sh: exit 0
+(no output)
+
+### git repo with no stack marker and no profile
+hooks/scripts/print-handoff.sh: exit 0
+(no output)
+
+### directory that is not a git repo
+hooks/scripts/print-handoff.sh: exit 0
+(no output)
+
+### profile without schema_version, with stale content key, no graph-checks.json
+hooks/scripts/print-handoff.sh: exit 0
+(no output)
+
+### same repo after the fix, first startup
+hooks/scripts/print-handoff.sh: exit 0
+(no output)
+
+### same repo, second startup, nothing changed (cache hit)
+hooks/scripts/print-handoff.sh: exit 0
+(no output)
+

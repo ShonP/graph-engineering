@@ -1,0 +1,45 @@
+# after: branch ge-t-w2-status-usage. Inputs are the SYNTHETIC fixture tests/graph_control/fixtures/sessions
+# (copied to a temp CLAUDE_CONFIG_DIR, ages applied); the last block is one real line from the owner machine.
+
+$ cd <repo> && PYTHONPATH=<plugin>/scripts python3 -m graph_control.status --line
+ge 0192f3ab: 3 live · reviewer(opus) 12m! implementer(opus) 2m qa(sonnet) 0m · out 48k
+exit=0
+
+$ cd <repo> && uv run --with PyYAML==6.0.2 python <plugin>/scripts/graph-control.py status
+graph-engineering status · session syntheti · out 48k
+RUNNING (3)
+  0192f3ab:review          reviewer(opus)               12m!
+  0192f3ab:implement       implementer(opus)            2m
+  0192f3ab:qa              qa(sonnet)                   0m
+NEEDS YOU (2)
+  0192f3ab: Merge now or wait for qa? Default: wait, reversible
+  0192f3ab: Keep the old flag one more release? Default: yes
+COST
+  type                                 requests      out  cache reads cache writes
+  main                                        2      18k          20k          21k
+  graph-engineering:implementer               3      13k          30k          66k
+  graph-engineering:reviewer                  1       8k            0          40k
+  graph-engineering:researcher                1       5k            0          25k
+  graph-engineering:implementer-simple        1       4k            0          20k
+  graph-engineering:qa                        0        0            0            0
+exit=0
+
+$ python3 scripts/session_usage.py --root <fixture>/project --start 2026-09-28T00:00:00Z --end 2026-09-29T00:00:00Z --session synthetic-session --medians  (roles only)
+filters {"session": "synthetic-session", "role": null, "run": null}
+{"role": "graph-engineering:implementer", "agents": 2, "first_turn_input_median": 32602.0, "output_median": 6600.0, "cache_read_median": 15000.0, "cache_write_median": 32850.0}
+{"role": "graph-engineering:implementer-simple", "agents": 1, "first_turn_input_median": 20007, "output_median": 4000, "cache_read_median": 0, "cache_write_median": 20000}
+{"role": "graph-engineering:researcher", "agents": 1, "first_turn_input_median": 25006, "output_median": 5000, "cache_read_median": 0, "cache_write_median": 25000}
+{"role": "graph-engineering:reviewer", "agents": 1, "first_turn_input_median": 40004, "output_median": 8000, "cache_read_median": 0, "cache_write_median": 40000}
+{"role": "main", "agents": 1, "first_turn_input_median": 20010, "output_median": 18000, "cache_read_median": 20000, "cache_write_median": 21000}
+exit=0
+
+# real, 2026-09-30 (this workflow session; descriptions use <wave>:<task>, so the group is "other")
+$ PYTHONPATH=<plugin>/scripts python3 -m graph_control.status --line --root $HOME
+ge other: 2 live · implementer(opus) 0m implementer(opus) 0m · out 3.1M
+exit=0
+
+# performance (wall time incl. a ~18 ms bare interpreter start, macOS, Python 3.14)
+# 30 live agents (synthetic): cold 37-40 ms, cached 38-39 ms over 5 trials; the line caps at 120 chars:
+ge 0192f3ab: 30 live · implementer(opus) 14m! implementer(opus) 13m! reviewer(opus) 12m! +27 · out 372k
+# largest real session on this machine (325 transcripts, 476 MB): first compute 1.1 s once,
+# then 2 ms per refresh plus the appended bytes (per-file offsets in the cache)

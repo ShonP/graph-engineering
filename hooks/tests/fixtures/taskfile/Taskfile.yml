@@ -1,4 +1,5 @@
-# Fixture project: convention 3 of the detection order. The Stop hook only looks
+# Fixture project, bait for the retired autodetection: without graph-checks.json
+# the Stop hook must not run this test task. The old hook looked
 # for a task named test in `task --list-all --silent`.
 version: '3'
 

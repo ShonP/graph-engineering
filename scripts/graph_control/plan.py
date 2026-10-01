@@ -1,10 +1,45 @@
-"""Task contracts: dependency reachability, witnesses, ownership and cases."""
+"""Task contracts: dependency reachability, witnesses, ownership, cases and success signals."""
 
 import re
 from dataclasses import dataclass
 from typing import Any
 
 from .common import array, boolean, choice, obj, require, strings, text, unique, version
+
+NUMBER = r"-?[0-9]+(?:\.[0-9]+)?"
+CONDITION = re.compile(rf"value (<=|>=|==|<|>) (?:({NUMBER})|baseline \* ({NUMBER})(?: \+ ({NUMBER}))?)")
+SOURCES = {"prometheus", "sentry", "sql-readonly", "command"}
+SIGNAL_KEYS = {"success_signals", "success_signals_reason"}
+CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def measure_key(goal: str) -> str:
+    """The goal as scripts/measure_signals.py clean() keys it in measure.md, baseline.json and --due."""
+    return " ".join(CONTROL.sub(" ", goal).replace("|", "/").split())
+
+
+@dataclass(frozen=True)
+class Signal:
+    """A post-merge outcome the plan promises to watch. Stored as data; graph_control never runs it."""
+
+    goal: str
+    source: str
+    command: tuple[str, ...]
+    success_condition: str
+    window_days: int
+
+    @classmethod
+    def parse(cls, value: Any) -> "Signal":
+        row = obj(value, "goal source command success_condition window_days")
+        command = tuple(text(item) for item in array(row["command"]))
+        require(bool(command), "success signal command must be a nonempty argv")
+        condition = row["success_condition"]
+        require(isinstance(condition, str) and CONDITION.fullmatch(condition) is not None,
+                f"success_condition must be 'value <op> <number>' or "
+                f"'value <op> baseline * <number> [+ <number>]', got {condition!r}")
+        days = row["window_days"]
+        require(type(days) is int and 1 <= days <= 90, "window_days must be an integer 1-90")
+        return cls(text(row["goal"]), choice(row["source"], SOURCES), command, condition, days)
 
 
 @dataclass(frozen=True)
@@ -72,30 +107,53 @@ class Plan:
     cases: tuple[Case, ...]
     tasks: tuple[Task, ...]
     external_contracts: tuple[Contract, ...]
+    success_signals: tuple[Signal, ...] = ()
+    success_signals_reason: str | None = None
 
     @classmethod
     def parse(cls, value: Any) -> "Plan":
-        row = obj(value, "schema_version cases tasks external_contracts")
-        version(row["schema_version"])
+        row = obj(value, "schema_version cases tasks external_contracts", " ".join(sorted(SIGNAL_KEYS)))
+        schema = version(row["schema_version"], frozenset({1, 2}))
+        require(schema == 2 or not row.keys() & SIGNAL_KEYS,
+                "success_signals and success_signals_reason need schema_version 2")
+        signals = tuple(Signal.parse(x) for x in array(row.get("success_signals", [])))
+        empty = "success_signals" in row and not signals
+        reason = text(row["success_signals_reason"]) if "success_signals_reason" in row else None
+        require(not empty or reason is not None, "an empty success_signals list needs a success_signals_reason")
+        require(reason is None or empty, "success_signals_reason only explains an empty success_signals list")
+        keys = [measure_key(signal.goal) for signal in signals]
+        for key in keys:
+            require(keys.count(key) == 1, f"duplicate success signal goal {key!r}: each is measured by its goal")
         result = cls(tuple(Case.parse(x) for x in array(row["cases"])),
                      tuple(Task.parse(x) for x in array(row["tasks"])),
-                     tuple(Contract.parse(x) for x in array(row["external_contracts"])))
+                     tuple(Contract.parse(x) for x in array(row["external_contracts"])),
+                     signals, reason)
         result.validate()
+        return result
+
+    def levels(self) -> list[list[str]]:
+        """Topological levels from depends_on; tasks keep plan order within a level."""
+        pending = unique(self.tasks)
+        placed: set[str] = set()
+        result: list[list[str]] = []
+        while pending:
+            ready = [key for key, task in pending.items() if set(task.depends_on) <= placed]
+            require(bool(ready), "cyclic or unknown task dependency")
+            result.append(ready)
+            placed.update(ready)
+            for key in ready:
+                del pending[key]
         return result
 
     def validate(self) -> None:
         cases, tasks = unique(self.cases), unique(self.tasks)
         require(bool(cases) and bool(tasks), "plan needs cases and tasks")
         parents: dict[str, set[str]] = {}
-        pending = dict(tasks)
-        while pending:
-            ready = [task for task in pending.values() if set(task.depends_on) <= parents.keys()]
-            require(bool(ready), "cyclic or unknown task dependency")
-            for task in ready:
-                parents[task.id] = set(task.depends_on)
-                for dependency in task.depends_on:
-                    parents[task.id].update(parents[dependency])
-                del pending[task.id]
+        for level in self.levels():
+            for key in level:
+                parents[key] = set(tasks[key].depends_on)
+                for dependency in tasks[key].depends_on:
+                    parents[key].update(parents[dependency])
         providers = {key: (None, contract) for key, contract in unique(self.external_contracts).items()}
         for task in self.tasks:
             for contract in task.produces:

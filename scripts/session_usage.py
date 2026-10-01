@@ -5,10 +5,14 @@ from collections import defaultdict
 from datetime import datetime
 import json
 from pathlib import Path
+import re
 import statistics
 
 KEYS = ('input_tokens', 'output_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens')
 TTL_KEYS = ('ephemeral_5m_input_tokens', 'ephemeral_1h_input_tokens')
+RUN8 = re.compile(r'[0-9A-Za-z]{8}')
+RUN_PREFIX = re.compile(r'([0-9A-Za-z]{8}):')
+PER_AGENT = ('output_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens')
 
 
 def instant(value):
@@ -18,11 +22,52 @@ def instant(value):
     return parsed
 
 
-def aggregate(root, start, end):
+def run8(value):
+    if not RUN8.fullmatch(value):
+        raise ValueError('a run is the first 8 letters or digits of its id')
+    return value
+
+
+def identity(path):
+    """(role, run8) of a transcript: meta.json agentType and description prefix; main-thread files are main."""
+    if 'subagents' not in path.parts:
+        return 'main', None
+    try:
+        meta = json.loads(path.with_suffix('.meta.json').read_text())
+    except (OSError, ValueError):
+        meta = None
+    meta = meta if isinstance(meta, dict) else {}
+    description = meta.get('description') if isinstance(meta.get('description'), str) else ''
+    prefix = RUN_PREFIX.match(description)
+    return str(meta.get('agentType') or 'unknown'), prefix.group(1) if prefix else None
+
+
+def medians(requests):
+    """Per role: agent count and the median per agent of first-turn input, output, cache reads and writes."""
+    agents = defaultdict(list)
+    for request in requests.values():
+        agents[(request['role'], request['agent'])].append(request)
+    roles = defaultdict(list)
+    for (role, _), rows in agents.items():
+        first = min(rows, key=lambda row: row['at'])['counts']
+        context = first['input_tokens'] + first['cache_creation_input_tokens'] + first['cache_read_input_tokens']
+        roles[role].append((context, *(sum(row['counts'][key] for row in rows) for key in PER_AGENT)))
+    names = ('first_turn_input_median', 'output_median', 'cache_read_median', 'cache_write_median')
+    return [{'role': role, 'agents': len(rows),
+             **{name: statistics.median(row[index] for row in rows) for index, name in enumerate(names)}}
+            for role, rows in sorted(roles.items())]
+
+
+def aggregate(root, start, end, session=None, role=None, run=None, medians_table=False):
     requests = {}
     malformed = 0
     conflicts = 0
     for path in root.rglob('*.jsonl'):
+        if session and path.stem != session and session not in path.parts[:-1]:
+            continue
+        path_role, path_run = identity(path)
+        if role and role not in (path_role, path_role.rsplit(':', 1)[-1]) or run and path_run != run:
+            continue
         with path.open(errors='replace') as stream:
             for line in stream:
                 try:
@@ -31,7 +76,8 @@ def aggregate(root, start, end):
                         continue
                     if not isinstance(row.get('timestamp'), str):
                         raise ValueError('invalid timestamp')
-                    if not start <= instant(row['timestamp']) < end:
+                    at = instant(row['timestamp'])
+                    if not start <= at < end:
                         continue
                     message = row.get('message', {})
                     if not isinstance(message, dict):
@@ -57,7 +103,8 @@ def aggregate(root, start, end):
                         conflicts += 1
                         continue
                     if previous is None:
-                        requests[key] = {'model': model, 'bucket': bucket, 'counts': counts}
+                        requests[key] = {'model': model, 'bucket': bucket, 'counts': counts,
+                                         'role': path_role, 'agent': str(path), 'at': at}
                     else:
                         # Streamed rows and copied sessions may repeat a message.
                         for name, value in counts.items():
@@ -78,10 +125,14 @@ def aggregate(root, start, end):
                        'input_context_median': statistics.median(contexts),
                        'input_context_max': max(contexts),
                        'cache_read_fraction': totals['cache_read_input_tokens'] / total_input if total_input else None})
-    return {'start': start.isoformat(), 'end_exclusive': end.isoformat(),
-            'unique_requests': len(requests), 'malformed_rows': malformed,
-            'conflicting_model_rows': conflicts, 'groups': result,
-            'billing_note': 'Local token evidence, not reconciled spend; no conversation content included.'}
+    report = {'start': start.isoformat(), 'end_exclusive': end.isoformat(),
+              'unique_requests': len(requests), 'malformed_rows': malformed,
+              'conflicting_model_rows': conflicts, 'groups': result,
+              'filters': {'session': session, 'role': role, 'run': run},
+              'billing_note': 'Local token evidence, not reconciled spend; no conversation content included.'}
+    if medians_table:
+        report['roles'] = medians(requests)
+    return report
 
 
 def main():
@@ -89,10 +140,18 @@ def main():
     parser.add_argument('--root', type=Path, default=Path.home() / '.claude/projects')
     parser.add_argument('--start', type=instant, required=True)
     parser.add_argument('--end', type=instant, required=True)
+    parser.add_argument('--session', help='only this session id: its main transcript and its subagents')
+    parser.add_argument('--role', help='only this agent type from meta.json, or its name after the last colon; '
+                                       'main-thread requests are role main')
+    parser.add_argument('--run', type=run8, help='only agents whose description starts with <run8>:')
+    parser.add_argument('--medians', action='store_true',
+                        help='add per role: agent count and per-agent medians of first-turn input, '
+                             'output, cache reads and cache writes')
     args = parser.parse_args()
     if not args.root.is_dir() or args.end <= args.start:
         parser.error('require an existing session directory and end after start')
-    print(json.dumps(aggregate(args.root, args.start, args.end), indent=2))
+    print(json.dumps(aggregate(args.root, args.start, args.end, args.session, args.role, args.run, args.medians),
+                     indent=2))
 
 
 if __name__ == '__main__':

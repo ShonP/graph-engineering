@@ -1,39 +1,26 @@
 #!/usr/bin/env bash
 #
-# Stop hook: run the project's own test script and block the turn until it is
-# green. Exit 2 with a short reason on stderr blocks; exit 0 lets Claude stop.
+# Stop hook: run the tests a repository opted into in .claude/graph-checks.json,
+# at most once per user prompt. No config, or a config with no test block:
+# exit 0 in silence. Nothing is autodetected. Whether any config can apply is
+# decided in bash first (opt-in.sh: the project dir, the input cwd and their
+# ancestors), so a repo that never opted in starts no Python and is not told
+# that Python is missing.
 #
-# Contract, from the docs fetched 2026-09-10:
-#   Hooks reference, "Hooks reference - Claude Code Docs"
-#     https://code.claude.com/docs/en/hooks
-#     - "Exit code 2 behavior per event": for Stop, exit 2 "Prevents Claude from
-#       stopping, continues the conversation".
-#     - "Stop decision control": "A hook that blocks by exiting 2 routes the same
-#       way as `reason`: Claude receives the stderr message as the explanation for
-#       why it should continue."
-#     - "Stop input": stop_hook_active is true while Claude Code is already
-#       continuing because of a stop hook, and "Claude Code overrides the hook and
-#       ends the turn after 8 consecutive blocks". That cap is enforced by Claude
-#       Code, so this script keeps no counter of its own; it reports the flag in
-#       the reason so the loop state is visible in the transcript.
-#   uv, "Running commands | uv"
-#     https://docs.astral.sh/uv/concepts/projects/run/
-#     - `uv run <name>` runs a command the project environment provides.
-#   Task, "Command Line Interface Reference | Task"
-#     https://taskfile.dev/reference/cli/
-#     - "Combine --list or --list-all with --silent ... to list only the task
-#       names in each line. Useful for scripting with grep or similar."
-#
-# Detection order, in $CLAUDE_PROJECT_DIR only, no walking:
-#   1. pyproject.toml with test under [project.scripts]  -> `uv run test`
-#   2. package.json with scripts.test                    -> `<pm> run test`
-#      where <pm> is pnpm, yarn, bun or npm, chosen by lockfile.
-#   3. Taskfile.yml with a test task in `task --list-all --silent` -> `task test`
-# No match, or the tool the project needs is not installed: exit 0 in silence.
-#
-# Least privilege: the only command this hook runs is the project's own test
-# script, from the session's project directory. No eval, no network, nothing read
-# from a file's contents.
+# Contract (Claude Code 2.1.285, spiked 2026-09-30; hooks reference
+# https://code.claude.com/docs/en/hooks). Registered with asyncRewake: exit 2
+# wakes Claude with stderr, exit 0 and 1 are silent.
+#   - stop_hook_active is false only on the first Stop of a prompt and true on
+#     every continuation, including the re-fire after a wake. Exiting 0 on true,
+#     in bash before any python, is what bounds the loop to one run per prompt.
+#   - background_tasks entries with status "running" mean work is still in
+#     flight; the tree is not final, so the check waits for a later Stop.
+#   - The input cwd is the tree being worked on; project_root.py binds a linked
+#     worktree of $CLAUDE_PROJECT_DIR to itself. Inside that root, the
+#     graph-checks.json nearest the cwd (then the project dir) is the one that
+#     runs, from its own directory: a monorepo package keeps its own checks.
+# configured_check.py owns the run, the timeout ("not verified", exit 0) and
+# every message.
 
 set -eu
 
@@ -41,151 +28,51 @@ set -eu
 HOOK_INPUT="$(cat)"
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-}"
-[ -n "$PROJECT_DIR" ] || exit 0
-[ -d "$PROJECT_DIR" ] || exit 0
+[ -n "$PROJECT_DIR" ] && [ -d "$PROJECT_DIR" ] || exit 0
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
+ACTIVE='"stop_hook_active"[[:space:]]*:[[:space:]]*true'
+[[ $HOOK_INPUT =~ $ACTIVE ]] && exit 0
+
+case "$0" in
+  */*) SCRIPT_DIR="${0%/*}" ;;
+  *) SCRIPT_DIR=. ;;
+esac
+# shellcheck source=opt-in.sh
+. "$SCRIPT_DIR/opt-in.sh"
+STATUS=0
+CWD=
+ge_input_path "$HOOK_INPUT" cwd || STATUS=$?
+case $STATUS in
+  0) CWD="$GE_INPUT_PATH"; ge_opted_in "" "$PROJECT_DIR" "$CWD" || exit 0 ;;
+  2) ;; # an escaped cwd: Python decodes it and decides
+  *) ge_opted_in "" "$PROJECT_DIR" || exit 0 ;;
+esac
+
+SCRIPT_DIR="$(cd "$SCRIPT_DIR" && pwd -P)"
 # shellcheck source=python-runtime.sh
 . "$SCRIPT_DIR/python-runtime.sh"
 ge_python_runtime || exit 2
-PROJECT_DIR="$(HOOK_INPUT="$HOOK_INPUT" CLAUDE_PROJECT_DIR="$PROJECT_DIR" "$GE_PYTHON" "$SCRIPT_DIR/project_root.py")" || exit 2
-set +e
-"$GE_PYTHON" "$SCRIPT_DIR/configured_check.py" "$PROJECT_DIR"
-CONFIGURED_STATUS=$?
-set -e
-[ "$CONFIGURED_STATUS" -eq 77 ] || exit "$CONFIGURED_STATUS"
 
-STOP_ACTIVE="$(HOOK_INPUT="$HOOK_INPUT" "$GE_PYTHON" -c '
-import json
-import os
-
+HOOK_INPUT="$HOOK_INPUT" "$GE_PYTHON" -c '
+import json, os, sys
 try:
-    data = json.loads(os.environ["HOOK_INPUT"])
-    value = data["stop_hook_active"]
+    tasks = json.loads(os.environ["HOOK_INPUT"]).get("background_tasks")
 except Exception:
-    print("unknown")
-else:
-    print("true" if value else "false")
-' 2>/dev/null)" || STOP_ACTIVE="unknown"
+    sys.exit(1)
+live = isinstance(tasks, list) and any(isinstance(t, dict) and t.get("status") == "running" for t in tasks)
+sys.exit(0 if live else 1)
+' 2>/dev/null && exit 0
 
-cd "$PROJECT_DIR" || exit 0
-PROJECT_DIR="$(pwd -P)"
-
-has_script() { # has_script <pyproject|package> <name>
-  PROJECT_KIND="$1" SCRIPT_NAME="$2" "$GE_PYTHON" -c '
-import json
-import os
-import sys
-
-kind = os.environ["PROJECT_KIND"]
-name = os.environ["SCRIPT_NAME"]
-
-if kind == "pyproject":
-    try:
-        import tomllib
-    except ImportError:
-        sys.exit(1)
-    try:
-        with open("pyproject.toml", "rb") as handle:
-            data = tomllib.load(handle)
-    except Exception:
-        sys.exit(1)
-    scripts = data.get("project", {}).get("scripts", {})
-else:
-    try:
-        with open("package.json", "rb") as handle:
-            data = json.load(handle)
-    except Exception:
-        sys.exit(1)
-    scripts = data.get("scripts", {})
-
-if isinstance(scripts, dict) and isinstance(scripts.get(name), str) and scripts[name].strip():
-    sys.exit(0)
-sys.exit(1)
-' 2>/dev/null
-}
-
-package_manager() {
-  if [ -f pnpm-lock.yaml ]; then
-    echo pnpm
-  elif [ -f yarn.lock ]; then
-    echo yarn
-  elif [ -f bun.lock ] || [ -f bun.lockb ]; then
-    echo bun
-  else
-    echo npm
-  fi
-}
-
-taskfile_has_test() {
-  set +e
-  listing="$(task --list-all --silent 2>/dev/null)"
-  set -e
-  printf '%s\n' "$listing" |
-    sed 's/^[[:space:]*]*//; s/[[:space:]]*$//' |
-    grep -qx 'test'
-}
-
-LABEL=""
-set --
-
-if [ -f pyproject.toml ] && has_script pyproject test && command -v uv >/dev/null 2>&1; then
-  LABEL="uv run test"
-  set -- uv run test
-elif [ -f package.json ] && has_script package test; then
-  PM="$(package_manager)"
-  if command -v "$PM" >/dev/null 2>&1; then
-    LABEL="$PM run test"
-    set -- "$PM" run test
-  fi
-elif [ -f Taskfile.yml ] && command -v task >/dev/null 2>&1; then
-  set +e
-  taskfile_has_test
-  HAS_TASK_TEST=$?
-  set -e
-  if [ "$HAS_TASK_TEST" -eq 0 ]; then
-    LABEL="task test"
-    set -- task test
-  fi
+root() { HOOK_INPUT="$HOOK_INPUT" CLAUDE_PROJECT_DIR="$PROJECT_DIR" "$GE_PYTHON" "$SCRIPT_DIR/project_root.py"; }
+# A cwd in an unrelated repository is an error only for a project that opted in.
+if [ -f "$PROJECT_DIR/.claude/graph-checks.json" ]; then
+  ROOT="$(root)" || exit 2
+else
+  ROOT="$(root 2>/dev/null)" || exit 0
 fi
 
-[ -n "$LABEL" ] || exit 0
-
-set +e
-OUTPUT="$("$@" 2>&1)"
-STATUS=$?
-set -e
-
-if [ "$STATUS" -eq 0 ]; then
-  exit 0
-fi
-
-# The backticks below are literal Markdown in the reason text, and the python
-# source must reach "$GE_PYTHON" unexpanded, so single quotes are deliberate here.
-# shellcheck disable=SC2016
-LABEL="$LABEL" STATUS="$STATUS" OUTPUT="$OUTPUT" \
-  PROJECT_DIR="$PROJECT_DIR" STOP_ACTIVE="$STOP_ACTIVE" "$GE_PYTHON" -c '
-import os
-import sys
-
-lines = os.environ["OUTPUT"].rstrip().splitlines()
-if len(lines) > 20:
-    lines = ["... earlier output trimmed ..."] + lines[-20:]
-tail = "\n".join(lines)[:2000]
-
-sys.stderr.write(
-    "`%s` failed in %s (exit %s). Fix the failing tests, then finish.\n"
-    "stop_hook_active=%s; Claude Code ends the turn after 8 consecutive blocks "
-    "(hooks reference, \"Stop input\").\n\n%s\n"
-    % (
-        os.environ["LABEL"],
-        os.environ["PROJECT_DIR"],
-        os.environ["STATUS"],
-        os.environ["STOP_ACTIVE"],
-        tail,
-    )
-)
-' || printf '`%s` failed in %s (exit %s). Fix the failing tests, then finish.\n' \
-  "$LABEL" "$PROJECT_DIR" "$STATUS" >&2
-
-exit 2
+# The config nearest the cwd, then the project dir, wins; never one above ROOT.
+STATUS=0
+"$GE_PYTHON" "$SCRIPT_DIR/configured_check.py" test "$ROOT" ${CWD:+"$CWD"} "$PROJECT_DIR" || STATUS=$?
+[ "$STATUS" -eq 77 ] && exit 0
+exit "$STATUS"

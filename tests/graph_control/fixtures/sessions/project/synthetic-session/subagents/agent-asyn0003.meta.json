@@ -1,0 +1,9 @@
+{
+  "agentType": "graph-engineering:qa",
+  "description": "0192f3ab:qa",
+  "requestShape": "background",
+  "requestNonInteractive": true,
+  "spawnDepth": 1,
+  "toolUseId": "toolu_synthetic",
+  "model": "sonnet"
+}

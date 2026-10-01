@@ -73,9 +73,9 @@ gate: no
 next: merge
 
 ## node: merge
-agent: planner
+agent: engine
 in: the reviewed diff, the gate verdict, every .graph/<run>/qa/infra/<app>.diff, .graph/<run>/followups.md
-out: .graph/<run>/ledger.md
+out: .graph/<run>/merge.md (the exhibit the engine renders per graph-ship step 5, also the PR body), .graph/<run>/ledger.md
 gate: yes
 next: post-deploy
 
@@ -88,9 +88,8 @@ gate: no
 next: retro
 
 ## node: retro
-agent: planner
-skills: [retro]
+agent: retro
 in: the whole run directory
-out: .graph/<run>/retro.md (leaks, classes, proposed rule changes as diffs - never applied)
+out: .graph/<run>/retro.md (leaks, classes, proposed rule changes as diffs - never applied; the engine writes the one-line fast-path version itself when nothing leaked, per graph-ship step 10)
 gate: no
 next: END

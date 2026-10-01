@@ -57,6 +57,8 @@ procrastination wearing a lab coat.
 | 4 | Named author, dated, cites sources, shows code or numbers | usable, one rung below anything it cites |
 | 5 | Anonymous post, SEO listicle, "experts agree", undated | inspiration only, never a decision input |
 
+Memory files and earlier notes are claims (rung 5) until re-verified against the code or a current rung 1-2 source, your own included.
+
 ## Skepticism checklist - every claim you are about to build on
 
 - **Who** says it, and what do they gain if you believe it?
@@ -65,7 +67,9 @@ procrastination wearing a lab coat.
 - **What evidence** is shown - code, numbers, a reproduction, or adjectives?
 - **Does it reproduce** in this repo, with these versions? If the claim is
   load-bearing for the design and you have not reproduced it, it is not yet
-  true: spike it. Dispatch `researcher` in spike mode, or run the smallest
+  true: spike it. Dispatch `graph-engineering:researcher-spike` (it runs
+  without CLAUDE.md, so the brief carries the profile path, the REQUIRED
+  skills, the rule packs and the project invariants), or run the smallest
   experiment that could kill the claim yourself.
 - **Never validate on one happy-path run.** A spike verdict is
   `VALIDATED`, `PARTIAL`, or `INVALIDATED`, and it names the edge case tried.

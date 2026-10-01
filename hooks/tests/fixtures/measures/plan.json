@@ -1,0 +1,15 @@
+{
+  "schema_version": 2,
+  "cases": [],
+  "tasks": [],
+  "external_contracts": [],
+  "success_signals": [
+    {
+      "goal": "synthetic error ratio stays low",
+      "source": "command",
+      "command": ["sh", "-c", "touch RAN_SIGNAL; echo 0"],
+      "success_condition": "value <= 0.01",
+      "window_days": 7
+    }
+  ]
+}

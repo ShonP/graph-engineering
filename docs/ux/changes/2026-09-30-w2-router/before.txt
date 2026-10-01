@@ -1,0 +1,253 @@
+### startup, 200-line HANDOFF, profile present
+exit: 0
+stdout:
+docs/HANDOFF.md, first 40 lines (graph-engineering SessionStart hook):
+
+line 1 of a long synthetic handoff
+line 2 of a long synthetic handoff
+line 3 of a long synthetic handoff
+line 4 of a long synthetic handoff
+line 5 of a long synthetic handoff
+line 6 of a long synthetic handoff
+line 7 of a long synthetic handoff
+line 8 of a long synthetic handoff
+line 9 of a long synthetic handoff
+line 10 of a long synthetic handoff
+line 11 of a long synthetic handoff
+line 12 of a long synthetic handoff
+line 13 of a long synthetic handoff
+line 14 of a long synthetic handoff
+line 15 of a long synthetic handoff
+line 16 of a long synthetic handoff
+line 17 of a long synthetic handoff
+line 18 of a long synthetic handoff
+line 19 of a long synthetic handoff
+line 20 of a long synthetic handoff
+line 21 of a long synthetic handoff
+line 22 of a long synthetic handoff
+line 23 of a long synthetic handoff
+line 24 of a long synthetic handoff
+line 25 of a long synthetic handoff
+line 26 of a long synthetic handoff
+line 27 of a long synthetic handoff
+line 28 of a long synthetic handoff
+line 29 of a long synthetic handoff
+line 30 of a long synthetic handoff
+line 31 of a long synthetic handoff
+line 32 of a long synthetic handoff
+line 33 of a long synthetic handoff
+line 34 of a long synthetic handoff
+line 35 of a long synthetic handoff
+line 36 of a long synthetic handoff
+line 37 of a long synthetic handoff
+line 38 of a long synthetic handoff
+line 39 of a long synthetic handoff
+line 40 of a long synthetic handoff
+
+### startup, 12-line HANDOFF, no profile
+exit: 0
+stdout:
+docs/HANDOFF.md, first 40 lines (graph-engineering SessionStart hook):
+
+line 1 of a short synthetic handoff
+line 2 of a short synthetic handoff
+line 3 of a short synthetic handoff
+line 4 of a short synthetic handoff
+line 5 of a short synthetic handoff
+line 6 of a short synthetic handoff
+line 7 of a short synthetic handoff
+line 8 of a short synthetic handoff
+line 9 of a short synthetic handoff
+line 10 of a short synthetic handoff
+line 11 of a short synthetic handoff
+line 12 of a short synthetic handoff
+
+### startup, no HANDOFF, profile present
+exit: 0
+stdout:
+
+
+### compact, 200-line HANDOFF, profile present
+exit: 0
+stdout:
+docs/HANDOFF.md, first 40 lines (graph-engineering SessionStart hook):
+
+line 1 of a long synthetic handoff
+line 2 of a long synthetic handoff
+line 3 of a long synthetic handoff
+line 4 of a long synthetic handoff
+line 5 of a long synthetic handoff
+line 6 of a long synthetic handoff
+line 7 of a long synthetic handoff
+line 8 of a long synthetic handoff
+line 9 of a long synthetic handoff
+line 10 of a long synthetic handoff
+line 11 of a long synthetic handoff
+line 12 of a long synthetic handoff
+line 13 of a long synthetic handoff
+line 14 of a long synthetic handoff
+line 15 of a long synthetic handoff
+line 16 of a long synthetic handoff
+line 17 of a long synthetic handoff
+line 18 of a long synthetic handoff
+line 19 of a long synthetic handoff
+line 20 of a long synthetic handoff
+line 21 of a long synthetic handoff
+line 22 of a long synthetic handoff
+line 23 of a long synthetic handoff
+line 24 of a long synthetic handoff
+line 25 of a long synthetic handoff
+line 26 of a long synthetic handoff
+line 27 of a long synthetic handoff
+line 28 of a long synthetic handoff
+line 29 of a long synthetic handoff
+line 30 of a long synthetic handoff
+line 31 of a long synthetic handoff
+line 32 of a long synthetic handoff
+line 33 of a long synthetic handoff
+line 34 of a long synthetic handoff
+line 35 of a long synthetic handoff
+line 36 of a long synthetic handoff
+line 37 of a long synthetic handoff
+line 38 of a long synthetic handoff
+line 39 of a long synthetic handoff
+line 40 of a long synthetic handoff
+
+### resume (defence in depth beside the matcher)
+exit: 0
+stdout:
+docs/HANDOFF.md, first 40 lines (graph-engineering SessionStart hook):
+
+line 1 of a long synthetic handoff
+line 2 of a long synthetic handoff
+line 3 of a long synthetic handoff
+line 4 of a long synthetic handoff
+line 5 of a long synthetic handoff
+line 6 of a long synthetic handoff
+line 7 of a long synthetic handoff
+line 8 of a long synthetic handoff
+line 9 of a long synthetic handoff
+line 10 of a long synthetic handoff
+line 11 of a long synthetic handoff
+line 12 of a long synthetic handoff
+line 13 of a long synthetic handoff
+line 14 of a long synthetic handoff
+line 15 of a long synthetic handoff
+line 16 of a long synthetic handoff
+line 17 of a long synthetic handoff
+line 18 of a long synthetic handoff
+line 19 of a long synthetic handoff
+line 20 of a long synthetic handoff
+line 21 of a long synthetic handoff
+line 22 of a long synthetic handoff
+line 23 of a long synthetic handoff
+line 24 of a long synthetic handoff
+line 25 of a long synthetic handoff
+line 26 of a long synthetic handoff
+line 27 of a long synthetic handoff
+line 28 of a long synthetic handoff
+line 29 of a long synthetic handoff
+line 30 of a long synthetic handoff
+line 31 of a long synthetic handoff
+line 32 of a long synthetic handoff
+line 33 of a long synthetic handoff
+line 34 of a long synthetic handoff
+line 35 of a long synthetic handoff
+line 36 of a long synthetic handoff
+line 37 of a long synthetic handoff
+line 38 of a long synthetic handoff
+line 39 of a long synthetic handoff
+line 40 of a long synthetic handoff
+
+### fork (defence in depth beside the matcher)
+exit: 0
+stdout:
+docs/HANDOFF.md, first 40 lines (graph-engineering SessionStart hook):
+
+line 1 of a long synthetic handoff
+line 2 of a long synthetic handoff
+line 3 of a long synthetic handoff
+line 4 of a long synthetic handoff
+line 5 of a long synthetic handoff
+line 6 of a long synthetic handoff
+line 7 of a long synthetic handoff
+line 8 of a long synthetic handoff
+line 9 of a long synthetic handoff
+line 10 of a long synthetic handoff
+line 11 of a long synthetic handoff
+line 12 of a long synthetic handoff
+line 13 of a long synthetic handoff
+line 14 of a long synthetic handoff
+line 15 of a long synthetic handoff
+line 16 of a long synthetic handoff
+line 17 of a long synthetic handoff
+line 18 of a long synthetic handoff
+line 19 of a long synthetic handoff
+line 20 of a long synthetic handoff
+line 21 of a long synthetic handoff
+line 22 of a long synthetic handoff
+line 23 of a long synthetic handoff
+line 24 of a long synthetic handoff
+line 25 of a long synthetic handoff
+line 26 of a long synthetic handoff
+line 27 of a long synthetic handoff
+line 28 of a long synthetic handoff
+line 29 of a long synthetic handoff
+line 30 of a long synthetic handoff
+line 31 of a long synthetic handoff
+line 32 of a long synthetic handoff
+line 33 of a long synthetic handoff
+line 34 of a long synthetic handoff
+line 35 of a long synthetic handoff
+line 36 of a long synthetic handoff
+line 37 of a long synthetic handoff
+line 38 of a long synthetic handoff
+line 39 of a long synthetic handoff
+line 40 of a long synthetic handoff
+
+### startup with agent_type (claude --agent)
+exit: 0
+stdout:
+docs/HANDOFF.md, first 40 lines (graph-engineering SessionStart hook):
+
+line 1 of a long synthetic handoff
+line 2 of a long synthetic handoff
+line 3 of a long synthetic handoff
+line 4 of a long synthetic handoff
+line 5 of a long synthetic handoff
+line 6 of a long synthetic handoff
+line 7 of a long synthetic handoff
+line 8 of a long synthetic handoff
+line 9 of a long synthetic handoff
+line 10 of a long synthetic handoff
+line 11 of a long synthetic handoff
+line 12 of a long synthetic handoff
+line 13 of a long synthetic handoff
+line 14 of a long synthetic handoff
+line 15 of a long synthetic handoff
+line 16 of a long synthetic handoff
+line 17 of a long synthetic handoff
+line 18 of a long synthetic handoff
+line 19 of a long synthetic handoff
+line 20 of a long synthetic handoff
+line 21 of a long synthetic handoff
+line 22 of a long synthetic handoff
+line 23 of a long synthetic handoff
+line 24 of a long synthetic handoff
+line 25 of a long synthetic handoff
+line 26 of a long synthetic handoff
+line 27 of a long synthetic handoff
+line 28 of a long synthetic handoff
+line 29 of a long synthetic handoff
+line 30 of a long synthetic handoff
+line 31 of a long synthetic handoff
+line 32 of a long synthetic handoff
+line 33 of a long synthetic handoff
+line 34 of a long synthetic handoff
+line 35 of a long synthetic handoff
+line 36 of a long synthetic handoff
+line 37 of a long synthetic handoff
+line 38 of a long synthetic handoff
+line 39 of a long synthetic handoff
+line 40 of a long synthetic handoff
+

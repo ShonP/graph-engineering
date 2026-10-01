@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "test": {
+    "argv": ["make", "check"],
+    "timeout_seconds": 600
+  },
+  "precheck": {
+    "argv": ["docker", "info"],
+    "timeout_seconds": 10
+  },
+  "lint": {
+    "argv": ["ruff", "check", "{file}"],
+    "extensions": [".py"],
+    "timeout_seconds": 60
+  }
+}

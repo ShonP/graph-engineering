@@ -24,9 +24,11 @@ The engine does not know what a feature is. It reads a playbook and runs the
 nodes it finds, which is why a bug workflow and an infra workflow are new
 markdown files rather than new branches in the engine.
 
-Three playbooks ship: `feature`, `bug` and `infra`. The feature playbook:
-
-![feature playbook](docs/img/playbook.png)
+Five playbooks ship: `feature`, `bug`, `infra`, `quick` (the small-ask lane)
+and `research` (a decision from evidence, no code). Each one is drawn in
+[docs/playbooks.md](docs/playbooks.md), which `graph-control render --write`
+generates from `graphs/*.md`; `render --check` is the drift gate the test suite
+runs. The feature playbook, with the agent on each node:
 
 ```mermaid
 flowchart LR
@@ -43,7 +45,9 @@ flowchart LR
 
     subgraph agents [" "]
         direction LR
-        a1["planner: goal, plan, merge, retro"]
+        a1["planner: goal, plan"]
+        a6["engine: merge exhibit (no dispatch)"]
+        a7["retro: retro (engine writes a one-line retro when nothing leaked)"]
         a0["researcher: research-ux / tech / competitor / impact (parallel)"]
         a5["ux-designer: design (captures the running UI, decides placement)"]
         a2["implementer / implementer-simple: implement, fix"]
@@ -104,71 +108,159 @@ Then restart the session to apply.
 
 ```
 /graph-init            # once per repo: writes .claude/graph-profile.yaml
-/graph-ship "<goal>"   # triage picks feature, bug or infra, then runs it
+/graph-init --upgrade  # moves an existing profile to schema v2; shows the diff first
+/graph-doctor          # read-only setup check, one fix per finding
+/graph-ship "<goal>"   # the router picks a lane and a playbook, then runs it
 /graph-ship "<goal>" --graph bug   # or name the playbook yourself
+/graph-ship "<goal>" --lane quick  # or the lane
 ```
 
-Triage writes its pick and the reason as the first line of the run's ledger;
-the owner sees it at the first gate.
+The router sizes each ask into one of eight lanes: `answer` (no code), `direct`
+(one small diff, at most 2 files, one `implementer-simple`, no run dir),
+`quick` (`graphs/quick.md`, at most 5 files), `full` (the playbook the ask type
+picks), `spike`, `research` (`graphs/research.md`: 1, 3 or 6 researcher leaves
+behind a brief-only firewall, claims to `claims.jsonl`, a report with an
+`Evidence against` section), `product` (the research playbook's product preset:
+options, riskiest assumption, one spike, then a go / kill / clarify gate that
+hands a go to `feature`) and `investigate` (one `signals`-mode researcher runs
+the profile's `pulse.command` into a one-page digest of aggregates; the owner
+ranks the items once and each routes to `direct`, `quick` or `bug`). Any match against the profile's `risk:` table forces at
+least `quick`, and so does the built-in `agent-control` row: a diff to
+`.claude/**`, `CLAUDE.md`, `AGENTS.md`, `.mcp.json`, `.github/**` or the
+profile's `instructionPaths`. Research, spike and product deliverables go to
+`<docsPath>/research/`, a durable repo path; `.graph/` keeps only working data.
+`/graph-ship` itself loads only the router; a lane that opens a run Reads
+`docs/engine/run.md` and `land.md`, and `direct` and `investigate` read
+`docs/engine/lanes.md`. The lane, the matched risk rows, the playbook and the reason are
+the first line of the run's ledger; the owner sees them at the first gate.
 
 | Playbook | Shape | For |
 |---|---|---|
 | `feature` | goal -> research ux / tech / competitor / impact -> design (UI goals: placement in the running app) -> **plan gate** -> implement -> review ∥ qa -> fix (≤3) -> **merge gate** -> post-deploy -> retro | new behaviour, chores, mixed app + infra |
 | `bug` | report -> reproduce (a **failing test**, by qa) -> diagnose (`systematic-debugging`) -> sibling search (same bug shape elsewhere, Semgrep) -> **plan gate** -> implement -> review ∥ qa -> fix -> **merge gate** -> post-deploy -> retro | existing behaviour that is wrong |
 | `infra` | goal -> research tech / impact -> **plan gate** -> implement -> review ∥ verify (render, validate CRDs too, rendered diff, apply to a throwaway cluster) -> fix -> **merge gate** -> post-deploy -> retro | Helm, kustomize, Argo CD, manifests, gateway and policy config |
+| `quick` | intake -> impact -> design (UI goals only) -> **plan gate** (goal and plan as one exhibit) -> implement -> review ∥ qa -> fix (≤3) -> **merge gate** -> post-deploy -> retro | a defined intent on at most 5 files, or any risk-row match on a small ask |
+| `research` | brief -> research (1 / 3 / 6 leaves, or the product preset) -> verify (deep only) -> **report gate** | a comparison, a decision, "is this worth building"; writes no code |
 
 `/graph-ship --resume <run-id>` picks a run back up from its ledger.
 `/graph-ship --auto-merge` relaxes only the merge gate, only for that run.
+A repo can opt risk classes into auto-merge on full green with
+`gates.auto_classes` (no blocking or important findings left, qa a full PASS,
+`verify` green, no class in `gates.owner_classes`); the template ships `[]`, so
+the owner merges everything until the repo opts in. `agent-control` always
+waits for the owner, even under `--auto-merge`: that diff can rewrite the
+gates themselves. `gates.plan` and `gates.merge` take only `owner`. `integration: pr |
+push-main` picks how approved work lands.
+
+`graph-control status --line` prints a status line that costs no tokens and
+lists the live subagents per `<run8>:<node>`, with model and idle age; plain
+`graph-control status` adds NEEDS YOU decision cards and cost by agent type.
+Pipe the host's status-line JSON into `--line` (or pass `--session <id>`) so
+each session shows its own agents when several share one checkout. The full
+status also lists what finished since you last looked and what runs next, from
+`plan.json`, `run.json` and the receipts.
+
+`graph-control digest --root <worktree> --base <ref> [--plan] [--profile]`
+prints the merge exhibit's change digest from git alone, at most 60 lines: a
+stat grouped by plan task for a small diff; for a large one, size without the
+profile's `digest.exclude` globs, new public surfaces, the top churn x size
+hotspots and the ux evidence. `graph-control validate-briefs <run-dir>` blocks a
+task brief that is missing, over 300 lines or over 35% fenced code.
+
+**Success signals.** A plan (`plan.json` schema v2) names the outcome each run
+should move: `success_signals`, each an argv command that prints one aggregate,
+a `value <op> ...` condition and a window of 1-90 days, or `[]` with a reason.
+Post-deploy records the baseline; `scripts/measure_signals.py` measures each
+signal once its window has passed, writes `measure.md` and a ledger line, and a
+`not met` becomes a suggested bug run, never an automatic one.
 
 ## Hooks
 
-Installing this plugin turns on three hooks, and they run your repository's own
-scripts. Read this before enabling it on a repo you did not write.
+Installing this plugin registers six hooks. The two that run your repository's
+own commands (lint and test) are opt-in: they do nothing until the repo commits
+`.claude/graph-checks.json` (copy `templates/graph-checks.json` and edit the argv
+lists). Read this before enabling it on a repo you did not write.
 
 | When | What runs | If it is unhappy |
 |---|---|---|
-| after every `Edit` or `Write` | your `lint`, then your `typecheck`, on the file just touched | nothing is blocked. The output comes back to Claude as context beside the tool result |
-| before Claude stops | your whole `test` script | the turn is blocked with exit 2 and Claude keeps working until the suite is green, or until Claude Code ends the turn after 8 consecutive blocks (hooks reference, "Stop input") |
-| at session start | the first 40 lines of `docs/HANDOFF.md`, when that file exists | nothing |
+| after every `Edit` or `Write`, async | `lint.argv` from `graph-checks.json` on the file just touched, only for a listed extension | nothing is blocked. Findings arrive on the next turn |
+| before a `Bash` command that pushes, removes a remote, runs `rm` or `docker` | the destructive-command guard (a bash filter; python only on a match) | Claude Code asks the owner, showing the evidence it gathered (force push without a lease, remote removal, Docker volume delete, recursive `rm` of a protected path). It never denies |
+| before an `Agent` call | the policy guard, only when the profile has a `policy:` block | `general-purpose` and `policy.never` models are denied; each role runs on its `policy.roles` tier; a `policy-override: <reason>` line in the prompt skips it and is logged |
+| after Claude stops, `asyncRewake` | `test.argv` from `graph-checks.json`, after an optional `precheck` | Claude is woken with the failure, at most once per prompt. A precheck failure or timeout reports "not verified" and does not wake it. An unchanged tree replays its stored verdict instead of rerunning; `GRAPH_CHECKS_NO_MEMO=1` turns that off |
+| at session start (`startup`, `clear`, `compact`) | the first 40 lines of `docs/HANDOFF.md`, when that file exists, the reply contract when the repo has a profile, and one line when a run's success measures are due (python starts only when `.graph/*/plan.json` exists); silent on resume, fork and `--agent` sessions | a warning line when `HANDOFF.md` is over 150 lines |
+| at session start (`startup` only, cached) | the doctor's quick checks | up to 3 finding lines, or a `/graph-init` hint in a git repo with a stack marker and no profile; silent when clean |
 
-The edit hook acts only on a real file strictly inside `$CLAUDE_PROJECT_DIR`, so
-an edit inside a scratch clone of somebody else's repo never runs that repo's
-scripts. The stop hook looks in the project root and nowhere else. Neither runs
-anything unless your repo declares the script under one of three conventions
-(`pyproject.toml`, `package.json`, `Taskfile.yml`), so a repo with none of them
-sees no change at all.
+**0.15 breaks 0.14 autodetect.** The `pyproject.toml`, `package.json` and
+`Taskfile.yml` script lookups are gone; a repo that relied on them adds
+`.claude/graph-checks.json` to keep the Stop gate and the lint.
 
-Two costs to know before you install. A suite that is red for reasons unrelated
-to the current task blocks up to 8 turns, running your full test command each
-time; and a slow suite is paid on every stop. To turn them off, disable the
-plugin with `claude plugin disable graph-engineering`, or every hook in a scope
-with `"disableAllHooks": true` in that scope's settings file (hooks reference,
-"Disable or remove hooks").
+To turn the hooks off, disable the plugin with `claude plugin disable
+graph-engineering`, or every hook in a scope with `"disableAllHooks": true` in
+that scope's settings file (hooks reference, "Disable or remove hooks").
 
-Detection order, the project-directory bound, the dependency list and the test
-command: [`hooks/README.md`](hooks/README.md).
+The `graph-checks.json` contract, version floors and the rationale for each
+handler: [`hooks/README.md`](hooks/README.md).
 
 ## Roster
 
-The full organization - seven agents, engineering only:
+The full organization - eleven agents, engineering only:
 
 | Agent | Model | Job | Writes |
 |---|---|---|---|
-| `planner` | fable | spec, then task-decomposed plan with per-task sizing | specs only |
-| `researcher` | sonnet | one bounded question, five modes: ux / tech / competitor / impact (blast radius + adjacent-issue triage) / spike (strict turn budget) | reports only |
+| `planner` | opus | spec, then task-decomposed plan with per-task sizing, `success_signals` and one brief file per task; the product concept under `docsPath` for the product preset | specs only |
+| `researcher` | sonnet | one bounded question, six modes: ux / tech / competitor / impact (blast radius + adjacent-issue triage) / spike (dispatched as `researcher-spike`) / signals (the profile's `pulse.command`, aggregates and pseudonymised ids only) | reports only |
+| `researcher-spike` | sonnet | one falsifiable spike under a hard turn budget, launched without CLAUDE.md; returns VALIDATED, PARTIAL or INVALIDATED naming the edge case tried | reports only |
 | `ux-designer` | opus | the `design` node: captures the running UI, decides placement, shows it in the best-suited available medium (live-app capture, Storybook, HTML, Claude artifact, Claude Design), writes the experience spec with UI acceptance rows; variant exploration scored against the house rubric | mockups only |
 | `implementer` | opus | one non-trivial task, test-first, with spine-named skills | yes |
 | `implementer-simple` | sonnet | one SMALL task (mechanical, 1-2 files); escalates instead of pushing through | yes |
-| `reviewer` | opus | reads the diff once through every lens it needs | no (read-only) |
-| `qa` | sonnet | acceptance criteria verified on a RUNNING system, evidence per criterion | tests only |
+| `reviewer` | opus | reads the diff once through every lens it needs; as a panel leaf, reviews one slice and writes its findings to a file | no (read-only) |
+| `reviewer-lead` | opus | panel review of a diff over ~2,000 changed lines or ~120k tokens: at most 4 slices, one opus reviewer leaf each in one message, then merges, dedupes and reproduces every blocker into one `findings.json` | `findings.json` only |
+| `qa` | sonnet | acceptance criteria verified on a RUNNING system once per merge unit or wave, evidence per criterion; rows end `VERIFIED`, `FAILED` or `BLOCKED`, the verdict is `PASS`, `FAIL INCOMPLETE: <row ids>` or `INCOMPLETE: <row ids>`, and findings go to `qa-findings.json` | tests only |
+| `qa-lead` | sonnet | qa for a merge unit spanning 2 lanes, 2+ platforms, or ~8+ criteria across 3+ lanes: stands the runtime up once, runs up to 4 `qa` leaves in parallel, merges their reports into `qa.md` and `qa-findings.json`, tears the runtime down | reports only |
+| `retro` | sonnet | the `retro` node when a finding leaked past its gate: leak table, then guard first - a recurring class becomes a test fixture, semgrep rule or lint config before any prose rule; proposed diffs, never applied | `retro.md` only |
 
-The model column is the agent's frontmatter and the engine dispatches it unchanged: `/graph-ship` never passes a `model:` override, so a scoped re-check of a three-line fix runs on the same opus reviewer as the first review. Implementer versus implementer-simple, by task size, is the engine's only model choice.
+The model column is the default tier in the agent's frontmatter. The profile's
+`policy:` block is the single source of tiers: the engine passes
+`model: <policy.roles tier>` on every dispatch, and the `guard-agent` hook
+rewrites any roster call to its role's tier. Never haiku, never fable, never
+`general-purpose`. Review never drops to a cheaper tier; the only move is up:
+fix round 3 escalates a small task from `implementer-simple` to `implementer`.
+`implementer` (200), `implementer-simple` (60), `qa` (250), `qa-lead` (150),
+`reviewer-lead` (120), `researcher-spike` (25) and `retro` (40) carry a
+frontmatter `maxTurns` cap. Children return at most 1,500 tokens plus artifact
+paths; the reviewer writes `findings.json` (schema v1 in `review-protocol`, a
+route on every finding) and ends with one `PASS|CHANGES-REQUESTED ... findings=<path>`
+verdict line. `graph-control depth` sets the review depth (`lint`, `single`
+or `panel`) from the diff and the profile's risk rows; at `lint` (prose only,
+no risk row) the engine runs the repo's configured lint itself and dispatches
+no reviewer.
 
 The engine picks the implementer by the task's `size` in the plan: `small` goes
 to `implementer-simple`, everything else to `implementer`. Every agent below its
 skill floor returns `NEEDS_SETUP` instead of improvising.
 
-Still planned: board sync and `/graph-doctor`.
+**Parallelism and nesting.** The implement node runs `plan.json` in the waves
+`graph-control waves` prints: tasks at one dependency level, at most 4
+concurrent opus writers, all dispatched in one message in the foreground.
+`graph-control host-check` runs before each wave (free disk below the profile's `host.min_free_gb`, default 20 GB, blocks it). A wave
+with 2+ writers gives each task its own worktree, branched from the run branch
+head SHA and set up by the profile's `bootstrap:` commands; branches merge back
+in plan order and `scripts/worktree-gc.sh --apply --base <run branch> --prefix
+<run-id>-` removes that run's merged, clean task worktrees without forcing
+(never another session's; the full run id, since runs opened in the same
+minute share a UUIDv7's first 8 characters). A command on a resource the profile declares under `lanes:`
+(a device build, a shared database, a cluster) runs through
+`scripts/lane-run.sh <lane> --slots <n> -- <cmd>`, whose lock dies with the
+command. A suite longer than one tool call runs through
+`hooks/scripts/wait-run.sh`, which blocks at most 270 s per call and never
+polls. Nesting stops at depth 2: only `qa-lead` and `reviewer-lead` have the
+Agent tool, the engine dispatches them at depth 1, and leaves never nest.
+`/graph-init` proposes `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=2` and
+`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS=8` for the repo's settings. Opt-in, for a
+long unattended run: keep the machine awake for the life of the session with
+`caffeinate -i -w <pid>` on macOS or `systemd-inhibit` on Linux.
+
+Still planned: board sync.
 
 ## Competencies
 
@@ -178,21 +270,33 @@ task's files. The directory name is the routing name, and
 `scripts/check-skill-frontmatter.sh` enforces that the frontmatter `name` agrees
 with it, and `scripts/check-routing-resolves.sh` checks that every name the
 routing table and the roster reference actually resolves to one skill.
+`scripts/check-agent-frontmatter.sh` holds every roster agent to the allowed
+frontmatter keys, an opus or sonnet tier, a well-formed `maxTurns`, and fully
+qualified `graph-engineering:` skill names, and checks that every playbook node
+names a real agent (or `engine`).
 `scripts/check-skill-scripts.sh` runs the regression tests that ship beside
 skill scripts (`skills/**/tests/`): `vet_smoke.py`, which guards writes to a
 shared environment, and `compose_isolation.sh`, which keeps qa's stack off the
-developer's.
+developer's. `bash scripts/run-all-tests.sh` runs every suite and check,
+discovering new ones by convention, and is the only CI step.
+
+Framework skills are routed by what a manifest declares, not by a file
+extension: `/graph-init` reads the template's dependency-derived block and
+writes a row per manifest (a `package.json` that depends on react, a
+`pyproject.toml` that depends on fastapi, a Gradle build that uses Compose).
+Static rows are language or file-type only, so a Go CLI or an Express service
+routes no React or FastAPI skill.
 
 | Group | Skills | Routed by |
 |---|---|---|
-| `ios` | swiftui-pro, healthkit, widgetkit, activitykit, photokit, push-notifications | `**/*.swift`, plus dir globs per framework |
-| `android` | compose-state, compose-ui, compose-performance, compose-build-and-test, kotlin-concurrency, kotlin-control-flow, kotlin-functions, kotlin-types-value-class | `**/*.{kt,kts}` |
-| `react` | react-rules, tanstack-query-rules, tanstack-router | `**/*.{ts,tsx}` |
-| `supabase` | supabase, supabase-postgres-best-practices | `**/*.sql` |
-| `python` | uv, pydantic, pydantic-house-rules, fastapi, building-pydantic-ai-agents, pydantic-ai-harness | `**/*.py`, `**/{pyproject.toml,uv.lock,.python-version}`; building-pydantic-ai-agents on `**/agents/**/*.py`; pydantic-ai-harness by the agent catalogs only, no routing row |
-| `agents` | microsoft-agent-framework | `**/agents/**/*.py` |
+| `ios` | swiftui-pro, healthkit, widgetkit, activitykit, photokit, push-notifications | derived: `.swift` files that import SwiftUI; Apple framework skills by Swift file name (`{Health,Workout}*.swift`, ...) |
+| `android` | compose-state, compose-ui, compose-performance, compose-build-and-test, kotlin-concurrency, kotlin-control-flow, kotlin-functions, kotlin-types-value-class | `**/*.{kt,kts}` for the Kotlin rules; Compose skills derived when the Gradle build uses Compose |
+| `react` | react-rules, tanstack-query-rules, tanstack-router, tailwind, forms-i18n, turborepo | derived from `package.json` dependencies (react, @tanstack/*, tailwindcss, react-hook-form / i18next); turborepo on `**/turbo.json`, `pnpm-workspace.yaml`, and `**/package.json` when a root `turbo.json` exists |
+| `supabase` | supabase, supabase-postgres-best-practices | supabase-postgres-best-practices on `**/*.sql`; supabase derived from `supabase/config.toml` |
+| `python` | uv, ruff, pydantic, pydantic-house-rules, fastapi, sqlalchemy, loguru, building-pydantic-ai-agents, pydantic-ai-harness | uv and ruff on `**/*.py` and `**/{pyproject.toml,uv.lock,.python-version}`; pydantic, fastapi, sqlalchemy, loguru and building-pydantic-ai-agents derived from `pyproject.toml` dependencies; pydantic-ai-harness by the agent catalogs only, no routing row |
+| `agents` | microsoft-agent-framework | derived: `**/agents/**/*.py` when `pyproject.toml` depends on agent-framework |
 | `k8s-gitops` | argocd, helm, kubectl, kustomize, cloudnativepg, envoy-gateway, agent-router, sops-age | `argocd/**`, `manifests/**`, `**/Chart.yaml`, `**/kustomization.{yaml,yml}`, `**/*.enc.yaml` |
-| `temporal` | temporal-developer | `**/{workflows,activities}/**/*.py` |
+| `temporal` | temporal-developer | derived: `**/{workflows,activities}/**/*.py` when `pyproject.toml` depends on temporalio |
 | `qa` | playwright-cli, playwright-trace, playwright-component-testing, bruno, schemathesis | `tests/**/*.spec.ts`, `playwright.config.ts`, `**/*.bru`; bruno and schemathesis also on every API-surface row |
 | `observability` | promql, loki, tempo | `observability/**`, `**/dashboards/**/*.json`, `**/*rule*.{yaml,yml}` |
 | `security` | security-review | `always.review` |
@@ -238,7 +342,9 @@ body. Pre-allow `Bash(npx:*)` and `Bash(npm:*)` on the runner, or pass
 How each skill was sourced, and what was rejected:
 `docs/superpowers/plans/2026-09-10-stack-skills.md` and
 `docs/research/2026-09-10-stack-skills-sourcing.md`; for `ruff`, `sqlalchemy`,
-`loguru` and `nats`, `docs/research/2026-09-23-python-skills-sourcing.md`.
+`loguru` and `nats`, `docs/research/2026-09-23-python-skills-sourcing.md`; for
+`tailwind`, `forms-i18n` and `turborepo`,
+`docs/research/2026-09-24-frontend-skills-sourcing.md`.
 
 ## House rules
 
@@ -279,7 +385,14 @@ standing rules and every agent carries them:
   read-only, and on FAIL hands the owner a filled-in rollback, never running it
   (`post-deploy-verification`) - and `retro`, a blameless leak table (what each
   gate caught, what got past the gate that should have) turned into proposed
-  rule diffs the owner applies or declines (`retro`).
+  guards (a test fixture, a semgrep rule or a lint config such as
+  `scripts/lint-no-plan-numbers.sh`) before any prose rule, which the owner
+  applies or declines (`retro`).
+- **Mutation witnesses.** A new guard or validation ships with a receipt from
+  `skills/process/review-protocol/scripts/mutate-witness.sh`, which applies one
+  mutant in a throwaway detached worktree, never the working tree, and records
+  whether the test killed it. The reviewer treats a surviving mutant, or a new
+  guard with no receipt, as Important.
 - **Prior art.** No ask starts from priors. At the start of every task, and
   again at every mid-task fork, look at what others do - reuse candidates
   first (an existing skill, plugin or library), then competitors, open source,
@@ -322,6 +435,7 @@ Configure project Stop gates in `.claude/graph-checks.json`; see
 [hook prerequisites and worktree binding](hooks/README.md). Python 3.11+ is required;
 `uv python install 3.12` supplies it when your system Python is older.
 
-Cache lifetimes and role model mappings belong to host settings. See
+Model tiers per role live in the profile's `policy:` block (see Roster).
+Cache lifetimes belong to host settings. See
 [cost measurement](docs/cost-measurement.md) before changing them; a gateway must
 actually report one-hour cache writes before a TTL experiment counts as enabled.

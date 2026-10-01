@@ -1,0 +1,10 @@
+# before: base commit 7593295, graph_control.status does not exist; the status line has no agent segment
+$ PYTHONPATH=scripts python3 -m graph_control.status --line
+python3: No module named graph_control.status
+exit=1
+$ uv run --with PyYAML==6.0.2 python scripts/graph-control.py status
+graph-control.py: error: argument command: invalid choice: 'status' (choose from validate-plan, validate-attempts, fingerprint, snapshot, preflight, record-receipt, verify, event, guard-agent)
+exit=2
+$ python3 scripts/session_usage.py --medians --start 2026-09-28T00:00:00Z --end 2026-09-29T00:00:00Z
+session_usage.py: error: unrecognized arguments: --medians
+exit=2

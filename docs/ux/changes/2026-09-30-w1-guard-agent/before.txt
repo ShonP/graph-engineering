@@ -1,0 +1,10 @@
+# before: base commit 1854977, guard-agent does not exist
+$ echo '{"tool_name":"Agent","tool_input":{"subagent_type":"general-purpose","prompt":"...","description":"..."}}' | uv run --with PyYAML==6.0.2 python scripts/graph-control.py guard-agent --profile p --root r
+usage: graph-control.py [-h]
+                        {validate-plan,validate-attempts,fingerprint,snapshot,preflight,record-receipt,verify,event}
+                        ...
+graph-control.py: error: argument command: invalid choice: 'guard-agent' (choose from validate-plan, validate-attempts, fingerprint, snapshot, preflight, record-receipt, verify, event)
+exit=2
+$ grep -c PreToolUse hooks/hooks.json
+0
+(no PreToolUse hook: a general-purpose or model: haiku dispatch proceeds with no policy message)

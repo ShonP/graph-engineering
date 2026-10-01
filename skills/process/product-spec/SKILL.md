@@ -1,6 +1,6 @@
 ---
 name: product-spec
-description: Write a product spec that states intent, value, success metrics and non-goals, and that surfaces open questions instead of burying them. Use when turning a stated goal into something a plan can be built from.
+description: Write a product spec that states intent, value, success metrics and non-goals, and that surfaces open questions instead of burying them. Use when turning a stated goal or a new product idea into something a plan can be built from.
 ---
 
 # Product spec
@@ -28,6 +28,32 @@ rework than any other, because it is where scope creep is refused in advance.
 **Open questions.** Every unknown, listed. Each one leaves this section by being
 spiked or by becoming a stated assumption in the plan. Never by being resolved
 quietly.
+
+The next three sections are required in a product concept (`<date>-<slug>-concept.md`) and
+whenever the goal carries `product-discovery: yes`; a bounded change on an
+established contract leaves them out.
+
+**Options.** 2-3 ways to meet the intent, each with its cost and what it gives
+up. One is always the smallest thing that puts the intent in front of a real
+user. One is always buy / do nothing: an existing product, service or library,
+or not building it, with what that costs the named user. A recommendation
+closes the section.
+
+**Riskiest assumption.** One per option: the belief that, if false, kills that
+option (value, usability, feasibility or viability), and the cheapest spike
+that would test it.
+
+**Completeness checklist.** One row each for design system, auth and session,
+developer experience and CI, QA, observability, cost, and skills per
+technology: `covered`, `gap` or `n/a`, with the research line or reason that
+says so. A `gap` on the recommended option is a task or an open question.
+
+**Signal.** One line under the success metrics,
+`signal: already logged | instrumentation task`: whether the success metric is
+already measured where the product runs (name the metric, event or table), or
+needs an instrumentation task that ships ahead of the change so a baseline
+exists. Internal, refactor and infra work with no user-facing outcome has no
+signal line; its plan says why instead.
 
 ## The rule that matters
 

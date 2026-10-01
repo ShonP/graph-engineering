@@ -1,176 +1,331 @@
 # Plugin hooks
 
-Three hooks ship with `graph-engineering`. They are generic: they key on the
-script names `test`, `lint` and `typecheck` across three project conventions, and
-on `docs/HANDOFF.md`. Nothing in them is specific to one repo.
+Six scripts ship with `graph-engineering`, registered in `hooks/hooks.json` as
+eight handlers. They are generic: nothing in them names a repo, a stack or a
+package manager. What to run is declared by the project in
+`.claude/graph-checks.json`; how agents are tiered is declared in the project's
+`.claude/graph-profile.yaml`. One more script, `scripts/wait-run.sh`, is not a
+hook: agents call it by path to wait on a long suite (see wait-run below).
 
-| Event | Script | What it does | Exit codes |
+| Event, matcher | Script | Mode | What it does |
 | --- | --- | --- | --- |
-| `PostToolUse`, matcher `Edit\|Write` | `scripts/lint-touched-file.sh` | Lints and typechecks the file Claude just wrote, and hands any findings back as context next to the tool result | `0` always. It informs, it never blocks |
-| `Stop` | `scripts/test-before-stop.sh` | Runs the project's test script and holds the turn open until it is green | `2` with a short reason on stderr when the tests fail, `0` when they pass or when no test script applies |
-| `SessionStart`, no matcher | `scripts/print-handoff.sh` | Prints the first 40 lines of `docs/HANDOFF.md` into the new session's context | `0` always |
+| `PostToolUse`, `Edit\|Write` | `scripts/lint-touched-file.sh` | `async`, timeout 130 | Runs the configured lint on the file Claude just wrote and hands findings back on the next turn. Exit `0` always: it informs, it never blocks |
+| `PreToolUse`, `Bash` | `scripts/guard-destructive.sh` | sync, timeout 10, three handlers gated by `if` | Asks before a destructive command, with evidence. Never denies |
+| `PreToolUse`, `Agent\|Task` | `scripts/guard-agent.sh` | sync, timeout 15 | Enforces the profile's `policy:` block on subagent calls |
+| `Stop`, no matcher | `scripts/test-before-stop.sh` | `asyncRewake`, timeout 620 | Runs the configured test after the turn ends and wakes Claude only when it fails. On an unchanged tree it replays the stored verdict instead (`<git common dir>/graph-engineering/checks-state.json`); any nonempty `GRAPH_CHECKS_NO_MEMO` turns that off |
+| `SessionStart`, `startup\|clear\|compact` | `scripts/print-handoff.sh` | sync, timeout 15 | Prints the head of `docs/HANDOFF.md` into the new context, a warning when that file is over 150 lines, the reply contract when the repo has a profile, and one line when a run's success measures are due. Silent on resume, fork and `--agent` sessions. Exit `0` always |
+| `SessionStart`, `startup` | `scripts/doctor-on-start.sh` | sync, timeout 5 | Cached setup check: up to 3 lines of doctor findings, or a `/graph-init` hint. Silent when clean. Exit `0` always |
 
-## Detection order
+## Claude Code versions
 
-Both working hooks find the project's script the same way, and stop at the first
-convention that matches. For `PostToolUse`, a project file that declares neither
-`lint` nor `typecheck` is passed on the way to an ancestor of the same kind that
-does; see the bound below.
+Minimum Claude Code 2.1.271, tested on 2.1.285. Feature floors the registrations
+lean on:
 
-| Order | Project file | Condition | Command |
-| --- | --- | --- | --- |
-| 1 | `pyproject.toml` | the script is declared under `[project.scripts]` | `uv run <script>` |
-| 2 | `package.json` | the script is declared under `scripts` | `<pm> run <script>` |
-| 3 | `Taskfile.yml` | `task --list-all --silent` prints a line `test` | `task test` (`Stop` only) |
+| Feature | Floor | Used by |
+| --- | --- | --- |
+| `if` on a hook handler | 2.1.85 | the three `guard-destructive.sh` handlers |
+| `if` evaluated inside compound commands (`a && b`, `$(...)`) | 2.1.89 | the same handlers, so `npm test && git push` still matches |
+| `background_tasks` in the Stop input | 2.1.145 | the Stop hook's skip while background work runs |
 
-`<pm>` is chosen by lockfile: `pnpm-lock.yaml` gives `pnpm`, `yarn.lock` gives
-`yarn`, `bun.lock` or `bun.lockb` gives `bun`, anything else gives `npm`.
+## Opt-in via `.claude/graph-checks.json`
 
-Taskfiles are `Stop` only. A single-file lint or typecheck has no Taskfile shape,
-so `PostToolUse` skips a Taskfile project in silence.
+The Stop and lint hooks do nothing until the repo commits this file. The shape:
 
-The file argument is passed with no `--` separator: measured on 2026-09-10,
-npm 11.12.1 strips a leading `--` while pnpm 10.33.3 forwards it to the script as
-a literal first argument, so the bare form is the one that behaves the same on
-both. Open question, not a rule: yarn and bun were not measured, because neither
-was installed on the machine where this was written. The bare form is what their
-docs describe, but if a yarn or bun repo sees a mangled lint argument, that pair
-is where to look first.
+- `version`: `1`.
+- `test`, `precheck` and `lint` blocks, each optional. A block takes `argv` (a
+  list, spawned directly with no shell) and `timeout_seconds`.
+- `lint.argv` has exactly one `{file}` element, replaced with the edited file's
+  path relative to the config's directory (the repo root, or a package). `lint.extensions` is required: only files with a
+  listed extension are linted.
+- Timeouts are at most 600 for `test`, 120 for `lint` and 60 for `precheck`.
+- `precheck` is a cheap gate for what the test needs (a daemon, a database) so a
+  missing dependency reads as not verified instead of as a red test.
 
-When nothing matches, or when the tool a project needs (`uv`, the package
-manager, `task`) is not installed, the hook exits 0 and prints nothing.
+A complete example is at `templates/graph-checks.json`; copy it to
+`.claude/graph-checks.json` and edit the argv lists for the repo's own tools.
+
+**Without the file, both hooks do nothing. This breaks 0.14 autodetect (removed in 0.15).**
+
+Where the hooks look: first the hook binds a root, the repository (or linked
+worktree) being worked on. Then the nearest `.claude/graph-checks.json` wins,
+walking up from the edited file's directory (lint) or from the session's working
+directory, then `CLAUDE_PROJECT_DIR` (Stop), and never above that root. The
+command runs from the directory holding `.claude/`. So a package in a monorepo
+keeps its own file even when Claude Code was launched inside it
+(`CLAUDE_PROJECT_DIR` is the launch directory), a nested repo in a multi-repo
+workspace and a linked worktree use their own, and a package directory maps
+into the linked worktree Claude is working in. A package's file is also a
+package's memo: its verdict is keyed by its path as well as the tree. When no
+file is found the hook exits in bash before starting Python, so a repo that
+never opted in is never told that Python 3.11+ is missing.
+
+Removed in 0.15: the `uv run test` and `package.json` script lookups and the Taskfile lookup.
+A repo that relied on them has to add the file to keep the Stop gate and the lint.
+
+Why opt-in: a guessed command is the one a repo never chose. In the measured
+sessions a script named `lint` ran the whole project for every edited file, and a
+test script needed a daemon nobody had started. The repo now says exactly which
+command proves its own work, and how long it may take.
+
+## Stop: test before finishing
+
+- Runs after the turn ends. `asyncRewake` starts it in the background, so the
+  turn is never held open.
+- Wakes Claude only when the tests fail (exit `2`, the output arrives as a
+  system reminder). A pass or a clean skip is silent.
+- At most once per prompt. While the input carries `stop_hook_active: true`, Claude
+  is already continuing because of this hook, so it stands down.
+- Skipped while `background_tasks` holds a running task: the session is paused for
+  that work, not finished.
+- A `precheck` failure or a timeout means not verified. That is neither a pass
+  nor a failure: the hook exits `0` and does not wake Claude.
+- No `if` on this entry. On a non-tool event a hook with `if` never runs
+  (spike e, 2.1.285).
+
+Why the hook keeps no block counter of its own. Spike c measured the harness cap:
+it honours 8 consecutive blocks, then overrides silently, and the count resets
+per prompt. An override that says nothing looks like completion, so the hook
+never relies on the cap to end a loop. It stands down after one wake per prompt
+and reports what it could not verify.
+
+## Lint: async, by extension
+
+- Registered `async`, so the edit returns immediately and the result is delivered
+  on the next turn. Claude Code does not enforce the registered `timeout` on a
+  plain async hook, so the `lint.timeout_seconds` bound (at most 120) is the one
+  that applies.
+- Filtered by extension before anything is spawned: an edit to a file whose
+  extension is not in `lint.extensions` costs a shell `case`, not a process tree.
+- When the configured runner is missing, typically in a fresh linked worktree
+  with no dependencies installed, the hook reports `lint skipped` and exits `0`
+  rather than failing the edit.
+- Informational only. Stop and the merge gate are what block.
+
+## Destructive-command guard
+
+`guard-destructive.sh` asks, with the evidence it gathered, and never denies. The
+human or the harness decides. It asks for:
+
+- `git remote remove` and `git remote rm`.
+- A force push without `--force-with-lease`.
+- `docker volume rm` and `docker volume prune`.
+- `docker system prune -a` and `docker system prune --volumes`.
+- A recursive `rm` of `/`, `$HOME`, a repository root, a `.git` path or the Docker
+  data directories.
+
+Registration is three handlers, one per `if`: `Bash(git *)`, `Bash(rm *)` and
+`Bash(docker *)`. The git rule is the whole tool, not `git push*`, because git
+takes global options before the subcommand: `git -C <worktree> push -f` is how
+worktree flows force-push, and `git -c k=v` and `git --no-pager` shift it the
+same way. Spike e found that `if` holds exactly one permission rule; a pipe, a
+brace or a list inside it matches nothing. A command that matches none of the
+three never spawns the script, and a git command that never says `push` or
+`remote` stops at the script's bash `case`. Because `if` is
+best-effort (Claude Code runs the hook when it cannot parse the command), the
+script re-checks the command itself. For a hard stop, put the fixed string in
+`permissions.deny`; a hook is the wrong tool for an absolute rule.
+
+## Agent policy guard
+
+`guard-agent.sh` is a no-op unless the project's profile has a `policy:` block.
+With one, it blocks dispatch to `general-purpose` and to any model listed in
+`policy.never`, and it sets the role's model tier on `Agent` calls. The matcher is
+`Agent|Task` because the tool has carried both names.
+
+A line `policy-override: <reason>` in the call's prompt skips the guard for that
+call, and the override and its reason are logged to `.graph/ledger.md`.
+
+## SessionStart matcher
+
+`startup|clear|compact`. Spike i found the matcher is an exact-string list against
+the start source. `resume` and `fork` keep their existing context, so printing the
+handoff again would only add a stale copy; a fresh session, a `/clear` and a
+compaction lose it, so those three print.
+
+The doctor entry is `startup` alone: setup does not change on a resume, a `/clear`
+or a compaction, so checking once per fresh session is enough.
+
+## SessionStart doctor
+
+`doctor-on-start.sh` tells a fresh session when this repo's graph-engineering
+setup is broken, and says nothing otherwise. It always exits `0`: any failure
+(no `uv`, no Python 3.11+, a doctor error, output it cannot read) is silent.
+
+- `CLAUDE_PROJECT_DIR` without a `.git`: silent, so home and scratch sessions
+  pay nothing.
+- No `.claude/graph-profile.yaml`: one line pointing the owner at `/graph-init`,
+  but only when the project root holds a stack marker (`package.json`,
+  `pyproject.toml`, `go.mod`, `Cargo.toml`, `Package.swift`, `build.gradle`,
+  `build.gradle.kts`, `pom.xml`, `Gemfile`). Otherwise silent.
+- A profile: runs `graph-control.py doctor --root <dir> --quick`, the subset of
+  `/graph-doctor` that starts no process (no profile, an unreadable profile,
+  `schema_version`, removed keys, missing `.claude/graph-checks.json`, plugin version differs from the
+  installed one), and prints at most 3 lines,
+  `graph-engineering doctor: <message> - fix: <fix>`, errors first. Run
+  `/graph-doctor` for the full list.
+- A clean result is cached in `$(git rev-parse --git-common-dir)/graph-engineering/doctor-cache`,
+  one line per project directory (linked worktrees share the file), keyed by the
+  plugin version and the mtimes of the profile and `.claude/graph-checks.json`. A
+  hit exits before starting `uv`; editing either file or updating the plugin
+  misses it. A run with findings is never cached, so they repeat until fixed.
+  Delete the file to force a check.
+
+## SessionStart: due success measures
+
+A merged run can promise `success_signals` in its `plan.json` (schema 2): a
+goal, an argv `command` that prints one aggregate, a `success_condition` and a
+`window_days`. Long windows end days after the run, in a session that knows
+nothing about it, so `print-handoff.sh` is the lazy trigger. After everything
+else it prints, it may add
+
+```
+graph-engineering: <n> success measure(s) due (<run ids>). Run: python3 <plugin>/scripts/measure_signals.py .graph/<run>
+```
+
+- Only when a bash glob finds `.graph/*/plan.json` under `CLAUDE_PROJECT_DIR`.
+  Without one no interpreter starts, so every repo that never ran a plan pays
+  one glob.
+- Then one Python call, `measure_signals.py --due <project dir>`, counts the
+  signals whose window has elapsed since the ledger's `merged: <sha>` (the
+  commit time from `git show -s --format=%cI`) and that have no row in that
+  run's `measure.md`. It reads files and asks git for one date per run; it
+  never runs a signal's command. No Python 3.11+, a malformed plan or an
+  unmerged run: silent.
+- Measuring is a separate, deliberate step: the owner or `/graph-ship` runs the
+  printed command for a run, which writes `measure.md` and the ledger lines. The
+  contract (sources, the aggregate-only output rule, `baseline.json`) is in the
+  `post-deploy-verification` skill.
+
+## wait-run: a bounded wait for long suites
+
+Spike f (2.1.285): a foreground subagent's background jobs are killed when it
+ends its turn, and a background subagent is re-woken only when its lead goes
+idle. The harness also blocks a bare `sleep N`. So a suite longer than one tool
+call runs through
+
+```
+<plugin root>/hooks/scripts/wait-run.sh --log <absolute path> [--max-block S] [-- <argv...>]
+```
+
+- With argv: starts it detached, then waits. Refused with exit `2` and `a job
+  for this log is still running; call again without a command to attach` while
+  `<log>.pid` names a live job that has not written `<log>.exit`.
+- Without argv: attaches to the job for that log and waits.
+- Blocks at most S seconds: default 270, so each return lands inside the
+  5-minute worker cache; above 590 is clamped to 590. Give the Bash call a
+  longer timeout than S (300000 ms for the default).
+- Prints exactly one line,
+  `wait-run: exit=<n>|running state=complete|partial elapsed=<s>s max_block=<S>s log=<path>`.
+  `elapsed` is the job's age; `max_block` is S after clamping. A completed job
+  with a nonzero exit adds the last 20 lines of the log, at most 2000 characters.
+- Exit: the job's code when complete (128+N when signal N killed it, 127 when
+  argv could not start), `75` (EX_TEMPFAIL) when still running, `2` on a usage
+  error, a refusal, no job for the log, or a job that died without writing an
+  exit code. Errors print no summary line, which tells them from a job that
+  itself exited 2 or 75.
+- Beside the log: `<log>.pid`, the supervisor's pid and the job's process
+  group (`kill -- -"$(cat <log>.pid)"` stops the job), and `<log>.exit`. Each
+  start truncates the log. All three are created mode 0600, and a symlink in
+  their place is refused rather than followed. Keep the log outside the
+  worktree, in the run directory or a temp dir, so it never lands in a commit.
+- Why the job survives its caller: a double fork with `setsid` reparents the
+  supervisor to init in its own session, and it closes every descriptor above
+  2. A process-group kill or a tree kill of the caller does not reach it, and a
+  harness waiting for EOF on its pipes is not held open by it.
+- Argv is spawned directly, with the caller's working directory and
+  environment and stdin from `/dev/null`: no shell, no network. The logic is
+  `scripts/wait_run.py`, stdlib only, run by the interpreter
+  `python-runtime.sh` selects.
 
 ## Scope and least privilege
 
-- `PostToolUse` acts only when `tool_input.file_path` canonicalises to a real
-  file strictly inside `$CLAUDE_PROJECT_DIR`. Strictly: the project root itself,
-  a directory, and a path that no longer exists are all rejected, and
-  containment requires a path separator, so a sibling that merely shares the
-  project's name prefix is out. Anything rejected exits 0 with no command run,
-  which is what keeps an edit inside a scratch clone of somebody else's repo
-  from running that repo's scripts.
-- Inside the project it walks up from the edited file to the nearest project
-  file, and no further than `$CLAUDE_PROJECT_DIR`. The walk re-checks the bound before it inspects any
-  directory, so it cannot leave the project whatever start point it is handed.
-- When that nearest project file declares neither script, the walk continues
-  to the nearest ancestor project file **of the same kind** that declares one.
-  That matters in a uv workspace, where the root owns the script names and the
-  member ships no entry point: stopping at the member's `pyproject.toml` would
-  resolve every file under `packages/*/src/` to a project with no scripts, and
-  the hook would exit 0 in silence — the whole library silently unlinted.
-- The same-kind limit is the other half: a `web/package.json` declaring only
-  `build` and `test` under a Python root must not resolve to the root, which
-  would run `uv run lint` on a `.tsx` file. A directory holding a project file
-  of another kind, or the bound, ends the search, and the nearest project file
-  is the answer — the hook then finds no script there and stays silent. A
-  project file the resolver cannot read or parse stops the walk where it is,
-  rather than letting an ancestor's scripts run against a file it does not own.
-- That bound lives in `scripts/resolve_touched_project.py` rather than inline,
-  so each of its three guards can be tested on its own. `hooks/tests/cases-resolver.sh`
-  calls them directly, because end to end only one of the three is reachable.
-- `Stop` looks in `$CLAUDE_PROJECT_DIR` only and does not walk.
-- The only commands these hooks run are the project's own named scripts. Nothing
-  is taken from the contents of the edited file, there is no `eval`, no shell
-  interpolation of a path, and no network access.
-- Enabling this plugin therefore means a repo's own `lint`, `typecheck` and
-  `test` scripts run automatically in that repo. `SessionStart` also reads
-  `docs/HANDOFF.md` into context. Treat both the way you treat opening an
-  untrusted repo at all: a repo you would not run `task test` in is a repo whose
-  hooks you should turn off before you open it.
+- The only commands these hooks run are the argv arrays committed in
+  `.claude/graph-checks.json`, each spawned directly. There is no `eval`, no shell
+  interpolation of a path (`{file}` is a whole argv element) and no network access.
+- Nothing is taken from the contents of an edited file.
+- Linked Git worktrees resolve through their common Git directory, including nested
+  worktrees. A different repository in a Stop event fails with a binding error.
+- `doctor-on-start.sh` runs only the plugin's own pinned helper, which reads the
+  profile and `.claude/graph-checks.json` and executes neither; it writes only
+  its cache file inside the repo's Git directory.
+- Enabling this plugin therefore means a repo's own committed checks run
+  automatically in that repo. `SessionStart` also reads `docs/HANDOFF.md` into
+  context. Treat that the way you treat opening any untrusted repo: a repo whose
+  checks you would not run by hand is a repo whose hooks you turn off first.
+- The due-measures line reads `.graph/<run>/plan.json`, `measure.md` and
+  `ledger.md` and runs `git show` for a commit date. A signal's `command` runs
+  only when someone runs `scripts/measure_signals.py` by hand or from a run.
 
 ## Dependencies
 
-`bash` and `python3` only. `python3` parses the hook's JSON input and the
-project files; no `jq`, no packages to install. A machine without `python3`
-gets a silent exit 0 from every hook.
+`bash` and a Python 3.11+ interpreter, found on `PATH` or among interpreters uv
+has already installed. Hooks never download one, and in a repo that opted in an
+unavailable interpreter fails visibly instead of skipping a check; a repo that did
+not opt in never needs one. The due-measures line needs one only when the repo
+has a `.graph/*/plan.json`, and is silent without it. No `jq`, no packages to install. The agent guard and
+the SessionStart doctor also need `uv`, and skip silently without it.
+Whatever the configured argv lists name (a linter, a build tool) is the repo's own
+dependency, not the plugin's.
 
-`uv`, the package manager and `task` are invoked only when the matching project
-file is present and the tool is on `PATH`.
+## Turning hooks off
 
-## The Stop loop, and its cap
+There is no per-hook disable for a plugin's hooks (hooks reference, "Disable or
+remove hooks"). The ways out, in order of least collateral damage:
 
-The `Stop` hook blocks by exiting 2, and Claude Code hands Claude the stderr text
-as the reason to keep going ("Stop decision control"). It keeps no counter of its
-own, because the platform owns the cap: "Claude Code overrides the hook and ends
-the turn after 8 consecutive blocks" ("Stop input"). The `stop_hook_active` flag
-from the input is echoed into the reason line so the loop state is visible in the
-transcript. It is read and deliberately not acted on: standing down on the second
-attempt would let a suite that a fix has genuinely turned green go unverified,
-and the price of not standing down is bounded by the platform cap, so the gate is
-kept honest and the cost is disclosed in the plugin README instead.
-
-## Turning them off
-
-There is no documented per-hook disable for a plugin's hooks. The documented
-ways out, in order of least collateral damage:
-
-- Let them no-op. A repo with no `test`, `lint` or `typecheck` script under any
-  of the three conventions, and no `docs/HANDOFF.md`, never triggers a command.
-- `claude plugin disable graph-engineering` turns off the plugin, hooks included
-  (plugins reference, "plugin disable").
+- Let them no-op. No `.claude/graph-checks.json`, no `policy:` block in the profile
+  and no `docs/HANDOFF.md` means the lint, the Stop gate, the agent guard and the
+  handoff all do nothing. The destructive-command guard still asks on the commands
+  above; answer it, or use the next two.
+- `policy-override: <reason>` in one agent prompt skips the agent guard for that call.
+- `claude plugin disable graph-engineering` turns off the plugin, hooks included.
 - `"disableAllHooks": true` in a settings file turns off every hook from every
-  source for that scope (hooks reference, "Disable or remove hooks").
+  source for that scope; `--settings '{"disableAllHooks": true}'` does it for one
+  run.
 
 ## Tests
 
 ```
-bash hooks/tests/run-tests.sh
+bash scripts/run-all-tests.sh
 ```
 
-Runs from any working directory and needs nothing but `bash` and `python3`:
-`uv`, `pnpm` and `task` are stubbed under `hooks/tests/fixtures/stubs/` and are
-installed onto `PATH` inside the sandbox, so the suite never touches the real
-tools or the network. It copies `hooks/tests/fixtures/` into a `mktemp`
-directory, writes only there, removes it on the way out, and exits non-zero when
-any case fails.
+runs every suite in the repo. The hook suites on their own:
 
-`cases-resolver.sh` unit-tests the project-directory bound directly;
-`cases-posttooluse.sh`, `cases-stop.sh` and `cases-sessionstart.sh` drive the
-three hooks end to end.
+```
+bash hooks/tests/run-tests.sh
+python3 hooks/tests/test_configured_checks.py
+python3 hooks/tests/test_hooks_registration.py
+python3 hooks/tests/test_doctor_on_start.py
+python3 hooks/tests/test_wait_run.py
+python3 -m unittest discover -s tests/measure
+```
 
-The fixtures are one mini project per convention (`py/` for `uv`, `node/` for
-the package manager, `taskfile/` for `task`), one with no scripts at all
-(`bare/`), and three that exist to be refused: `outside/`, which stands for a
-clone of somebody else's repo outside the project directory, `py-evil/`, which
-sits next to `py/` and shares its name prefix, and `escape/`, an ancestor project
-sitting one level above a session project that has no project file of its own.
-Each of them leaves a marker file if its scripts are ever executed, and the suite
-asserts the markers are absent.
+`run-tests.sh` needs only `bash` and `python3`. It copies `hooks/tests/fixtures/`
+into a `mktemp` directory, drives each hook the way Claude Code does (the event's
+JSON on stdin, `CLAUDE_PROJECT_DIR` in the environment), writes only in the sandbox
+and exits non-zero when any case fails. `test_hooks_registration.py` checks that
+`hooks/hooks.json` holds exactly the registrations above and that this README keeps
+stating the floors, the opt-in file and the breaking change.
 
 ## Registration
 
 `hooks/hooks.json` at the plugin root is the default location and loads with no
 entry in `.claude-plugin/plugin.json`; the manifest's `hooks` key exists for
-configs kept somewhere else (plugins reference, "Hooks" and "Component path
-fields"). Note that `claude plugin validate <plugin dir>` reads this file, but
-`claude plugin validate <repo root>` validates the marketplace manifest and does
-not, so the JSON is checked here with `python3 -m json.tool`.
+configs kept somewhere else (plugins reference, "Hooks"). `claude plugin validate
+<plugin dir>` reads this file, but `claude plugin validate <repo root>` validates
+the marketplace manifest and does not, so the JSON is also checked with
+`python3 -m json.tool hooks/hooks.json`. Entries keep the `type: command`,
+`args: []` exec form, so `${CLAUDE_PLUGIN_ROOT}` is substituted as one argument with
+no shell quoting.
 
-## Sources, fetched 2026-09-10
+## Sources, fetched 2026-09-30
 
-- https://code.claude.com/docs/en/hooks "Hooks reference - Claude Code Docs"
-- https://code.claude.com/docs/en/plugins-reference "Plugins reference - Claude Code Docs"
-- https://docs.astral.sh/uv/concepts/projects/run/ "Running commands | uv"
-- https://taskfile.dev/reference/cli/ "Command Line Interface Reference | Task"
+Read the raw markdown (append `.md` to the docs URL). WebFetch summaries of the hooks
+page were wrong in spikes d and e.
 
-## Explicit project checks and linked worktrees
-
-Hooks require Python 3.11+ (`tomllib`). They use a compatible Python on PATH or
-an already installed uv interpreter; they do not download one during a hook.
-An unavailable supported interpreter fails visibly instead of skipping checks.
-
-For Make-based projects or a custom test gate, commit `.claude/graph-checks.json`:
-
-```json
-{"version": 1, "test": {"argv": ["make", "check"], "timeout_seconds": 600}}
-```
-
-The Stop hook executes that argv directly in the candidate root. Missing runners,
-invalid configuration, timeout or nonzero exit block completion. Choose a command
-that itself rejects zero tests and skipped required cases. Without this file,
-existing script discovery remains available; no discovered script is not QA proof.
-Linked Git worktrees resolve through their common Git directory, including nested
-worktrees. A different repository in a Stop event fails with a binding error.
-Post-edit lint remains informational; Stop gates and graph receipts provide the
-completion checks. Run the regressions with `bash hooks/tests/run-tests.sh` and
-`python3 hooks/tests/test_configured_checks.py`.
+- https://code.claude.com/docs/en/hooks.md: handler fields (`if`, `async`,
+  `asyncRewake`), "Run hooks in the background", "Stop input" (`stop_hook_active`,
+  `background_tasks`, the 8-block cap), the SessionStart matcher values.
+- https://code.claude.com/docs/en/plugins-reference.md: `hooks/hooks.json` default
+  location.
+- The 2026-09-30 spikes, summarised in `docs/superpowers/plans/2026-09-30-ge-0-15.md`: c (cap
+  behaviour), e (`if` and `asyncRewake` on 2.1.285), i (SessionStart sources).

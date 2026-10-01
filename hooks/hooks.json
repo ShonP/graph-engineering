@@ -1,5 +1,5 @@
 {
-  "description": "graph-engineering: lint on edit, test before stop, handoff on session start",
+  "description": "graph-engineering: async lint on edit, destructive-command and agent-policy guards, test on stop, handoff on session start",
   "hooks": {
     "PostToolUse": [
       {
@@ -9,8 +9,47 @@
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lint-touched-file.sh",
             "args": [],
-            "timeout": 120,
-            "statusMessage": "Linting the file you just touched"
+            "async": true,
+            "timeout": 130
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/guard-destructive.sh",
+            "args": [],
+            "if": "Bash(git *)",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/guard-destructive.sh",
+            "args": [],
+            "if": "Bash(rm *)",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/guard-destructive.sh",
+            "args": [],
+            "if": "Bash(docker *)",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/guard-agent.sh",
+            "args": [],
+            "timeout": 15
           }
         ]
       }
@@ -22,21 +61,32 @@
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/test-before-stop.sh",
             "args": [],
-            "timeout": 620,
-            "statusMessage": "Running the project test script"
+            "asyncRewake": true,
+            "timeout": 620
           }
         ]
       }
     ],
     "SessionStart": [
       {
+        "matcher": "startup|clear|compact",
         "hooks": [
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/print-handoff.sh",
             "args": [],
-            "timeout": 15,
-            "statusMessage": "Reading docs/HANDOFF.md"
+            "timeout": 15
+          }
+        ]
+      },
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/doctor-on-start.sh",
+            "args": [],
+            "timeout": 5
           }
         ]
       }

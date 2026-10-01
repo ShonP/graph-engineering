@@ -7,8 +7,7 @@ its recommendations. Preserve independent review and public-surface QA.
    3.11+. Verify with broken candidate / passing parent and Make-only fixtures.
 2. Validate task contracts, named cases, real versus synthetic witnesses, graph
    capabilities and exact-candidate receipts. Verify negative CLI cases.
-3. Reduce repeated context and unconditional research. Retain security/privacy
-   review and emit compact status references. Verify graph/role contracts.
+3. Resolved in 0.15: see the `when:` flags in `graphs/feature.md` and the engine's step 4 (`docs/engine/run.md`).
 4. Repair backend response contracts, add Bruno cases with an isolated Temporal
    harness, and gate a committed schema snapshot. Verify HTTP/SSE boundaries.
 5. Gate frontend unit, schema-consumer and mock-browser cases in CI. Verify

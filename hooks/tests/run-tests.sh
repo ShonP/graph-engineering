@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 #
 # Regression test for the three plugin hooks. Runs from any working directory
-# and needs nothing but bash, python3 and the fixtures beside this file: uv,
-# the package managers and task are all stubbed under fixtures/stubs.
+# and needs nothing but bash, python3 and the fixtures beside this file. Every
+# check a hook runs is opted into per case by writing .claude/graph-checks.json
+# into the sandbox. uv, pnpm and task are stubbed under fixtures/stubs and put
+# on PATH as bait: a project that declares test or lint scripts but has no
+# graph-checks.json must run none of them.
 #
 # Every case invokes a hook script the way Claude Code does: the event's
 # documented JSON input on stdin, CLAUDE_PROJECT_DIR in the environment, from a
@@ -40,7 +43,7 @@ trap 'rm -rf "$WORK"' EXIT INT TERM
 cp -R "$TESTS_DIR/fixtures/." "$WORK/" || exit 1
 
 # The stubs are committed under names that say what they are, and are installed
-# into the sandbox under the names the hooks look for on PATH.
+# into the sandbox under the names the old autodetection looked for on PATH.
 FIX="$WORK"
 STUB_BIN="$WORK/bin"
 mkdir -p "$STUB_BIN"
@@ -50,7 +53,13 @@ for tool in uv pnpm task; do
 done
 rm -rf "$WORK/stubs"
 
-SYSTEM_PATH="$PATH"
+# A python3 that only leaves a marker: first on PATH with GE_PYTHON unset, it
+# proves a hook decided in bash alone, before spawning any interpreter.
+PY_TRAP="$WORK/python-trap"
+mkdir -p "$PY_TRAP"
+printf '#!/bin/sh\ntouch "%s/RAN_PYTHON"\nexit 1\n' "$WORK" >"$PY_TRAP/python3"
+chmod +x "$PY_TRAP/python3"
+
 HOOK_PATH="$STUB_BIN:$PATH"
 
 pass=0
@@ -100,13 +109,16 @@ skip() { # skip <label> <reason>
 row() { ROWS+=("$1|$2|$3"); }
 
 reset_markers() {
-  find "$WORK" \( -name 'RAN_*' -o -name 'OUTSIDE_*' -o -name 'EVIL_*' \
-    -o -name 'ESCAPED_*' -o -name 'INNER_*' \) |
+  find "$WORK" \( -name 'RAN_*' -o -name 'OUTSIDE_*' -o -name 'EVIL_*' \) |
     while read -r marker; do rm -f "$marker"; done
 }
 
 set_pass() { touch "$FIX/$1/PASS"; }
 set_fail() { rm -f "$FIX/$1/PASS"; }
+
+# write_config <dir> <json> - opt <dir> into checks for one case.
+write_config() { mkdir -p "$1/.claude" && printf '%s\n' "$2" >"$1/.claude/graph-checks.json"; }
+clear_config() { rm -f "$1/.claude/graph-checks.json"; }
 
 # run_hook <script> <project_dir> <json> - sets RC, OUT and ERR.
 run_hook() {
@@ -125,6 +137,18 @@ run_hook() {
   rm -f "$outf" "$errf"
 }
 
+# run_hook_python_trap <script> <project_dir> <json> - run_hook with GE_PYTHON
+# unset and the python3 trap first on PATH; RAN_PYTHON appears if python ran.
+run_hook_python_trap() {
+  local saved_path="$HOOK_PATH" saved_python="$GE_PYTHON"
+  HOOK_PATH="$PY_TRAP:$HOOK_PATH"
+  unset GE_PYTHON
+  run_hook "$@"
+  GE_PYTHON="$saved_python"
+  export GE_PYTHON
+  HOOK_PATH="$saved_path"
+}
+
 # run_hook_no_project_dir <script> <json> - sets RC only.
 run_hook_no_project_dir() {
   (
@@ -138,8 +162,8 @@ event_json() { # event_json <event> [key=value ...]
   "$GE_PYTHON" "$TESTS_DIR/make-input.py" "$@"
 }
 
-post_json() { event_json PostToolUse "file_path=$1"; }
-stop_json() { event_json Stop "stop_hook_active=$1"; }
+post_json() { local f="$1"; shift; event_json PostToolUse "file_path=$f" "$@"; }
+stop_json() { local a="$1"; shift; event_json Stop "stop_hook_active=$a" "$@"; }
 session_json() { event_json SessionStart "source=$1"; }
 
 echo "== hooks under test: $HOOKS_DIR"
@@ -153,16 +177,15 @@ for script in "$LINT" "$STOP" "$HANDOFF"; do
 done
 "$GE_PYTHON" -m json.tool "$HOOKS_DIR/hooks.json" >/dev/null 2>&1
 check "hooks.json parses as JSON" 0 $?
-for script in "$LINT" "$STOP" "$HANDOFF"; do
+for script in "$LINT" "$STOP" "$HANDOFF" "$HOOKS_DIR/scripts/opt-in.sh"; do
   bash -n "$script" 2>/dev/null
   check "parses as bash: $(basename "$script")" 0 $?
 done
-"$GE_PYTHON" -c 'import ast, sys; ast.parse(open(sys.argv[1]).read(), sys.argv[1])' \
-  "$HOOKS_DIR/scripts/resolve_touched_project.py" 2>/dev/null
-check "resolve_touched_project.py parses" 0 $?
-
-# shellcheck source=cases-resolver.sh
-. "$TESTS_DIR/cases-resolver.sh"
+for module in configured_check.py checks_config.py; do
+  "$GE_PYTHON" -c 'import ast, sys; ast.parse(open(sys.argv[1]).read(), sys.argv[1])' \
+    "$HOOKS_DIR/scripts/$module" 2>/dev/null
+  check "$module parses" 0 $?
+done
 # shellcheck source=cases-posttooluse.sh
 . "$TESTS_DIR/cases-posttooluse.sh"
 # shellcheck source=cases-stop.sh

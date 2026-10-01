@@ -1,0 +1,44 @@
+### Stop, configured test fails, first stop of the prompt
+exit: 2
+stderr:
+Tests failed: sh check.sh in <tmp>/repo (exit 1). Fix them, then finish. This check runs once per prompt.
+FAILED tests/test_math.py::test_add - assert 3 == 4
+1 failed, 12 passed
+stdout:
+
+
+### Stop, configured test fails, continuation (stop_hook_active=true)
+exit: 0
+stderr:
+
+stdout:
+
+
+### Stop, configured test exceeds its timeout
+exit: 0
+stderr:
+tests not verified: sleep did not finish within 1 s
+stdout:
+
+
+### Stop, no graph-checks.json, package.json test script fails
+exit: 0
+stderr:
+
+stdout:
+
+
+### PostToolUse, lint reports a problem
+exit: 0
+stderr:
+
+stdout:
+{"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": "Lint on src/app.py reported problems (exit 1). This is information, not a block.\n\nsrc/app.py:1:8: F401 [*] os imported but unused"}}
+
+### PostToolUse, lint runner not installed
+exit: 0
+stderr:
+
+stdout:
+{"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": "lint skipped: graph-absent-linter not found in <tmp>/repo - dependencies not installed in this worktree? Lint not verified."}}
+
