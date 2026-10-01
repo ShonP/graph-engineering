@@ -353,6 +353,14 @@ class Cli(Fixture):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(json.loads(result.stdout)["risk_rows"], ["outside-the-run"])
 
+    def test_cli_blocks_a_mapping_risk_table_naming_the_one_shape(self):
+        result = self.run_cli(self.base, "risk:\n  db-schema: {paths: ['**/migrations/**']}\n")
+        self.assertEqual(result.returncode, 1)
+        out = json.loads(result.stdout)
+        self.assertEqual(out["status"], "BLOCKED")
+        self.assertIn("risk must be a list of rows", out["reason"])
+        self.assertIn("not a mapping", out["reason"])
+
     def test_cli_blocks_on_an_unknown_base(self):
         result = self.run_cli("no-such-branch", "stacks: {}\n")
         self.assertEqual(result.returncode, 1)

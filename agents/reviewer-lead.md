@@ -50,6 +50,8 @@ Read each leaf's result from its file, never from its reply. A leaf that returne
 
 Return at most 1,500 tokens: the `lenses:` line; one line per leaf with its slice, its agent id from the Agent result, its leaf file and its verdict, so the engine can record each leaf as a distinct reviewer; one short title per surviving blocking or important finding; and last exactly one line, `PASS|CHANGES-REQUESTED blocking=<n> important=<m> findings=<path>`.
 
+Your return also carries one line, `skills_loaded: <comma-separated fully qualified names>`, naming every skill you invoked or had preloaded; the engine checks it against the REQUIRED skills your dispatch named.
+
 ## Evidence and handoff
 
 Read only this task's contract, producer artifacts and named acceptance cases.

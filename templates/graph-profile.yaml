@@ -590,10 +590,11 @@ policy:
 # Risk classes: the one table the router, the review-depth check and the gates
 # below read. A diff matches a row when a changed path matches one of `paths`
 # (the routing glob dialect) or an added line contains one of `keywords`
-# (literal and case-sensitive: write them the way the code spells them). A risk
-# match forces at least the `quick` lane. These lists are starting points kept
-# deliberately tight; tune them to this repo, since every extra keyword is a
-# false positive that costs an owner gate.
+# (literal and case-insensitive, so `delete from` matches `DELETE FROM`; write
+# statement shapes, never bare words, since `truncate` is also a CSS class and
+# `drop` a UI verb). A risk match forces at least the `quick` lane. These
+# lists are starting points kept deliberately tight; tune them to this repo,
+# since every extra keyword is a false positive that costs an owner gate.
 #
 # One more row is built in, not listed here, and reserved: `agent-control`, the
 # agent's own control plane: .claude/** (at any depth), CLAUDE.md, AGENTS.md,
@@ -635,7 +636,7 @@ risk:
     keywords: ["stripe.", "Stripe("]
   - id: destructive
     paths: []
-    keywords: ["DROP ", "TRUNCATE", "DELETE FROM"]
+    keywords: ["DROP TABLE", "DROP DATABASE", "DROP SCHEMA", "TRUNCATE TABLE", "DELETE FROM"]
   - id: credentials-and-access
     paths: [".sops.yaml", "**/*.enc.{yaml,yml}", "**/.env*"]
     keywords: []

@@ -15,9 +15,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .common import load
+from .common import Invalid, load
 from .preflight import read_profile
-from .risk import CONTROL
+from .risk import CONTROL, parse_rows
 
 LEVELS = ("error", "warn", "info")
 TIERS = ("opus", "sonnet")
@@ -104,18 +104,18 @@ def _policy(profile: dict[str, Any]) -> list[Finding]:
     return findings
 
 
-def _risk_ids(risk: Any) -> set[str]:
-    if isinstance(risk, dict):
-        return {key for key in risk if isinstance(key, str)}
-    if isinstance(risk, list):
-        rows = (row.get("id") if isinstance(row, dict) else row for row in risk)
-        return {row for row in rows if isinstance(row, str)}
-    return set()
+def _risk(profile: dict[str, Any]) -> tuple[list[Finding], set[str] | None]:
+    """The risk table read by the reader depth uses; None ids when its shape is wrong."""
+    try:
+        return [], {row.id for row in parse_rows(profile.get("risk"))}
+    except Invalid as error:
+        return [Finding("error", "risk-shape", str(error), "write `risk:` as a list of `- id: <name>` rows with "
+                        "`paths` and `keywords`, as templates/graph-profile.yaml does")], None
 
 
 def _gates(profile: dict[str, Any]) -> list[Finding]:
-    findings = []
-    if CONTROL in _risk_ids(profile.get("risk")):
+    findings, ids = _risk(profile)
+    if ids is not None and CONTROL in ids:
         findings.append(Finding("error", "risk-reserved", f"the risk table defines `{CONTROL}`, a built-in reserved row",
                                 f"delete that row; `{CONTROL}` always covers .claude/**, CLAUDE.md, AGENTS.md, "
                                 ".mcp.json, .github/** and instructionPaths"))
@@ -131,10 +131,10 @@ def _gates(profile: dict[str, Any]) -> list[Finding]:
     if CONTROL in (auto if isinstance(auto, list) else [auto]):
         findings.append(Finding("warn", "gates-control", f"gates.auto_classes lists `{CONTROL}`, which always waits "
                                 "for the owner", f"remove `{CONTROL}` from gates.auto_classes"))
-    known = _risk_ids(profile.get("risk")) | {"none", CONTROL}
+    known = (ids or set()) | {"none", CONTROL}
     for key in CLASS_KEYS:
         value = gates.get(key)
-        if value is None:
+        if value is None or ids is None:  # a misshapen table is reported once, as risk-shape
             continue
         items = value if isinstance(value, list) else [value]
         unknown = [repr(item) for item in items if not (isinstance(item, str) and item in known)]

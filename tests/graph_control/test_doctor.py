@@ -24,11 +24,16 @@ from unittest import mock
 import helpers  # noqa: F401  (puts scripts/ on sys.path)
 from graph_control import cli
 from graph_control.commands import iter_commands
+from graph_control.common import Invalid
+from graph_control.depth import decide
 from graph_control.doctor import Finding, diagnose
+from graph_control.preflight import read_profile
 
 PLUGIN = Path(__file__).resolve().parents[2]
 VERSION = json.loads((PLUGIN / ".claude-plugin" / "plugin.json").read_text())["version"]
 RUNTIME = "runtime:\n  none: CLI verified through public commands\n"
+LIST_ROW = '  - {id: db-schema, paths: ["migrations/**"]}\n'
+MAP_ROW = '  db-schema: {paths: ["migrations/**"]}\n'
 QUICK = {"no-profile", "profile-invalid", "schema-version", "stale-key", "checks-missing",
          "version-mismatch", "cannot-determine"}
 
@@ -47,7 +52,7 @@ policy:
   never: [haiku, fable]
   block_types: [general-purpose]
 risk:
-  db-schema: {paths: ["migrations/**"]}
+  - {id: db-schema, paths: ["migrations/**"]}
 gates:
   plan: owner
   merge: owner
@@ -125,9 +130,10 @@ CASES = {
     "merge gate set to auto": (swap("merge: owner", "merge: auto"), {("warn", "gates-value")}),
     "auto class lists agent-control": (swap("auto_classes: [none]", "auto_classes: [none, agent-control]"),
                                        {("warn", "gates-control")}),
-    "risk table redefines agent-control": (swap('  db-schema: {paths: ["migrations/**"]}\n',
-                                                '  db-schema: {paths: ["migrations/**"]}\n  agent-control: {paths: []}\n'),
+    "risk table redefines agent-control": (swap(LIST_ROW, LIST_ROW + "  - {id: agent-control, paths: []}\n"),
                                            {("error", "risk-reserved")}),
+    "risk table as a mapping": (swap(LIST_ROW, MAP_ROW), {("error", "risk-shape")}),
+    "risk rows as bare ids": (swap(LIST_ROW, "  - db-schema\n"), {("error", "risk-shape")}),
     "routing names an unknown skill": (swap("review: [review-protocol]", "review: [review-protocol, no-such-skill]"),
                                        {("warn", "routing-skill")}),
     ".graph not ignored": (lambda f: (f.root / ".gitignore").write_text("node_modules/\n"), {("warn", "graph-not-ignored")}),
@@ -153,10 +159,14 @@ class Checks(unittest.TestCase):
                 for finding in findings:
                     self.assertTrue(finding.message.strip() and finding.fix.strip(), finding)
 
-    def test_risk_rows_as_a_list_of_ids_resolve(self):
+    def test_a_mapping_risk_table_gets_the_message_depth_blocks_with(self):
         fixture = Fixture(self)
-        fixture.profile(CLEAN.replace('  db-schema: {paths: ["migrations/**"]}', '  - {id: db-schema, paths: ["migrations/**"]}'))
-        self.assertEqual(diagnose(fixture.root, PLUGIN, quick=False), [])
+        fixture.profile(CLEAN.replace(LIST_ROW, MAP_ROW))
+        [finding] = diagnose(fixture.root, PLUGIN, quick=False)
+        with self.assertRaises(Invalid) as caught:
+            decide(fixture.root, "HEAD", read_profile(fixture.root / ".claude" / "graph-profile.yaml"))
+        self.assertEqual((finding.level, finding.id, finding.message), ("error", "risk-shape", str(caught.exception)))
+        self.assertIn("templates/graph-profile.yaml", finding.fix)
 
     def test_messages_name_the_versions(self):
         fixture = Fixture(self)
@@ -201,7 +211,7 @@ class Gates(unittest.TestCase):  # AC-W2-DR-03
 
     def test_none_is_accepted_without_any_risk_table(self):
         fixture = Fixture(self)
-        body = CLEAN.replace('risk:\n  db-schema: {paths: ["migrations/**"]}\n', "")
+        body = CLEAN.replace("risk:\n" + LIST_ROW, "")
         fixture.profile(body.replace("owner_classes: [db-schema]", "owner_classes: [none]"))
         self.assertEqual(diagnose(fixture.root, PLUGIN, quick=False), [])
 

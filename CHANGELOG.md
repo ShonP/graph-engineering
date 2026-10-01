@@ -79,7 +79,7 @@ of model tiers, and haiku, fable and `general-purpose` are blocked.
   rows, `instructionPaths`, `review.panel_lines` and `review.seams`, and reports
   the matched `risk_rows` the merge gate reads. The new `risk` module is the
   one reader of the risk table: a row matches on a path glob, or on a keyword
-  that appears in an added line, spelled exactly (case-sensitive); a row with no
+  that appears literally, case-insensitively, in an added line; a row with no
   paths and no keywords is a placeholder that matches nothing. `wcmatch==11.0.1`
   is now pinned in the entry point. `--plan <run>/plan.json` evaluates the
   `outside-the-run` row (a changed path in no task's `writable_paths`), which
@@ -187,6 +187,16 @@ of model tiers, and haiku, fable and `general-purpose` are blocked.
 - `scripts/lint-no-plan-numbers.sh [--base <ref>] [paths...]` bans plan, task,
   wave and ADR numbers in code comments across stacks (comments found by file
   extension; string literals and prose skipped).
+- **Skill receipt.** Every roster agent with the Skill tool returns one line,
+  `skills_loaded: <fully qualified names>`, and after each dispatch that named
+  REQUIRED skills the engine runs `graph-control skills-check --required ...
+  --loaded ...` (no model, no file read). A miss marks the node
+  `SKILLS_MISSING: <names>` and re-dispatches once; a second miss goes to the
+  owner. Names compare by the part after the last colon, and a bare name that
+  is also a host built-in (`security-review` and the rest of `HOST_BUILTINS` in
+  `graph_control/skills.py`) counts as not loaded. Why: in 30 days of
+  sessions, 15 of 102 subagents that edited `.tsx` never loaded a React or
+  TanStack skill, and dispatches that REQUIRED `bruno` loaded it 1 of 3 times.
 
 ### Changed
 
@@ -353,6 +363,17 @@ of model tiers, and haiku, fable and `general-purpose` are blocked.
 
 ### Fixed
 
+- **One risk table shape.** `risk:` is a list of `{id, paths, keywords}` rows,
+  as the template writes it. `graph-control doctor` used to accept a mapping
+  keyed by id (and bare ids) that `depth` then rejected with `expected an
+  array`; now both read it through `risk.parse_rows`, doctor reports any other
+  shape as `risk-shape`, and depth is BLOCKED with the same message.
+- **Risk keywords match case-insensitively**, as contract C7 says, so
+  `delete from` in lowercase SQL matches `DELETE FROM`. The template's
+  `destructive` keywords become statement shapes (`DROP TABLE`,
+  `DROP DATABASE`, `DROP SCHEMA`, `TRUNCATE TABLE`, `DELETE FROM`), since bare
+  `TRUNCATE` and `DROP ` would now match the CSS class `truncate` and the verb
+  `drop`. A bare `TRUNCATE users` no longer matches; add it per repo if needed.
 - `graph-control --help` and `-h` no longer crash: a bare `%` in the
   `validate-briefs` help was read by argparse as a format spec. Tests render the
   top-level help, every subcommand's help and the entry point's `--help`.

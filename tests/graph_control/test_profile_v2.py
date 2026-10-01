@@ -25,7 +25,7 @@ RISK = [
     ("public-copy", [], []),
     ("outbound-messaging", ["**/{email,emails,mailers,notifications,notifier*}/**"], []),
     ("spend", ["**/{billing,payments}/**"], ["stripe.", "Stripe("]),
-    ("destructive", [], ["DROP ", "TRUNCATE", "DELETE FROM"]),
+    ("destructive", [], ["DROP TABLE", "DROP DATABASE", "DROP SCHEMA", "TRUNCATE TABLE", "DELETE FROM"]),
     ("credentials-and-access", [".sops.yaml", "**/*.enc.{yaml,yml}", "**/.env*"], []),
     ("outside-the-run", [], []),
 ]
@@ -87,9 +87,10 @@ class SchemaV2Tests(unittest.TestCase):
     def test_risk_comment_names_the_built_in_control_plane_row(self):
         text = comment_before("risk:")
         for token in ("agent-control", ".claude/**", "CLAUDE.md", "AGENTS.md", ".mcp.json", ".github/**",
-                      "instructionPaths", "reserved"):
+                      "instructionPaths", "reserved", "case-insensitive"):
             with self.subTest(token=token):
                 self.assertIn(token, text)
+        self.assertNotIn("case-sensitive", text)
         self.assertNotIn("agent-control", [r["id"] for r in self.profile["risk"]])
 
     def test_host_floor_is_a_profile_key(self):

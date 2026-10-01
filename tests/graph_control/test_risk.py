@@ -16,7 +16,7 @@ if importlib.util.find_spec("wcmatch") is None:  # the PEP 723 pin; scripts/run-
     raise unittest.SkipTest("needs wcmatch: uv run --with PyYAML==6.0.2 --with wcmatch==11.0.1")
 
 from graph_control.common import Invalid  # noqa: E402
-from graph_control.risk import Row, classify, load_rows  # noqa: E402
+from graph_control.risk import SHAPE, Row, classify, load_rows  # noqa: E402
 
 TEMPLATE = Path(__file__).resolve().parents[2] / "templates" / "graph-profile.yaml"
 
@@ -55,6 +55,22 @@ class LoadRows(unittest.TestCase):
             with self.subTest(name), self.assertRaises(Invalid):
                 load_rows(profile)
 
+    def test_only_a_list_of_rows_is_accepted_and_every_other_shape_names_it(self):
+        # One accepted shape, the template's; doctor reports the same message depth raises.
+        shapes = {
+            "mapping keyed by id": {"risk": {"db-schema": {"paths": ["migrations/**"]}}},
+            "bare ids": {"risk": ["db-schema"]},
+            "row without an id": {"risk": [{"paths": ["a/**"]}]},
+            "a string": {"risk": "db-schema"},
+        }
+        for name, profile in shapes.items():
+            with self.subTest(name), self.assertRaises(Invalid) as caught:
+                load_rows(profile)
+            self.assertIn(SHAPE, str(caught.exception))
+        with self.assertRaises(Invalid) as caught:
+            load_rows(shapes["mapping keyed by id"])
+        self.assertIn("not a mapping", str(caught.exception))
+
 
 class PlaceholderRows(unittest.TestCase):
     """The template ships rows the repo or the engine fills: they load and match nothing."""
@@ -71,9 +87,13 @@ class PlaceholderRows(unittest.TestCase):
 
     def test_template_keywords_skip_ui_code_that_shares_their_letters(self):
         rows = load_rows(yaml.safe_load(TEMPLATE.read_text()))
-        added = '<span className="truncate">{name}</span>\nonDrop={() => drop (item)}'
+        added = ('<span className="truncate">{name}</span>\nonDrop={() => drop (item)}\n'
+                 '<p className="truncate text-sm">Drag and drop the file</p>')
         self.assertEqual(classify(["web/src/Card.tsx"], added, rows), [])
-        self.assertEqual(classify(["web/src/Card.tsx"], "TRUNCATE users;", rows), ["destructive"])
+        for sql in ("TRUNCATE TABLE users;", "truncate table users;", "Delete From users where id = 1;",
+                    "drop schema app cascade;", "DROP DATABASE app;"):
+            with self.subTest(sql=sql):
+                self.assertEqual(classify(["src/db.py"], sql, rows), ["destructive"])
         striped = '<table className="table-striped" />\n// recharge, surcharge, discharge'
         self.assertEqual(classify(["web/src/Table.tsx"], striped, rows), [])
         self.assertEqual(classify(["src/pay.py"], "stripe.PaymentIntent.create(amount=1)", rows), ["spend"])
@@ -90,11 +110,19 @@ class Classify(unittest.TestCase):
         got = classify(["services/api/auth/login.py", "db/migrations/0001.sql"], "", self.rows)
         self.assertEqual(got, ["auth", "db-schema"])
 
-    def test_keywords_match_literally_and_case_sensitively(self):
-        # The template's contract: write keywords the way the code spells them.
-        self.assertEqual(classify(["src/app.py"], "API_KEY = read()", self.rows), ["credentials-and-access"])
-        self.assertEqual(classify(["src/app.py"], "config.api_key = read()", self.rows), [])
-        self.assertEqual(classify(["src/app.py"], "-----BEGIN PRIVATE KEY-----", self.rows), [])
+    def test_keywords_match_literally_and_case_insensitively(self):
+        # The profile contract: keywords match case-insensitively against added lines.
+        for added in ("API_KEY = read()", "config.api_key = read()", "Api_Key: x", "-----BEGIN PRIVATE KEY-----"):
+            with self.subTest(added=added):
+                self.assertEqual(classify(["src/app.py"], added, self.rows), ["credentials-and-access"])
+        self.assertEqual(classify(["src/app.py"], "apikey = read()", self.rows), [])
+
+    def test_a_mixed_case_keyword_matches_every_casing(self):
+        rows = load_rows({"risk": [{"id": "destructive", "keywords": ["Delete From"]}]})
+        for added in ("DELETE FROM users;", "delete from users;", "dElEtE fRoM users;"):
+            with self.subTest(added=added):
+                self.assertEqual(classify(["src/db.py"], added, rows), ["destructive"])
+        self.assertEqual(classify(["src/db.py"], "deleted_from = None", rows), [])
 
     def test_either_paths_or_keywords_match_a_row(self):
         self.assertEqual(classify(["src/web/page.tsx"], "set(session_token)", self.rows), ["auth"])
