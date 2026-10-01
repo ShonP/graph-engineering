@@ -327,5 +327,5 @@ page were wrong in spikes d and e.
   `background_tasks`, the 8-block cap), the SessionStart matcher values.
 - https://code.claude.com/docs/en/plugins-reference.md: `hooks/hooks.json` default
   location.
-- The 2026-09-30 spikes, in `docs/research/2026-09-30-next-version-roadmap.md`: c (cap
+- The 2026-09-30 spikes, summarised in `docs/superpowers/plans/2026-09-30-ge-0-15.md`: c (cap
   behaviour), e (`if` and `asyncRewake` on 2.1.285), i (SessionStart sources).

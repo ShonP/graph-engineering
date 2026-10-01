@@ -10,7 +10,6 @@ import re
 import subprocess
 import sys
 import tempfile
-import time
 import unittest
 
 HOOKS = Path(__file__).resolve().parents[1] / 'scripts'
@@ -75,9 +74,7 @@ class CheckMemo(unittest.TestCase):
     def test_a_timeout_replays_as_not_verified(self):  # AC-W2-MM-03
         self.configure('sleep 5', timeout=1)
         self.assertEqual(self.stop().stderr.strip(), 'tests not verified: sh did not finish within 1 s')
-        started = time.monotonic()
-        replay = self.stop()
-        self.assertLess(time.monotonic() - started, 1)
+        replay = self.stop()  # replayed, not re-run: self.runs() stays 1 below (no wall-clock bound, it flakes on slow CI hosts)
         self.assertEqual(replay.returncode, 0)
         self.assertRegex(replay.stderr.strip(), rf'^tests not verified \(timed out at {STAMP}; tree unchanged\)$')
         self.assertEqual(self.runs(), 1)
