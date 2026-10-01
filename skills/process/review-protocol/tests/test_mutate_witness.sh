@@ -8,7 +8,7 @@ set -uo pipefail
 
 MW="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)/scripts/mutate-witness.sh"
 { command -v git && command -v python3; } >/dev/null 2>&1 || { echo "SKIP: git or python3 missing"; exit 77; }
-unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE PYTHONDONTWRITEBYTECODE PYTHONPYCACHEPREFIX
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/ge-mw-test.XXXXXX")" && WORK="$(cd "$WORK" && pwd -P)" || exit 1
 trap 'rm -rf "$WORK"' EXIT
@@ -32,6 +32,19 @@ fresh() { # a committed repo holding a guard and the test that should witness it
   printf 'keep\n' > "$REPO/sub/.keep"
   git -C "$REPO" add -A && git -C "$REPO" commit -qm base
   WT_BEFORE="$(git -C "$REPO" worktree list --porcelain)"
+}
+
+fresh_py() { # fresh + a Python guard whose same-size mutant keeps the original mtime (a same-second edit)
+  fresh
+  printf '%s\n' 'def check(qty):' '    if qty <= 0:' '        return False' '    return True' > "$REPO/guard.py"
+  printf '%s\n' 'import os, sys' 'os.utime("guard.py", (1000000000, 1000000000))' 'from guard import check' \
+    'sys.exit(0 if check(0) is False and check(5) is True else 1)' > "$REPO/test_guard.py"
+  if [ "${1:-}" = tracked ]; then # a stale .pyc that is committed, so it is already there before any run
+    (cd "$REPO" && python3 -c 'import os, py_compile; os.utime("guard.py", (1000000000, 1000000000)); py_compile.compile("guard.py", doraise=True)') \
+      && git -C "$REPO" add -f __pycache__
+  fi
+  git -C "$REPO" add -A && git -C "$REPO" commit -qm python
+  WT_BEFORE="$(git -C "$REPO" worktree list --porcelain)" # the list names HEAD, which just moved
 }
 
 mw() { # mw <args...>: run the script from the repo root with the scratch TMPDIR
@@ -156,6 +169,27 @@ expect_code 2; expect_out "main tree changed"; expect_no_receipt
 [ "$(git -C "$REPO" worktree list --porcelain)" = "$WT_BEFORE" ] || note "worktree list changed"
 [ -z "$(ls -A "$SCRATCH")" ] || note "left behind in TMPDIR: $(ls -A "$SCRATCH")"
 verdict "main tree: a test that edits the real tree is reported, never receipted"
+
+# Python timestamps its .pyc to one second plus the source size, so a same-size edit in the
+# same second runs stale bytecode and the mutant falsely survives. The test pins the mtime to
+# stand in for "the same second".
+fresh_py
+mw --file guard.py --lines 2-2 --find 'qty <= 0' --replace 'qty >= 0' --receipt "$RECEIPT" -- python3 test_guard.py
+expect_code 0; expect_out "killed"; expect_field killed true; expect_field test_exit 1
+unchanged; verdict "python: a same-size mutant is not masked by the .pyc the baseline run wrote"
+
+fresh_py tracked
+mw --file guard.py --lines 2-2 --find 'qty <= 0' --replace 'qty >= 0' --receipt "$RECEIPT" -- python3 test_guard.py
+expect_code 0; expect_out "killed"; expect_field killed true; expect_field test_exit 1
+unchanged; verdict "python: a same-size mutant is not masked by a committed stale .pyc"
+
+fresh
+printf '%s\n' '#!/bin/sh' 'printf "%s\n" "${PYTHONDONTWRITEBYTECODE:-unset}" >> "$1"; exec sh test_guard.sh' > "$WORK/envlog.sh"
+mw --file guard.sh --lines 3-3 --find 'echo rejected' --replace 'echo denied' --receipt "$RECEIPT" -- sh "$WORK/envlog.sh" "$WORK/env.log"
+expect_code 1; expect_field killed false
+[ "$(tr '\n' ' ' < "$WORK/env.log")" = "1 1 " ] || note "PYTHONDONTWRITEBYTECODE was not 1 on both runs: $(tr '\n' ' ' < "$WORK/env.log")"
+unchanged; verdict "python: both runs export PYTHONDONTWRITEBYTECODE=1, other stacks are unaffected"
+rm -f "$WORK/env.log"
 
 # Bad input is refused with exit 2 and leaves nothing behind.
 bad_input() { # bad_input <label> <args...>

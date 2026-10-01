@@ -20,6 +20,12 @@
 # The test runs in the subdirectory you invoked from. The copy holds tracked
 # files only, so fetch or link dependencies inside the argv, for example
 #   -- sh -c 'ln -s /abs/repo/node_modules . && npm test -- src/total.test.ts'
+# Python caches bytecode keyed on the source's mtime (one-second resolution) and
+# size, so a same-size edit within the same second would run stale bytecode and
+# the mutant would falsely survive. Both runs export PYTHONDONTWRITEBYTECODE=1,
+# and a mutated *.py loses its __pycache__ entries (`<stem>.*.pyc`, which also
+# covers committed and pytest-rewritten ones) in the disposable copy. Other
+# stacks pay nothing: one environment variable and a path suffix test.
 # A trap on EXIT, INT and TERM removes the worktree. The script then asserts
 # your tree is unchanged (git diff --quiet, same git status --porcelain) and
 # writes the --receipt JSON:
@@ -104,7 +110,7 @@ sys.exit(rc if rc >= 0 else 128 - rc)
 
 # Byte-exact replacement inside lines a-b of a file that must stay in the tree.
 MUTATE='
-import os, sys
+import glob, os, sys
 root, rel, first, last, find, repl = sys.argv[1:7]
 first, last = int(first), int(last)
 def fail(msg):
@@ -123,6 +129,10 @@ if mutant == segment:
     fail("mutation did not change the file")
 with open(path, "wb") as f:
     f.write(b"".join(lines[:first - 1]) + mutant + b"".join(lines[last:]))
+if path.endswith(".py"):  # a stale .pyc would still match a same-size, same-second edit
+    folder, name = os.path.split(path)
+    for pyc in glob.glob(os.path.join(glob.escape(folder), "__pycache__", glob.escape(name[:-3]) + ".*.pyc")):
+        os.remove(pyc)
 '
 
 RECEIPT='
@@ -152,7 +162,7 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 run_test() { # run_test <log>: sets rc; runs in the background so a signal interrupts wait
-  (cd "$wt/$prefix" && exec python3 -c "$RUNNER" "$timeout" "${argv[@]}") >"$1" 2>&1 </dev/null &
+  (cd "$wt/$prefix" && export PYTHONDONTWRITEBYTECODE=1 && exec python3 -c "$RUNNER" "$timeout" "${argv[@]}") >"$1" 2>&1 </dev/null &
   runner=$!
   wait "$runner"; rc=$?
   runner=""
