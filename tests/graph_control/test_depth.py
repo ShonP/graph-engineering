@@ -321,7 +321,8 @@ class TemplateKeywords(Fixture):
     def test_sql_in_code_matches_destructive(self):
         for line in ('cur.execute("TRUNCATE audit_log")', "TRUNCATE TABLE x", "ALTER TABLE users DROP COLUMN email",
                      'cur.execute("drop table x")', 'cur.execute("delete from users where 1=1")',
-                     "alter table users drop column email"):
+                     "alter table users drop column email",
+                     'cur.execute(f"TRUNCATE {t}")', "sql`TRUNCATE ${t}`"):
             with self.subTest(line):
                 git(self.repo, "checkout", "-q", "--", ".")
                 self.append("src/app.py", line + "\n")

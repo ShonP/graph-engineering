@@ -642,9 +642,10 @@ risk:
     keywords: ["stripe.", "Stripe("]
   - id: destructive
     # Uppercase SQL, plus regexes for lowercase SQL in code: a statement opens
-    # a line or follows a quote, paren or `;`. `SHOULD_TRUNCATE`, the CSS class
-    # `truncate`, and copy like "Drag and drop column headers" or "Delete from
-    # favorites" do not match.
+    # a line or follows a quote, paren or `;`. A bare `TRUNCATE` also matches
+    # before an interpolated name (`f"TRUNCATE {t}"`, `TRUNCATE ${t}`).
+    # `SHOULD_TRUNCATE`, the CSS class `truncate`, and copy like "Drag and drop
+    # column headers" or "Delete from favorites" do not match.
     paths: []
     keywords:
       - "DROP TABLE"
@@ -654,7 +655,7 @@ risk:
       - "DROP VIEW"
       - "DROP INDEX"
       - "DELETE FROM"
-      - 're:\bTRUNCATE\s+(?:TABLE\b|ONLY\b|[A-Za-z_"])'
+      - 're:\bTRUNCATE\s+(?:TABLE\b|ONLY\b|[A-Za-z_"''`{$])'
       - 're:(?:^|["''`(;])\s*(?:drop|truncate)\s+(?:table|database|schema|view|index)\b'
       - 're:(?:^|["''`(;])\s*delete\s+from\s+\S'
       - 're:\balter\s+table\s+\S+\s+drop\s+column\b'

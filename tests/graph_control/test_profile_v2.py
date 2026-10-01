@@ -26,7 +26,7 @@ RISK = [
     ("outbound-messaging", ["**/{email,emails,mailers,notifications,notifier*}/**"], []),
     ("spend", ["**/{billing,payments}/**"], ["stripe.", "Stripe("]),
     ("destructive", [], ["DROP TABLE", "DROP DATABASE", "DROP SCHEMA", "DROP COLUMN", "DROP VIEW", "DROP INDEX",
-                         "DELETE FROM", r're:\bTRUNCATE\s+(?:TABLE\b|ONLY\b|[A-Za-z_"])',
+                         "DELETE FROM", r'''re:\bTRUNCATE\s+(?:TABLE\b|ONLY\b|[A-Za-z_"'`{$])''',
                          r"""re:(?:^|["'`(;])\s*(?:drop|truncate)\s+(?:table|database|schema|view|index)\b""",
                          r"""re:(?:^|["'`(;])\s*delete\s+from\s+\S""",
                          r"re:\balter\s+table\s+\S+\s+drop\s+column\b"]),

@@ -96,7 +96,8 @@ class PlaceholderRows(unittest.TestCase):
                      'cur.execute("delete from users where 1=1")', 'cur.execute(f"delete from {table}")',
                      "alter table users drop column email", "DELETE FROM users WHERE id = 1;",
                      "DROP DATABASE app;", "DROP SCHEMA app CASCADE;", "DROP VIEW v;", "DROP INDEX i;",
-                     "op.execute('truncate table audit')", "knex.raw(`drop table x`)", "    drop table x;"):
+                     "op.execute('truncate table audit')", "knex.raw(`drop table x`)", "    drop table x;",
+                     'cur.execute(f"TRUNCATE {t}")', "sql`TRUNCATE ${t}`"):
             with self.subTest(line=line):
                 self.assertIn("destructive", classify(["src/db.py"], line, rows))
 
@@ -109,6 +110,7 @@ class PlaceholderRows(unittest.TestCase):
                            ("web/src/locales/en.json", '"hint": "Drag and drop column headers",'),
                            ("web/src/flags.ts", "export const SHOULD_TRUNCATE = true;"),
                            ("src/config.py", 'TRUNCATE = "truncate"'),
+                           ("src/config.py", 'TRUNCATE = "x"'),
                            ("web/src/Card.tsx", 'className="truncate text-sm"'),
                            ("web/src/Table.tsx", '<table className="table-striped" />'),
                            ("web/src/Pay.tsx", "// recharge, surcharge, discharge"),
