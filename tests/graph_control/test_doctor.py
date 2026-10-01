@@ -43,8 +43,8 @@ runtime:
   none: CLI verified through public commands
 routing:
   always:
-    impl: [prior-art, graph-engineering:review-testing-rules]
-    review: [review-protocol]
+    impl: [graph-engineering:prior-art, graph-engineering:review-testing-rules]
+    review: [graph-engineering:review-protocol]
   "src/**/*.py":
     impl: [house-style, superpowers:test-driven-development]
 policy:
@@ -134,8 +134,13 @@ CASES = {
                                            {("error", "risk-reserved")}),
     "risk table as a mapping": (swap(LIST_ROW, MAP_ROW), {("error", "risk-shape")}),
     "risk rows as bare ids": (swap(LIST_ROW, "  - db-schema\n"), {("error", "risk-shape")}),
-    "routing names an unknown skill": (swap("review: [review-protocol]", "review: [review-protocol, no-such-skill]"),
+    "routing names an unknown skill": (swap("review: [graph-engineering:review-protocol]",
+                                            "review: [graph-engineering:review-protocol, no-such-skill]"),
                                        {("warn", "routing-skill")}),
+    "routing names a plugin skill bare": (swap("review: [graph-engineering:review-protocol]", "review: [review-protocol]"),
+                                          {("warn", "routing-bare")}),
+    "risk keyword is an invalid regex": (swap(LIST_ROW, '  - {id: db-schema, paths: ["migrations/**"], keywords: ["re:("]}\n'),
+                                         {("error", "risk-keyword")}),
     ".graph not ignored": (lambda f: (f.root / ".gitignore").write_text("node_modules/\n"), {("warn", "graph-not-ignored")}),
     "installed version differs": (lambda f: f.installed(installed("0.0.1")), {("warn", "version-mismatch")}),
     "installed_plugins.json absent": (lambda f: f.installed(None), {("info", "cannot-determine")}),
@@ -167,6 +172,24 @@ class Checks(unittest.TestCase):
             decide(fixture.root, "HEAD", read_profile(fixture.root / ".claude" / "graph-profile.yaml"))
         self.assertEqual((finding.level, finding.id, finding.message), ("error", "risk-shape", str(caught.exception)))
         self.assertIn("templates/graph-profile.yaml", finding.fix)
+
+    def test_an_invalid_keyword_regex_gets_the_message_depth_blocks_with(self):
+        fixture = Fixture(self)
+        fixture.profile(CLEAN.replace(LIST_ROW, '  - {id: db-schema, keywords: ["re:a)"]}\n'))
+        [finding] = diagnose(fixture.root, PLUGIN, quick=False)
+        with self.assertRaises(Invalid) as caught:
+            decide(fixture.root, "HEAD", read_profile(fixture.root / ".claude" / "graph-profile.yaml"))
+        self.assertEqual((finding.level, finding.id, finding.message), ("error", "risk-keyword", str(caught.exception)))
+        self.assertIn("re:", finding.fix)
+
+    def test_a_bare_plugin_skill_names_the_qualified_form(self):
+        fixture = Fixture(self)
+        fixture.profile(CLEAN.replace("impl: [graph-engineering:prior-art,", "impl: [prior-art,"))
+        [finding] = diagnose(fixture.root, PLUGIN, quick=False)
+        self.assertEqual(finding.id, "routing-bare")
+        self.assertIn("prior-art", finding.message)
+        self.assertIn("graph-engineering:prior-art", finding.fix)
+        self.assertNotIn("house-style", finding.message + finding.fix)  # a repo skill stays bare
 
     def test_messages_name_the_versions(self):
         fixture = Fixture(self)
@@ -225,7 +248,8 @@ class Quick(unittest.TestCase):  # AC-W2-DR-02
         (fixture.root / ".gitignore").write_text("")
         body = CLEAN.replace("schema_version: 2\n", "").replace(RUNTIME, "")
         body = body.replace("qa: sonnet", "qa: haiku").replace("auto_classes: [none]", "auto_classes: [spend]")
-        fixture.profile(body.replace("review: [review-protocol]", "review: [no-such-skill]") + "content: {}\n")
+        fixture.profile(body.replace("review: [graph-engineering:review-protocol]", "review: [no-such-skill]")
+                        + "content: {}\n")
         return fixture
 
     def test_quick_runs_no_subprocess_and_only_the_quick_checks(self):

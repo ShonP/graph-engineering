@@ -16,7 +16,7 @@ if importlib.util.find_spec("wcmatch") is None:  # the PEP 723 pin; scripts/run-
     raise unittest.SkipTest("needs wcmatch: uv run --with PyYAML==6.0.2 --with wcmatch==11.0.1")
 
 from graph_control.common import Invalid  # noqa: E402
-from graph_control.risk import SHAPE, Row, classify, load_rows  # noqa: E402
+from graph_control.risk import SHAPE, BadPattern, Row, classify, load_rows  # noqa: E402
 
 TEMPLATE = Path(__file__).resolve().parents[2] / "templates" / "graph-profile.yaml"
 
@@ -85,17 +85,26 @@ class PlaceholderRows(unittest.TestCase):
         self.assertIn("public-copy", [row.id for row in rows])
         self.assertIn("outside-the-run", [row.id for row in rows])
 
-    def test_template_keywords_skip_ui_code_that_shares_their_letters(self):
+    def test_template_destructive_keywords_catch_sql_in_code(self):
         rows = load_rows(yaml.safe_load(TEMPLATE.read_text()))
-        added = ('<span className="truncate">{name}</span>\nonDrop={() => drop (item)}\n'
-                 '<p className="truncate text-sm">Drag and drop the file</p>')
-        self.assertEqual(classify(["web/src/Card.tsx"], added, rows), [])
-        for sql in ("TRUNCATE TABLE users;", "truncate table users;", "Delete From users where id = 1;",
-                    "drop schema app cascade;", "DROP DATABASE app;"):
-            with self.subTest(sql=sql):
-                self.assertEqual(classify(["src/db.py"], sql, rows), ["destructive"])
-        striped = '<table className="table-striped" />\n// recharge, surcharge, discharge'
-        self.assertEqual(classify(["web/src/Table.tsx"], striped, rows), [])
+        for line in ('cur.execute("TRUNCATE audit_log")', "ALTER TABLE users DROP COLUMN email",
+                     "conn.execute('drop table x')", "TRUNCATE TABLE users;", "DELETE FROM users WHERE id = 1;",
+                     "DROP DATABASE app;", "DROP SCHEMA app CASCADE;", "DROP VIEW v;", "DROP INDEX i;",
+                     "op.execute('truncate table audit')"):
+            with self.subTest(line=line):
+                self.assertIn("destructive", classify(["src/db.py"], line, rows))
+
+    def test_template_keywords_skip_ui_code_and_copy_that_share_their_letters(self):
+        rows = load_rows(yaml.safe_load(TEMPLATE.read_text()))
+        for path, line in (("web/src/Card.tsx", '<span className="truncate text-sm">{name}</span>'),
+                           ("web/src/Card.tsx", "onDrop={() => drop(item)}"),
+                           ("web/src/Card.tsx", "<p>Drag and drop the file</p>"),
+                           ("web/src/locales/en.json", '"remove": "Delete from favorites",'),
+                           ("web/src/Table.tsx", '<table className="table-striped" />'),
+                           ("web/src/Pay.tsx", "// recharge, surcharge, discharge"),
+                           ("src/pay.py", "# Payments are processed by Stripe.")):
+            with self.subTest(line=line):
+                self.assertEqual(classify([path], line, rows), [])
         self.assertEqual(classify(["src/pay.py"], "stripe.PaymentIntent.create(amount=1)", rows), ["spend"])
 
 
@@ -110,22 +119,49 @@ class Classify(unittest.TestCase):
         got = classify(["services/api/auth/login.py", "db/migrations/0001.sql"], "", self.rows)
         self.assertEqual(got, ["auth", "db-schema"])
 
-    def test_keywords_match_literally_and_case_insensitively(self):
-        # The profile contract: keywords match case-insensitively against added lines.
-        for added in ("API_KEY = read()", "config.api_key = read()", "Api_Key: x", "-----BEGIN PRIVATE KEY-----"):
+    def test_keywords_match_literally_and_case_sensitively(self):
+        # The profile contract: a keyword is spelled the way the code spells it.
+        for added in ("API_KEY = read()", "-----BEGIN private key-----"):
             with self.subTest(added=added):
                 self.assertEqual(classify(["src/app.py"], added, self.rows), ["credentials-and-access"])
-        self.assertEqual(classify(["src/app.py"], "apikey = read()", self.rows), [])
-
-    def test_a_mixed_case_keyword_matches_every_casing(self):
-        rows = load_rows({"risk": [{"id": "destructive", "keywords": ["Delete From"]}]})
-        for added in ("DELETE FROM users;", "delete from users;", "dElEtE fRoM users;"):
+        for added in ("config.api_key = read()", "Api_Key: x", "-----BEGIN PRIVATE KEY-----", "apikey = read()"):
             with self.subTest(added=added):
-                self.assertEqual(classify(["src/db.py"], added, rows), ["destructive"])
-        self.assertEqual(classify(["src/db.py"], "deleted_from = None", rows), [])
+                self.assertEqual(classify(["src/app.py"], added, self.rows), [])
 
     def test_either_paths_or_keywords_match_a_row(self):
         self.assertEqual(classify(["src/web/page.tsx"], "set(session_token)", self.rows), ["auth"])
+
+
+class RegexKeywords(unittest.TestCase):
+    """A keyword starting with `re:` is a Python regex, compiled when the table is read."""
+
+    def rows(self, *keywords):
+        return load_rows({"risk": [{"id": "destructive", "keywords": list(keywords)}]})
+
+    def test_a_re_keyword_is_a_python_regex(self):
+        rows = self.rows(r"re:\b(?i:drop)\s+(?i:table)\b")
+        for added in ("drop table x", "DROP  Table x", "conn.execute('Drop table x')"):
+            with self.subTest(added=added):
+                self.assertEqual(classify(["src/db.py"], added, rows), ["destructive"])
+        for added in ("backdrop table", "drop tables", "drop the table"):
+            with self.subTest(added=added):
+                self.assertEqual(classify(["src/db.py"], added, rows), [])
+
+    def test_a_regex_matches_within_one_added_line(self):
+        self.assertEqual(classify(["src/db.py"], "x = 'drop'\ntable = 1", self.rows(r"re:drop\s+table")), [])
+
+    def test_a_plain_keyword_with_regex_characters_stays_literal(self):
+        rows = self.rows("stripe.")
+        self.assertEqual(classify(["src/pay.py"], "stripe.Charge.create()", rows), ["destructive"])
+        self.assertEqual(classify(["src/pay.py"], "stripes", rows), [])
+
+    def test_an_invalid_or_empty_matching_regex_is_rejected_naming_row_and_keyword(self):
+        for keyword in ("re:(", "re:", "re:a*"):
+            with self.subTest(keyword=keyword), self.assertRaises(BadPattern) as caught:
+                self.rows(keyword)
+            self.assertIn("destructive", str(caught.exception))
+            self.assertIn(repr(keyword), str(caught.exception))
+        self.assertTrue(issubclass(BadPattern, Invalid))
 
 
 class GlobDialect(unittest.TestCase):

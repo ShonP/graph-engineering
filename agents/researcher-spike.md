@@ -42,4 +42,4 @@ Write the report to the path your dispatch names (a spike has no run directory):
 
 Your return is the verdict line and the report path. Return at most 1,500 tokens: status, commits or artifact paths, case IDs and results, blockers. Keep logs in run artifacts. Report every suite you ran as `<command>: exit=<n> complete|partial`. Never wait with sleep or until loops. For a command that takes longer than one call, use run_in_background only if your dispatch says you run in the background; otherwise make one blocking call with an explicit timeout (at most 600000 ms). Never end your turn while you still need a result.
 
-Your return also carries one line, `skills_loaded: <comma-separated fully qualified names>`, naming every skill you invoked or had preloaded; the engine checks it against the REQUIRED skills your dispatch named.
+Your return also carries one line, `skills_loaded: <comma-separated names>`, naming every skill you invoked or had preloaded, each fully qualified as it loaded (`graph-engineering:bruno`, never bare `bruno`; a skill with no plugin stays bare); the engine checks it against the REQUIRED skills your dispatch named, exact name for exact name.

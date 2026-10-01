@@ -248,6 +248,10 @@ api:
 # `always` lenses are preloaded in the reviewer's frontmatter, so they cost no
 # dispatch hop. Everything else is matched by path glob.
 #
+# Plugin skills are written qualified, `graph-engineering:<name>`: a bare name can
+# resolve to a host built-in of the same name, and the engine's skill receipt
+# counts only the identical qualified name. A repo's own .claude/skills stay bare.
+#
 # Glob dialect: globstar (`**`) plus brace expansion, minimatch-style, matched
 # against repo-relative paths. Check a row with
 #   wcmatch.glob.globmatch(path, key, flags=GLOBSTAR | BRACE | DOTGLOB)
@@ -278,90 +282,90 @@ routing:
   # derived:
   #   - when: package.json in <dir> depends on react (react-dom, next, ...)
   #     glob: "<dir>/**/*.{ts,tsx,js,jsx}"
-  #     impl: [react-rules, frontend-rules, ux-evidence]
-  #     review: [react-rules, frontend-rules, ux-evidence]
-  #     qa: [ux-evidence]
+  #     impl: [graph-engineering:react-rules, graph-engineering:frontend-rules, graph-engineering:ux-evidence]
+  #     review: [graph-engineering:react-rules, graph-engineering:frontend-rules, graph-engineering:ux-evidence]
+  #     qa: [graph-engineering:ux-evidence]
   #   - when: the react package.json also depends on @tanstack/react-query
   #     glob: "<dir>/**/*.{ts,tsx,js,jsx}"
-  #     impl: [tanstack-query-rules]
-  #     review: [tanstack-query-rules]
+  #     impl: [graph-engineering:tanstack-query-rules]
+  #     review: [graph-engineering:tanstack-query-rules]
   #   - when: the react package.json also depends on @tanstack/react-router
   #     glob: "<dir>/**/*.{ts,tsx,js,jsx}"
-  #     impl: [tanstack-router]
+  #     impl: [graph-engineering:tanstack-router]
   #   - when: the react package.json also depends on tailwindcss
   #     glob: "<dir>/**/*.{ts,tsx,js,jsx}"
-  #     impl: [tailwind]
-  #     review: [tailwind]
+  #     impl: [graph-engineering:tailwind]
+  #     review: [graph-engineering:tailwind]
   #   - when: package.json in <dir> depends on tailwindcss
   #     glob: "<dir>/**/*.css"
-  #     impl: [tailwind]
-  #     review: [tailwind]
+  #     impl: [graph-engineering:tailwind]
+  #     review: [graph-engineering:tailwind]
   #   - when: the react package.json also depends on react-hook-form, i18next or react-i18next
   #     glob: "<dir>/**/*.{ts,tsx,js,jsx}"
-  #     impl: [forms-i18n]
-  #     review: [forms-i18n]
+  #     impl: [graph-engineering:forms-i18n]
+  #     review: [graph-engineering:forms-i18n]
   #   - when: package.json in <dir> has no UI framework (express, fastify, hono, @nestjs/core or none)
   #     glob: "<dir>/**/*.{ts,js}"
-  #     impl: [backend-rules]
-  #     review: [backend-rules]
+  #     impl: [graph-engineering:backend-rules]
+  #     review: [graph-engineering:backend-rules]
   #   - when: turbo.json at the repo root
   #     glob: "{**/turbo.json,pnpm-workspace.yaml,**/package.json}"
-  #     impl: [turborepo]
-  #     review: [turborepo]
+  #     impl: [graph-engineering:turborepo]
+  #     review: [graph-engineering:turborepo]
   #   - when: pyproject.toml in <dir> depends on pydantic (fastapi implies it)
   #     glob: "<dir>/**/*.py"
-  #     impl: [pydantic, pydantic-house-rules]
-  #     review: [pydantic, pydantic-house-rules]
+  #     impl: [graph-engineering:pydantic, graph-engineering:pydantic-house-rules]
+  #     review: [graph-engineering:pydantic, graph-engineering:pydantic-house-rules]
   #   - when: pyproject.toml in <dir> depends on fastapi
   #     glob: "<dir>/**/*.py"
-  #     impl: [fastapi, backend-rules, architecture-resilience-rules]
-  #     review: [fastapi, backend-rules, architecture-resilience-rules]
+  #     impl: [graph-engineering:fastapi, graph-engineering:backend-rules, graph-engineering:architecture-resilience-rules]
+  #     review: [graph-engineering:fastapi, graph-engineering:backend-rules, graph-engineering:architecture-resilience-rules]
   #   - when: pyproject.toml in <dir> depends on sqlalchemy or alembic
   #     glob: "<dir>/**/{models,db,migrations}/**/*.py"
-  #     impl: [sqlalchemy]
-  #     review: [sqlalchemy]
+  #     impl: [graph-engineering:sqlalchemy]
+  #     review: [graph-engineering:sqlalchemy]
   #   - when: pyproject.toml in <dir> depends on sqlalchemy or alembic
   #     glob: "<dir>/**/alembic/**"
-  #     impl: [sqlalchemy]
-  #     review: [sqlalchemy]
+  #     impl: [graph-engineering:sqlalchemy]
+  #     review: [graph-engineering:sqlalchemy]
   #   - when: pyproject.toml in <dir> depends on temporalio
   #     glob: "<dir>/**/{workflows,activities}/**/*.py"
-  #     impl: [temporal-developer, architecture-resilience-rules]
-  #     review: [temporal-developer, architecture-resilience-rules]
+  #     impl: [graph-engineering:temporal-developer, graph-engineering:architecture-resilience-rules]
+  #     review: [graph-engineering:temporal-developer, graph-engineering:architecture-resilience-rules]
   #   - when: pyproject.toml in <dir> depends on agent-framework
   #     glob: "<dir>/**/agents/**/*.py"
-  #     impl: [microsoft-agent-framework, agent-workflow-rules]
-  #     review: [microsoft-agent-framework, agent-workflow-rules]
+  #     impl: [graph-engineering:microsoft-agent-framework, graph-engineering:agent-workflow-rules]
+  #     review: [graph-engineering:microsoft-agent-framework, graph-engineering:agent-workflow-rules]
   #   - when: pyproject.toml in <dir> depends on pydantic-ai
   #     glob: "<dir>/**/agents/**/*.py"
-  #     impl: [building-pydantic-ai-agents, agent-workflow-rules]
-  #     review: [building-pydantic-ai-agents, agent-workflow-rules]
+  #     impl: [graph-engineering:building-pydantic-ai-agents, graph-engineering:agent-workflow-rules]
+  #     review: [graph-engineering:building-pydantic-ai-agents, graph-engineering:agent-workflow-rules]
   #   - when: pyproject.toml in <dir> depends on loguru
   #     glob: "<dir>/**/logging*.py"
-  #     impl: [loguru]
-  #     review: [loguru]
+  #     impl: [graph-engineering:loguru]
+  #     review: [graph-engineering:loguru]
   #   - when: a manifest in <dir> depends on a NATS client (nats-py, nats, nats.go, async-nats)
   #     glob: "<dir>/**/{bus,events,messaging}/**"
-  #     impl: [nats, architecture-resilience-rules]
-  #     review: [nats, architecture-resilience-rules, security-review]
+  #     impl: [graph-engineering:nats, graph-engineering:architecture-resilience-rules]
+  #     review: [graph-engineering:nats, graph-engineering:architecture-resilience-rules, graph-engineering:security-review]
   #   - when: a .swift file under <dir> imports SwiftUI (<dir> holds Package.swift, project.yml or the .xcodeproj)
   #     glob: "<dir>/**/*.swift"
-  #     impl: [swiftui-pro, ux-evidence]
-  #     review: [swiftui-pro, ux-evidence]
-  #     qa: [ux-evidence]
+  #     impl: [graph-engineering:swiftui-pro, graph-engineering:ux-evidence]
+  #     review: [graph-engineering:swiftui-pro, graph-engineering:ux-evidence]
+  #     qa: [graph-engineering:ux-evidence]
   #   - when: the Gradle build in <dir> uses androidx.compose
   #     glob: "<dir>/**/*.{kt,kts}"
-  #     impl: [compose-state, compose-ui, ux-evidence]
-  #     review: [compose-performance, compose-state, ux-evidence]
-  #     qa: [compose-build-and-test, ux-evidence]
+  #     impl: [graph-engineering:compose-state, graph-engineering:compose-ui, graph-engineering:ux-evidence]
+  #     review: [graph-engineering:compose-performance, graph-engineering:compose-state, graph-engineering:ux-evidence]
+  #     qa: [graph-engineering:compose-build-and-test, graph-engineering:ux-evidence]
   #   - when: supabase/config.toml under <dir> (<dir> holds the supabase/ directory)
   #     glob: "<dir>/supabase/**"
-  #     impl: [supabase, supabase-postgres-best-practices]
-  #     review: [supabase, supabase-postgres-best-practices]
+  #     impl: [graph-engineering:supabase, graph-engineering:supabase-postgres-best-practices]
+  #     review: [graph-engineering:supabase, graph-engineering:supabase-postgres-best-practices]
   #   - when: go.mod, Cargo.toml, Gemfile or pom.xml in <dir>
   #     glob: "<dir>/**"
-  #     impl: [backend-rules]
-  #     review: [backend-rules]
+  #     impl: [graph-engineering:backend-rules]
+  #     review: [graph-engineering:backend-rules]
   #     gap: "the plugin has no Go, Rust, Ruby or Java stack skill; name the language found"
 
   # Static rows: language- or file-type-level only. ux-evidence rides on the UI
@@ -372,31 +376,31 @@ routing:
   # turbo.json (`extends: ["//"]`) and the workspace list. Package manifests
   # join when a root turbo.json exists (block above).
   "{**/turbo.json,pnpm-workspace.yaml}":
-    impl: [turborepo]
-    review: [turborepo]
+    impl: [graph-engineering:turborepo]
+    review: [graph-engineering:turborepo]
   # Apple frameworks, by the Swift files named for them; adjust the globs to
   # your naming. Swift only, so a web NotificationBell.tsx never routes
   # push-notifications.
-  "**/{Health,Workout}*.swift": { impl: [healthkit] }
-  "**/{Widget,LiveActivity}*.swift": { impl: [widgetkit, activitykit] }
-  "**/{Photo,Camera}*.swift": { impl: [photokit] }
-  "**/*[Nn]otification*.swift": { impl: [push-notifications] }
+  "**/{Health,Workout}*.swift": { impl: [graph-engineering:healthkit] }
+  "**/{Widget,LiveActivity}*.swift": { impl: [graph-engineering:widgetkit, graph-engineering:activitykit] }
+  "**/{Photo,Camera}*.swift": { impl: [graph-engineering:photokit] }
+  "**/*[Nn]otification*.swift": { impl: [graph-engineering:push-notifications] }
   # Kotlin language rules. Compose rides on top only where the Gradle build
   # uses it (block above).
   "**/*.{kt,kts}":
-    impl: [kotlin-concurrency, kotlin-types-value-class]
-    review: [kotlin-control-flow]
+    impl: [graph-engineering:kotlin-concurrency, graph-engineering:kotlin-types-value-class]
+    review: [graph-engineering:kotlin-control-flow]
   # Postgres SQL; drop the row if the database is not Postgres. The supabase
   # skill itself routes only in a Supabase project (block above).
   "**/*.sql":
-    impl: [supabase-postgres-best-practices]
-    review: [supabase-postgres-best-practices]
+    impl: [graph-engineering:supabase-postgres-best-practices]
+    review: [graph-engineering:supabase-postgres-best-practices]
     qa: []
   # Data-touching changes pull the consent and erasure lenses in addition to
   # the always-on privacy-review, which only classifies.
   "**/{migrations,schemas}/**":
-    impl: [gdpr-erasure-retention]
-    review: [gdpr-erasure-retention, gdpr-consent]
+    impl: [graph-engineering:gdpr-erasure-retention]
+    review: [graph-engineering:gdpr-erasure-retention, graph-engineering:gdpr-consent]
     qa: []
   # Python toolchain: uv projects linted with ruff. Drop both here and on the
   # manifest row below if the repo uses another toolchain (poetry, pip-tools,
@@ -404,106 +408,106 @@ routing:
   # the lint is configured there but enforced per file. Frameworks (pydantic,
   # FastAPI, SQLAlchemy, Temporal, agents, loguru) come from the block above.
   "**/*.py":
-    impl: [uv, ruff]
-    review: [ruff]
+    impl: [graph-engineering:uv, graph-engineering:ruff]
+    review: [graph-engineering:ruff]
     qa: []
   # Project and lock files: environment and dependency work is uv's, not the
   # framework's.
   "**/{pyproject.toml,uv.lock,.python-version}":
-    impl: [uv]
-    review: [uv]
+    impl: [graph-engineering:uv]
+    review: [graph-engineering:uv]
   # Alembic's own tree: env.py, script.py.mako and the versions/ directory. A
   # directory named alembic is itself the signal, so this row is static. Not
   # restricted to *.py - alembic.ini and the mako template are part of the same
   # change, and a migration review that cannot see them is half a review.
   "**/alembic/**":
-    impl: [sqlalchemy]
-    review: [sqlalchemy]
+    impl: [graph-engineering:sqlalchemy]
+    review: [graph-engineering:sqlalchemy]
   # NATS, cluster half: a glob cannot see `apiVersion: jetstream.nats.io`, so -
   # like the postgres/cnpg rows below - route on the names that hold the server
   # config, the per-user allow-lists and the Stream/Consumer CRs (for example a
   # manifests/nats-streams/ directory or an argocd/apps/nats.yaml Application).
   # The authorization half is where NATS goes wrong silently, hence security-review.
   "**/nats*/**":
-    impl: [nats]
-    review: [nats, security-review]
+    impl: [graph-engineering:nats]
+    review: [graph-engineering:nats, graph-engineering:security-review]
   "**/nats*.{yaml,yml}":
-    impl: [nats]
-    review: [nats, security-review]
+    impl: [graph-engineering:nats]
+    review: [graph-engineering:nats, graph-engineering:security-review]
   # GitOps: Argo CD Applications. Argo renders Helm and kustomize, so both ride
   # along; kubectl is on the qa half because verification happens on a cluster.
   # infra-verification (render, validate, diff, ephemeral apply) rides on every
   # infra row: the implementer produces the rendered diff, qa runs the recipe.
   "argocd/**/*.{yaml,yml}":
-    impl: [argocd, helm, kubectl, architecture-resilience-rules, infra-verification]
-    review: [argocd, helm]
-    qa: [kubectl, infra-verification]
+    impl: [graph-engineering:argocd, graph-engineering:helm, graph-engineering:kubectl, graph-engineering:architecture-resilience-rules, graph-engineering:infra-verification]
+    review: [graph-engineering:argocd, graph-engineering:helm]
+    qa: [graph-engineering:kubectl, graph-engineering:infra-verification]
   # Plain Kubernetes manifests, kustomize overlays included.
   "manifests/**":
-    impl: [kubectl, kustomize, infra-verification]
-    review: [kubectl]
-    qa: [kubectl, infra-verification]
+    impl: [graph-engineering:kubectl, graph-engineering:kustomize, graph-engineering:infra-verification]
+    review: [graph-engineering:kubectl]
+    qa: [graph-engineering:kubectl, graph-engineering:infra-verification]
   # Helm: a chart's metadata, and the templates it renders. The templates row is
   # anchored under chart/ or charts/ on purpose: a bare **/templates/** also
   # matches every other meaning of the word, including this plugin's own
   # templates/graph-profile.yaml, and would route helm at a profile edit.
   "**/Chart.yaml":
-    impl: [helm, infra-verification]
-    review: [helm]
-    qa: [infra-verification]
+    impl: [graph-engineering:helm, graph-engineering:infra-verification]
+    review: [graph-engineering:helm]
+    qa: [graph-engineering:infra-verification]
   "**/{chart,charts}/**/templates/**/*.{yaml,yml,tpl}":
-    impl: [helm, infra-verification]
-    review: [helm]
-    qa: [infra-verification]
+    impl: [graph-engineering:helm, graph-engineering:infra-verification]
+    review: [graph-engineering:helm]
+    qa: [graph-engineering:infra-verification]
   "**/kustomization.{yaml,yml}":
-    impl: [kustomize, infra-verification]
-    review: [kustomize]
-    qa: [infra-verification]
+    impl: [graph-engineering:kustomize, graph-engineering:infra-verification]
+    review: [graph-engineering:kustomize]
+    qa: [graph-engineering:infra-verification]
   # CloudNativePG: a glob cannot see `apiVersion: postgresql.cnpg.io`, so route on
   # the directory that holds your Cluster manifests (for example
   # manifests/<app>-pg/, which the *-pg rows below match).
   "**/{postgres,cnpg}/**":
-    impl: [cloudnativepg]
-    review: [cloudnativepg]
+    impl: [graph-engineering:cloudnativepg]
+    review: [graph-engineering:cloudnativepg]
   "**/*-pg/**":
-    impl: [cloudnativepg]
-    review: [cloudnativepg]
+    impl: [graph-engineering:cloudnativepg]
+    review: [graph-engineering:cloudnativepg]
   "**/*-pg-*/**":
-    impl: [cloudnativepg]
-    review: [cloudnativepg]
+    impl: [graph-engineering:cloudnativepg]
+    review: [graph-engineering:cloudnativepg]
   # Envoy Gateway: manifests named by kind, plus the gateway-* directories that
   # hold the policies and their exemptions. An Argo CD Application named after a
   # gateway (argocd/apps/gateway-auth.yaml) matches the kind row too; that is a
   # known false positive and it is harmless, because the Application renders
   # those very manifests and rows are additive.
   "**/{httproute,securitypolicy,backendtlspolicy,backendtrafficpolicy,clienttrafficpolicy,gateway,gatewayclass,referencegrant}*.{yaml,yml}":
-    impl: [envoy-gateway]
-    review: [envoy-gateway, security-review]
+    impl: [graph-engineering:envoy-gateway]
+    review: [graph-engineering:envoy-gateway, graph-engineering:security-review]
   "**/{gateway,gateway-*}/**":
-    impl: [envoy-gateway]
-    review: [envoy-gateway, security-review]
+    impl: [graph-engineering:envoy-gateway]
+    review: [graph-engineering:envoy-gateway, graph-engineering:security-review]
   # LLM gateway: agent-router, the successor to Envoy AI Gateway.
   "**/{ai-gateway,agent-router,llm-gateway}/**":
-    impl: [agent-router, envoy-gateway]
-    review: [agent-router, security-review]
+    impl: [graph-engineering:agent-router, graph-engineering:envoy-gateway]
+    review: [graph-engineering:agent-router, graph-engineering:security-review]
   # Secrets: sops + age. security-review is always on and is repeated here on
   # purpose, because a secrets diff is where it earns its keep.
   "{.sops.yaml,**/*.enc.yaml,**/*.enc.yml}":
-    impl: [sops-age]
-    review: [sops-age, security-review]
+    impl: [graph-engineering:sops-age]
+    review: [graph-engineering:sops-age, graph-engineering:security-review]
     qa: []
   # QA: Playwright specs. A derived TS row can match them too; the union is
   # intended, a spec is still TypeScript.
   "{tests/**/*.spec.ts,playwright.config.ts}":
-    impl: [playwright-cli, playwright-component-testing]
-    review: [playwright-cli]
-    qa: [playwright-cli, playwright-trace, ux-evidence]
+    impl: [graph-engineering:playwright-cli, graph-engineering:playwright-component-testing]
+    review: [graph-engineering:playwright-cli]
+    qa: [graph-engineering:playwright-cli, graph-engineering:playwright-trace, graph-engineering:ux-evidence]
   # API collections: Bruno runs them in CI, so it is an implementation and a qa
   # competency both.
   "{**/*.bru,**/bruno.json}":
-    impl: [bruno, api-contract]
-    review: [bruno, api-contract]
-    qa: [bruno, api-contract]
+    impl: [graph-engineering:bruno, graph-engineering:api-contract]
+    review: [graph-engineering:bruno, graph-engineering:api-contract]
+    qa: [graph-engineering:bruno, graph-engineering:api-contract]
   # API surfaces: an edit here must ship a Bruno update and a current schema,
   # and qa runs Schemathesis against it (`api-contract`), so the competency is
   # routed by the code that changes the contract, not only by the .bru files.
@@ -519,28 +523,28 @@ routing:
   # TS routes are server code gets its own row from /graph-init, which finds
   # them by content (`Router()`, `app.get(`), not by name.
   "**/{routers,controllers,endpoints}/**/*.{py,go,java,kt,rb,ts,js}":
-    impl: [bruno, schemathesis, api-contract]
-    review: [api-contract]
-    qa: [bruno, schemathesis, api-contract]
+    impl: [graph-engineering:bruno, graph-engineering:schemathesis, graph-engineering:api-contract]
+    review: [graph-engineering:api-contract]
+    qa: [graph-engineering:bruno, graph-engineering:schemathesis, graph-engineering:api-contract]
   "**/{routes,handlers}/**/*.{py,go,java,kt,rb}":
-    impl: [bruno, schemathesis, api-contract]
-    review: [api-contract]
-    qa: [bruno, schemathesis, api-contract]
+    impl: [graph-engineering:bruno, graph-engineering:schemathesis, graph-engineering:api-contract]
+    review: [graph-engineering:api-contract]
+    qa: [graph-engineering:bruno, graph-engineering:schemathesis, graph-engineering:api-contract]
   # NestJS `nest g controller` output, and Next.js route handlers.
   "{**/*.controller.{ts,js},**/app/api/**/route.{ts,js},**/pages/api/**/*.{ts,js}}":
-    impl: [bruno, schemathesis, api-contract]
-    review: [api-contract]
-    qa: [bruno, schemathesis, api-contract]
+    impl: [graph-engineering:bruno, graph-engineering:schemathesis, graph-engineering:api-contract]
+    review: [graph-engineering:api-contract]
+    qa: [graph-engineering:bruno, graph-engineering:schemathesis, graph-engineering:api-contract]
   "**/{openapi,asyncapi,swagger}*.{yaml,yml,json}":
-    impl: [bruno, schemathesis, api-contract]
-    review: [api-contract]
-    qa: [bruno, schemathesis, api-contract]
+    impl: [graph-engineering:bruno, graph-engineering:schemathesis, graph-engineering:api-contract]
+    review: [graph-engineering:api-contract]
+    qa: [graph-engineering:bruno, graph-engineering:schemathesis, graph-engineering:api-contract]
   # Observability: PromQL for metrics and alert rules, LogQL for logs, TraceQL for
   # traces. Dashboards are JSON, alert rules are YAML.
   "{observability/**,**/dashboards/**/*.json,**/*rule*.{yaml,yml}}":
-    impl: [promql, loki, tempo]
-    review: [promql, loki, tempo]
-    qa: [promql, loki, tempo]
+    impl: [graph-engineering:promql, graph-engineering:loki, graph-engineering:tempo]
+    review: [graph-engineering:promql, graph-engineering:loki, graph-engineering:tempo]
+    qa: [graph-engineering:promql, graph-engineering:loki, graph-engineering:tempo]
   always:
     # prior-art is the research-before-work house rule: the planner has it
     # preloaded, every implementer loads it, the reviewer checks for its note.
@@ -549,10 +553,9 @@ routing:
     # definition-of-done and impact-map are NOT listed here: they apply to every
     # task, so implementers, planner and reviewer preload them in frontmatter
     # (spec 2.3). That also covers profiles written before 0.10.0.
-    # Names stay bare here; the engine qualifies them at dispatch.
-    impl: [prior-art, review-testing-rules]
-    review: [review-protocol, security-review, privacy-review]
-    design: [ux-journey, ui-ux-pro-max]
+    impl: [graph-engineering:prior-art, graph-engineering:review-testing-rules]
+    review: [graph-engineering:review-protocol, graph-engineering:security-review, graph-engineering:privacy-review]
+    design: [graph-engineering:ux-journey, graph-engineering:ui-ux-pro-max]
 
 # Defer to an agent this repo already owns. This is the additive contract: where
 # a local agent covers a leg, the engine dispatches it instead of the plugin's.
@@ -590,11 +593,12 @@ policy:
 # Risk classes: the one table the router, the review-depth check and the gates
 # below read. A diff matches a row when a changed path matches one of `paths`
 # (the routing glob dialect) or an added line contains one of `keywords`
-# (literal and case-insensitive, so `delete from` matches `DELETE FROM`; write
-# statement shapes, never bare words, since `truncate` is also a CSS class and
-# `drop` a UI verb). A risk match forces at least the `quick` lane. These
-# lists are starting points kept deliberately tight; tune them to this repo,
-# since every extra keyword is a false positive that costs an owner gate.
+# (literal and case-sensitive: write them the way the code spells them). A
+# keyword starting with `re:` is a Python regex, e.g. for lowercase SQL. Keywords
+# never read prose files (*.md, README, CHANGELOG and the like). A risk match
+# forces at least the `quick` lane. These lists are starting points kept
+# deliberately tight; tune them to this repo, since every extra keyword is a
+# false positive that costs an owner gate.
 #
 # One more row is built in, not listed here, and reserved: `agent-control`, the
 # agent's own control plane: .claude/** (at any depth), CLAUDE.md, AGENTS.md,
@@ -635,8 +639,19 @@ risk:
     paths: ["**/{billing,payments}/**"]
     keywords: ["stripe.", "Stripe("]
   - id: destructive
+    # Uppercase SQL, plus one regex for lowercase SQL in code. Bare `truncate`
+    # is a CSS class and "Delete from" is UI copy, so neither matches.
     paths: []
-    keywords: ["DROP TABLE", "DROP DATABASE", "DROP SCHEMA", "TRUNCATE TABLE", "DELETE FROM"]
+    keywords:
+      - "DROP TABLE"
+      - "DROP DATABASE"
+      - "DROP SCHEMA"
+      - "DROP COLUMN"
+      - "DROP VIEW"
+      - "DROP INDEX"
+      - "TRUNCATE "
+      - "DELETE FROM"
+      - 're:\b(?i:drop|truncate)\s+(?i:table|database|schema|column|view|index)\b'
   - id: credentials-and-access
     paths: [".sops.yaml", "**/*.enc.{yaml,yml}", "**/.env*"]
     keywords: []

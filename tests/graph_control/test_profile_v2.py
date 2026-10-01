@@ -7,7 +7,7 @@ import importlib.util
 import re
 import unittest
 
-from test_profile_template import TEMPLATE, anchor, derived_rows, load_template, matched
+from test_profile_template import TEMPLATE, anchor, bare, derived_rows, load_template, matched
 
 HAS_WCMATCH = importlib.util.find_spec("wcmatch") is not None
 
@@ -25,7 +25,9 @@ RISK = [
     ("public-copy", [], []),
     ("outbound-messaging", ["**/{email,emails,mailers,notifications,notifier*}/**"], []),
     ("spend", ["**/{billing,payments}/**"], ["stripe.", "Stripe("]),
-    ("destructive", [], ["DROP TABLE", "DROP DATABASE", "DROP SCHEMA", "TRUNCATE TABLE", "DELETE FROM"]),
+    ("destructive", [], ["DROP TABLE", "DROP DATABASE", "DROP SCHEMA", "DROP COLUMN", "DROP VIEW", "DROP INDEX",
+                         "TRUNCATE ", "DELETE FROM",
+                         r"re:\b(?i:drop|truncate)\s+(?i:table|database|schema|column|view|index)\b"]),
     ("credentials-and-access", [".sops.yaml", "**/*.enc.{yaml,yml}", "**/.env*"], []),
     ("outside-the-run", [], []),
 ]
@@ -61,7 +63,7 @@ class SchemaV2Tests(unittest.TestCase):
     def test_api_surface_is_the_routing_api_rows(self):
         routing = self.profile["routing"]
         api_rows = [k for k, v in routing.items() if k != "always"
-                    and "schemathesis" in v.get("impl", [])]
+                    and "graph-engineering:schemathesis" in v.get("impl", [])]
         self.assertEqual(api_rows, API_GLOBS)
 
     def test_gate_classes_name_risk_ids_or_none(self):
@@ -87,10 +89,10 @@ class SchemaV2Tests(unittest.TestCase):
     def test_risk_comment_names_the_built_in_control_plane_row(self):
         text = comment_before("risk:")
         for token in ("agent-control", ".claude/**", "CLAUDE.md", "AGENTS.md", ".mcp.json", ".github/**",
-                      "instructionPaths", "reserved", "case-insensitive"):
+                      "instructionPaths", "reserved", "case-sensitive", "`re:`", "never read prose files"):
             with self.subTest(token=token):
                 self.assertIn(token, text)
-        self.assertNotIn("case-sensitive", text)
+        self.assertNotIn("case-insensitive", text)
         self.assertNotIn("agent-control", [r["id"] for r in self.profile["risk"]])
 
     def test_host_floor_is_a_profile_key(self):
@@ -163,7 +165,7 @@ class SyntheticRiskAndRoutingTests(unittest.TestCase):
         return rows
 
     def skills(self, rows, path):
-        return {s for row in matched(rows, path).values() for skills in row.values() for s in skills}
+        return {s for row in matched(rows, path).values() for skills in row.values() for s in bare(skills)}
 
     def test_synthetic_go_cli_gets_rule_packs_and_a_gap_only(self):
         rows = [r for r in self.derived if "go.mod" in r["when"]]

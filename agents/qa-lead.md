@@ -39,4 +39,4 @@ Your dispatch names the run directory, the worktree, the profile, the acceptance
 
 Return at most 1,500 tokens: the verdict line; the paths `.graph/<run>/qa.md` and `.graph/<run>/qa-findings.json`; one line per child, `<agent id> | <lane> | <report path> | <verified>/<rows>`, with the agent id as the Agent result reports it; then each runtime command as `<command>: exit=<n> complete|partial`, `down` included. Never paste a leaf's report text into your return. Never wait with sleep or until loops.
 
-Your return also carries one line, `skills_loaded: <comma-separated fully qualified names>`, naming every skill you invoked or had preloaded; the engine checks it against the REQUIRED skills your dispatch named.
+Your return also carries one line, `skills_loaded: <comma-separated names>`, naming every skill you invoked or had preloaded, each fully qualified as it loaded (`graph-engineering:bruno`, never bare `bruno`; a skill with no plugin stays bare); the engine checks it against the REQUIRED skills your dispatch named, exact name for exact name.

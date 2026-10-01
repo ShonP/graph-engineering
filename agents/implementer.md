@@ -68,7 +68,7 @@ Status, files changed, each test command with its suite line (below), and any co
 - `NEEDS_CONTEXT` - information was missing. Name it.
 - `NEEDS_SETUP` - a REQUIRED skill could not load. Never improvise a competency you were not given; a plausible-looking result produced without the house patterns is worse than an honest stop.
 
-Your return also carries one line, `skills_loaded: <comma-separated fully qualified names>`, naming every skill you invoked or had preloaded; the engine checks it against the REQUIRED skills your dispatch named.
+Your return also carries one line, `skills_loaded: <comma-separated names>`, naming every skill you invoked or had preloaded, each fully qualified as it loaded (`graph-engineering:bruno`, never bare `bruno`; a skill with no plugin stays bare); the engine checks it against the REQUIRED skills your dispatch named, exact name for exact name.
 
 ## Evidence and handoff
 

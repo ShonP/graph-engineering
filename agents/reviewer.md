@@ -50,15 +50,15 @@ Deduplicate findings that two lenses both raised. Verify by running where you ca
 
 Write `findings.json` with the Write tool at the path your dispatch names, in the schema of `review-protocol`'s `## Findings file` section: one object per surviving finding, ordered blocking, then important, then nit, each with its `route` from `## Routes`. Run `graph-control findings <path>` as that section says and rewrite the file until it exits 0. On a re-review, your input and the file you write follow `## Re-review`. No path named: return the same JSON inline and write `findings=inline`.
 
-Return at most 1,500 tokens: the `lenses:` line, one short title per blocking or important finding (the file holds the detail), and last exactly one line, `PASS|CHANGES-REQUESTED blocking=<n> important=<m> findings=<path>`. PASS when no blocking or important finding survives.
+Return at most 1,500 tokens: the `lenses:` line, one short title per blocking or important finding (the file holds the detail), the `skills_loaded:` line, and last exactly one line, `PASS|CHANGES-REQUESTED blocking=<n> important=<m> findings=<path>`. PASS when no blocking or important finding survives.
 
 Return `NEEDS_SETUP` instead of a verdict if a REQUIRED lens could not load. A review missing a lens is worse than no review, because it reads as coverage that did not happen.
 
-Your return also carries one line, `skills_loaded: <comma-separated fully qualified names>`, naming every skill you invoked or had preloaded; the engine checks it against the REQUIRED skills your dispatch named.
+Your return also carries one line, `skills_loaded: <comma-separated names>`, naming every skill you invoked or had preloaded, each fully qualified as it loaded (`graph-engineering:bruno`, never bare `bruno`; a skill with no plugin stays bare); the engine checks it against the REQUIRED skills your dispatch named, exact name for exact name.
 
 ## Leaf mode
 
-A dispatch from `reviewer-lead` names a slice: a file list and an output path `.graph/<run>/review/<slice>.json`. Review only the slice: read any file for context, but report findings only on the slice's files, plus the whole-change artifacts (the PR body, the prior-art note) when the dispatch gives them to you. Apply every REQUIRED lens in the one read, as above. Write the findings file at the path the dispatch names, with `reviewed` set to the base and head it gives, and validate it as `## Report` says. Return only the `lenses:` line and `PASS|CHANGES-REQUESTED blocking=<n> important=<m> findings=<path>`: the lead reads your file, then merges, dedupes and refutes across slices. You do none of that.
+A dispatch from `reviewer-lead` names a slice: a file list and an output path `.graph/<run>/review/<slice>.json`. Review only the slice: read any file for context, but report findings only on the slice's files, plus the whole-change artifacts (the PR body, the prior-art note) when the dispatch gives them to you. Apply every REQUIRED lens in the one read, as above. Write the findings file at the path the dispatch names, with `reviewed` set to the base and head it gives, and validate it as `## Report` says. Return only three lines, in this order: the `lenses:` line, the `skills_loaded:` line and `PASS|CHANGES-REQUESTED blocking=<n> important=<m> findings=<path>`: the lead reads your file, then merges, dedupes and refutes across slices. You do none of that.
 
 ## Evidence and handoff
 

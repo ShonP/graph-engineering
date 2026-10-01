@@ -4,7 +4,8 @@ The diff is the working tree against `base` (`git diff <base>`): committed,
 staged and unstaged changes to tracked files. Untracked files are excluded, and
 the result says so. Precedence, first match wins:
 
-1. panel  any `risk:` row matches (a changed path, or a keyword in an added line);
+1. panel  any `risk:` row matches (a changed path, or a keyword in an added line
+          of a file that is not prose: README and CHANGELOG mentions never match);
           with a plan, `outside-the-run` matches a changed path in no task's
           `writable_paths` when the profile keeps that row. The built-in
           `agent-control` row (risk.control_row) always applies: the agent's
@@ -39,7 +40,8 @@ OUTSIDE = "outside-the-run"
 LINT = ("prose only: every changed file is *.md, *.markdown, *.rst, *.adoc or a named prose file "
         "(README, CHANGELOG, LICENSE and the like) and none matches instructionPaths")
 EMPTY = "no tracked change against base; untracked files are excluded"
-DIFF = ("diff", "--no-ext-diff", "--no-textconv", "--no-color", "--no-relative", "--find-renames")
+DIFF = ("diff", "--no-ext-diff", "--no-textconv", "--no-color", "--no-relative", "--find-renames",
+        "--src-prefix=a/", "--dst-prefix=b/")
 
 
 def _mapping(value: Any, name: str) -> dict[str, Any]:
@@ -75,15 +77,21 @@ def _numstat(raw: bytes) -> tuple[int, int, list[str]]:
     return lines, files, paths
 
 
-def _added(raw: bytes) -> str:
-    """Added lines of a `--unified=0` patch; a `+++` inside a hunk is content, not a header."""
-    lines, header = [], True
+def _added(raw: bytes, prose: Any) -> str:
+    """Added lines of a `--unified=0` patch, minus those of prose files; a `+++` inside a hunk is content.
+
+    The file is the header's `+++ b/<path>`, with the TAB git appends to a name
+    holding a space. A C-quoted path keeps its ASCII name and extension, which is
+    all the prose globs read, so the quotes are stripped and nothing is unescaped."""
+    lines, header, skip = [], True, False
     for line in raw.decode("utf-8", "replace").split("\n"):
         if line.startswith("diff --git "):
-            header = True
+            header, skip = True, False
+        elif header and line.startswith("+++ "):
+            skip = bool(prose.match(line[4:].rstrip("\t").strip('"').removeprefix("b/")))
         elif line.startswith("@@"):
             header = False
-        elif not header and line.startswith("+"):
+        elif not header and not skip and line.startswith("+"):
             lines.append(line[1:])
     return "\n".join(lines)
 
@@ -110,10 +118,10 @@ def decide(root: Path, base: str, profile: dict[str, Any], plan: Any = None) -> 
     seams = _seams(profile)
     commit = _commit(root, base)
     lines, files, paths = _numstat(git(root, *DIFF, "--numstat", "-z", commit, "--"))
-    risk_rows = classify(paths, _added(git(root, *DIFF, "--unified=0", commit, "--")), rows)
+    prose = matcher(PROSE)
+    risk_rows = classify(paths, _added(git(root, *DIFF, "--unified=0", commit, "--"), prose), rows)
     outside = _outside(paths, rows, plan)
     risk_rows = sorted({*risk_rows, OUTSIDE}) if outside else risk_rows
-    prose = matcher(PROSE)
 
     def result(depth: str, reasons: list[str]) -> dict[str, Any]:
         return {"depth": depth, "changed_lines": lines, "files": files, "risk_rows": risk_rows,

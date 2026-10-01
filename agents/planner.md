@@ -106,4 +106,4 @@ Scale the plan to the work. A one-line fix does not need a five-task plan, and w
 
 The artifact paths you wrote, the open questions and how each was resolved, and the parallelizable task set.
 
-Your return also carries one line, `skills_loaded: <comma-separated fully qualified names>`, naming every skill you invoked or had preloaded; the engine checks it against the REQUIRED skills your dispatch named.
+Your return also carries one line, `skills_loaded: <comma-separated names>`, naming every skill you invoked or had preloaded, each fully qualified as it loaded (`graph-engineering:bruno`, never bare `bruno`; a skill with no plugin stays bare); the engine checks it against the REQUIRED skills your dispatch named, exact name for exact name.

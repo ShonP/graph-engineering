@@ -22,6 +22,8 @@ HAS_WCMATCH = importlib.util.find_spec("wcmatch") is not None
 
 FRAMEWORK = {"react-rules", "tailwind", "forms-i18n", "fastapi", "pydantic", "supabase", "swiftui-pro"}
 FRAMEWORK_PREFIXES = ("tanstack-", "compose-")
+PLUGIN = "graph-engineering:"
+ROLES = ("impl", "review", "qa", "design")
 
 POLICY = {
     "roles": {"planner": "opus", "ux-designer": "opus", "implementer": "opus", "reviewer": "opus",
@@ -67,7 +69,13 @@ DERIVED = [
 ]
 
 
+def bare(names):
+    """Skill names without the plugin prefix every routing name carries (tested once, below)."""
+    return [name.removeprefix(PLUGIN) for name in names]
+
+
 def is_framework(skill):
+    skill = skill.removeprefix(PLUGIN)
     return skill in FRAMEWORK or skill.startswith(FRAMEWORK_PREFIXES)
 
 
@@ -133,16 +141,20 @@ class TemplateTests(unittest.TestCase):
     def test_policy_block_is_the_contract(self):
         self.assertEqual(self.profile["policy"], POLICY)
 
-    def test_always_names_stay_bare(self):
-        names = [n for skills in self.profile["routing"]["always"].values() for n in skills]
-        self.assertTrue(names)
-        self.assertEqual([n for n in names if ":" in n], [])
+    def test_routing_names_plugin_skills_qualified(self):
+        # A bare name can resolve to a host built-in of the same name, and the skill
+        # receipt counts only the identical qualified name: rows, `always` and the derived block.
+        rows = [*self.profile["routing"].values(), *derived_rows()]
+        names = [name for row in rows for role in ROLES for name in row.get(role, [])]
+        self.assertGreater(len(names), 100)
+        self.assertEqual([name for name in names if not name.startswith(PLUGIN)], [])
 
     def test_derived_block_lists_every_row(self):
         rows = derived_rows()
         for row in rows:
             self.assertTrue(row.get("when"), row)
-        got = sorted((r["glob"], r.get("impl", []), r.get("review", []), r.get("qa", [])) for r in rows)
+        got = sorted((r["glob"], bare(r.get("impl", [])), bare(r.get("review", [])), bare(r.get("qa", [])))
+                     for r in rows)
         self.assertEqual(got, sorted(DERIVED))
         gaps = [r for r in rows if r.get("gap")]
         self.assertEqual([r["glob"] for r in gaps], ["<dir>/**"])
@@ -160,7 +172,7 @@ class SyntheticLayoutTests(unittest.TestCase):
         self.derived = derived_rows()
 
     def skills(self, rows, path):
-        return {s for row in matched(rows, path).values() for skills in row.values() for s in skills}
+        return {s for row in matched(rows, path).values() for skills in row.values() for s in bare(skills)}
 
     def applied(self, when_word, directory):
         rows = {}

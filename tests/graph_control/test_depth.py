@@ -284,8 +284,8 @@ class ControlPlane(Fixture):
         self.assertEqual(result["depth"], "panel")
 
 
-class TemplateSpend(Fixture):
-    """The shipped template's `spend` keywords are code spellings, not substrings of UI words."""
+class TemplateKeywords(Fixture):
+    """The shipped template's keywords are code spellings, case-sensitive, and never read in prose files."""
 
     def setUp(self):
         super().setUp()
@@ -305,6 +305,25 @@ class TemplateSpend(Fixture):
                 self.assertEqual(decide(self.repo, self.base, self.profile)["risk_rows"], ["spend"])
 
 
+    def test_keywords_in_prose_files_never_match(self):
+        self.append("README.md", "Payments are processed by Stripe.\nRun DELETE FROM users to reset.\n")
+        self.append("docs/guide.rst", "stripe.Charge.create() then DROP TABLE t\n")
+        self.write('docs/a"b.md', "DELETE FROM users\n", track=True)
+        self.write("docs/my notes.md", "DELETE FROM users\n", track=True)  # git appends a TAB to this header
+        result = decide(self.repo, self.base, self.profile)
+        self.assertEqual((result["depth"], result["risk_rows"]), ("lint", []))
+
+    def test_the_same_line_in_code_matches_beside_prose(self):
+        self.append("README.md", "DELETE FROM users\n")
+        self.append("src/app.py", "cur.execute('DELETE FROM users')\n")
+        self.assertEqual(decide(self.repo, self.base, self.profile)["risk_rows"], ["destructive"])
+
+    def test_ui_copy_in_an_i18n_file_does_not_match_destructive(self):
+        self.write("web/locales/en.json", '{"remove": "Delete from favorites", "cell": "truncate text-sm"}\n', track=True)
+        result = decide(self.repo, self.base, self.profile)
+        self.assertEqual((result["depth"], result["risk_rows"]), ("single", []))
+
+
 class Validation(Fixture):
     def test_bad_input_is_invalid(self):
         self.append("src/app.py", "a = 1\n")
@@ -316,6 +335,7 @@ class Validation(Fixture):
             "panel_lines not an integer": (self.base, {"review": {"panel_lines": "2000"}}),
             "instructionPaths not a list": (self.base, {"instructionPaths": "CLAUDE.md"}),
             "bad risk row": (self.base, {"risk": [{"id": "x", "paths": "a/**"}]}),
+            "invalid keyword regex": (self.base, {"risk": [{"id": "x", "keywords": ["re:("]}]}),
         }
         for name, (base, profile) in bad.items():
             with self.subTest(name), self.assertRaises(Invalid):

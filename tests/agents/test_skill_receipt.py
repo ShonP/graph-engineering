@@ -13,9 +13,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 AGENTS = ROOT / "agents"
 RUN = ROOT / "docs" / "engine" / "run.md"
-SENTENCE = ("Your return also carries one line, `skills_loaded: <comma-separated fully qualified names>`, "
-            "naming every skill you invoked or had preloaded; the engine checks it against the REQUIRED "
-            "skills your dispatch named.")
+SENTENCE = ("Your return also carries one line, `skills_loaded: <comma-separated names>`, naming every skill "
+            "you invoked or had preloaded, each fully qualified as it loaded (`graph-engineering:bruno`, never "
+            "bare `bruno`; a skill with no plugin stays bare); the engine checks it against the REQUIRED skills "
+            "your dispatch named, exact name for exact name.")
 # Every roster agent with the Skill tool: the engine may name REQUIRED skills for any of them.
 RECEIPT_AGENTS = ("implementer", "implementer-simple", "reviewer", "reviewer-lead", "qa", "qa-lead",
                   "researcher", "researcher-spike", "ux-designer", "planner")
@@ -32,11 +33,11 @@ def report(name):
 
 
 class Receipt(unittest.TestCase):
-    def test_every_skill_capable_agent_reports_skills_loaded_once(self):
+    def test_every_skill_capable_agent_states_the_receipt_once(self):
         for name in RECEIPT_AGENTS:
             with self.subTest(agent=name):
                 self.assertIn(SENTENCE, report(name))
-                self.assertEqual(flat((AGENTS / f"{name}.md").read_text()).count("skills_loaded:"), 1)
+                self.assertEqual(flat((AGENTS / f"{name}.md").read_text()).count(SENTENCE), 1)
 
     def test_the_receipt_agents_are_exactly_those_with_the_skill_tool(self):
         with_skill = {path.stem for path in AGENTS.glob("*.md")
@@ -45,8 +46,9 @@ class Receipt(unittest.TestCase):
 
     def test_the_engine_runs_skills_check_and_marks_a_miss(self):
         text = flat(RUN.read_text())
-        for token in ("skills_loaded:", "graph-control skills-check --required", "--loaded",
-                      "SKILLS_MISSING: <names>", "re-dispatch once"):
+        for token in ("skills_loaded:", "graph-control skills-check --required", "--loaded", "Exit 1",
+                      "SKILLS_MISSING: <names>", "re-dispatch once", "Exit 2", "BLOCKED",
+                      "`skills_loaded: <plugin>:<skill>, ...`", "goes to the owner"):
             with self.subTest(token=token):
                 self.assertIn(token, text)
 

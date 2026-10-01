@@ -92,7 +92,7 @@ class GraphInitCommandTests(unittest.TestCase):
         self.assertIn("templates/graph-profile.yaml", routing)
         self.assertIn("gap", routing)
         self.assertIn("rule packs", routing)
-        self.assertNotRegex(text(), r'glob: "<dir>/|impl: \[react-rules')
+        self.assertNotRegex(text(), r'glob: "<dir>/|impl: \[(graph-engineering:)?react-rules')
 
     def test_graph_checks_table_covers_every_detection(self):
         got = {(block, tuple(argv)) for block, argv, _ in proposal_rows()}

@@ -80,6 +80,21 @@ class ReviewerLeafMode(unittest.TestCase):
                 self.assertIn(needle, body)
 
 
+class ReceiptOrder(unittest.TestCase):
+    """The `skills_loaded:` receipt sits immediately before the verdict line, which stays last."""
+
+    def test_reviewer_and_lead_put_the_receipt_right_before_the_last_line(self):
+        last = r"the `skills_loaded:` line[,;] and last exactly one line, " + re.escape(VERDICT)
+        for path in (REVIEWER, LEAD):
+            with self.subTest(path.name):
+                self.assertRegex(flat(section(path.read_text(encoding="utf-8"), "Report")), last)
+
+    def test_leaf_mode_returns_three_lines_in_order(self):
+        body = flat(section(REVIEWER.read_text(encoding="utf-8"), "Leaf mode"))
+        self.assertIn("Return only three lines, in this order: the `lenses:` line, the `skills_loaded:` line and "
+                      + VERDICT, body)
+
+
 class ProtocolPanel(unittest.TestCase):
     def setUp(self):
         self.body = flat(section(PROTOCOL.read_text(encoding="utf-8"), "Panel"))

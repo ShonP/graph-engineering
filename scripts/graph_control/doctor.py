@@ -17,7 +17,7 @@ from typing import Any
 
 from .common import Invalid, load
 from .preflight import read_profile
-from .risk import CONTROL, parse_rows
+from .risk import CONTROL, BadPattern, parse_rows
 
 LEVELS = ("error", "warn", "info")
 TIERS = ("opus", "sonnet")
@@ -108,6 +108,9 @@ def _risk(profile: dict[str, Any]) -> tuple[list[Finding], set[str] | None]:
     """The risk table read by the reader depth uses; None ids when its shape is wrong."""
     try:
         return [], {row.id for row in parse_rows(profile.get("risk"))}
+    except BadPattern as error:
+        return [Finding("error", "risk-keyword", str(error), "fix the regex after `re:`, or drop `re:` to match "
+                        "the keyword literally")], None
     except Invalid as error:
         return [Finding("error", "risk-shape", str(error), "write `risk:` as a list of `- id: <name>` rows with "
                         "`paths` and `keywords`, as templates/graph-profile.yaml does")], None
@@ -161,20 +164,24 @@ def _skill_names(node: Any) -> set[str]:
 
 
 def _routing(profile: dict[str, Any], root: Path, plugin_root: Path, plugin: str) -> list[Finding]:
-    missing = []
+    missing, bare_names = [], []
     for name in sorted(_skill_names(profile.get("routing"))):
         prefix, _, bare = name.rpartition(":")
         if prefix and prefix != plugin:
             continue  # another plugin's skill: not resolvable from here
-        found = SKILL_NAME.fullmatch(bare) and (
-            any(plugin_root.glob(f"skills/*/{bare}/SKILL.md")) or (root / ".claude" / "skills" / bare / "SKILL.md").is_file())
-        if not found:
+        valid = SKILL_NAME.fullmatch(bare) is not None
+        in_plugin = valid and any(plugin_root.glob(f"skills/*/{bare}/SKILL.md"))
+        if not (in_plugin or valid and (root / ".claude" / "skills" / bare / "SKILL.md").is_file()):
             missing.append(name)
-    if not missing:
-        return []
-    return [Finding("warn", "routing-skill",
-                    f"routing names skills that resolve to no plugin or repo skill: {', '.join(missing)}",
-                    "correct the names, or add .claude/skills/<name>/SKILL.md")]
+        elif in_plugin and not prefix:
+            bare_names.append(name)
+    findings = [Finding("warn", "routing-skill",
+                        f"routing names skills that resolve to no plugin or repo skill: {', '.join(missing)}",
+                        "correct the names, or add .claude/skills/<name>/SKILL.md")] if missing else []
+    if bare_names:  # a bare name can resolve to a host built-in; the skill receipt counts only the exact name
+        findings.append(Finding("warn", "routing-bare", f"routing names plugin skills bare: {', '.join(bare_names)}",
+                                "write them qualified: " + ", ".join(f"{plugin}:{name}" for name in bare_names)))
+    return findings
 
 
 def _checks(root: Path, plugin_root: Path, quick: bool) -> list[Finding]:

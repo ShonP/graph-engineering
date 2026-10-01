@@ -79,8 +79,9 @@ of model tiers, and haiku, fable and `general-purpose` are blocked.
   rows, `instructionPaths`, `review.panel_lines` and `review.seams`, and reports
   the matched `risk_rows` the merge gate reads. The new `risk` module is the
   one reader of the risk table: a row matches on a path glob, or on a keyword
-  that appears literally, case-insensitively, in an added line; a row with no
-  paths and no keywords is a placeholder that matches nothing. `wcmatch==11.0.1`
+  spelled exactly (case-sensitive) in an added line of a non-prose file, or a
+  `re:` keyword's Python regex; a row with no paths and no keywords is a
+  placeholder that matches nothing. `wcmatch==11.0.1`
   is now pinned in the entry point. `--plan <run>/plan.json` evaluates the
   `outside-the-run` row (a changed path in no task's `writable_paths`), which
   the merge gate's condition (a) now passes. `lint` is prose by file type only
@@ -191,10 +192,13 @@ of model tiers, and haiku, fable and `general-purpose` are blocked.
   `skills_loaded: <fully qualified names>`, and after each dispatch that named
   REQUIRED skills the engine runs `graph-control skills-check --required ...
   --loaded ...` (no model, no file read). A miss marks the node
-  `SKILLS_MISSING: <names>` and re-dispatches once; a second miss goes to the
-  owner. Names compare by the part after the last colon, and a bare name that
-  is also a host built-in (`security-review` and the rest of `HOST_BUILTINS` in
-  `graph_control/skills.py`) counts as not loaded. Why: in 30 days of
+  `SKILLS_MISSING: <names>` and re-dispatches once (exit 1); a malformed line is
+  BLOCKED (exit 2) and re-dispatched once asking for the exact format; a second
+  failure goes to the owner. A qualified `plugin:skill` is proven only by the
+  identical name, a bare one only by the identical bare name; the parser drops
+  backticks and `(annotations)`. So routing names plugin skills qualified:
+  the template does, and `check-routing-resolves.sh` and doctor's
+  `routing-bare` flag a bare one, since it can resolve to a host built-in. Why: in 30 days of
   sessions, 15 of 102 subagents that edited `.tsx` never loaded a React or
   TanStack skill, and dispatches that REQUIRED `bruno` loaded it 1 of 3 times.
 
@@ -368,12 +372,16 @@ of model tiers, and haiku, fable and `general-purpose` are blocked.
   keyed by id (and bare ids) that `depth` then rejected with `expected an
   array`; now both read it through `risk.parse_rows`, doctor reports any other
   shape as `risk-shape`, and depth is BLOCKED with the same message.
-- **Risk keywords match case-insensitively**, as contract C7 says, so
-  `delete from` in lowercase SQL matches `DELETE FROM`. The template's
-  `destructive` keywords become statement shapes (`DROP TABLE`,
-  `DROP DATABASE`, `DROP SCHEMA`, `TRUNCATE TABLE`, `DELETE FROM`), since bare
-  `TRUNCATE` and `DROP ` would now match the CSS class `truncate` and the verb
-  `drop`. A bare `TRUNCATE users` no longer matches; add it per repo if needed.
+- **Risk keywords stay case-sensitive, gain a `re:` form and skip prose.**
+  Case-insensitive matching caught Tailwind `truncate`, prose "Stripe" and UI
+  copy "Delete from favorites", so keywords match as spelled (SQL convention is
+  uppercase), and contract C7 now says so. A keyword starting with `re:` is a
+  Python regex, compiled once per run; an invalid one is doctor's
+  `risk-keyword` and BLOCKS depth with the same message. Keywords never read
+  added lines of prose files (the `lint` file types), so README and CHANGELOG
+  mentions raise no owner class. The template's `destructive` row covers
+  `DROP TABLE|DATABASE|SCHEMA|COLUMN|VIEW|INDEX`, `TRUNCATE `, `DELETE FROM`
+  and one regex for lowercase `drop`/`truncate` statements in code.
 - `graph-control --help` and `-h` no longer crash: a bare `%` in the
   `validate-briefs` help was read by argparse as a format spec. Tests render the
   top-level help, every subcommand's help and the entry point's `--help`.

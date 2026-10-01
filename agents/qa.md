@@ -40,7 +40,7 @@ The criterion table from `qa-verification`. Every row ends VERIFIED, FAILED or B
 
 Then one verdict line: `PASS` only when every required row is VERIFIED; otherwise `INCOMPLETE: <row ids>` naming every required row that is not VERIFIED, with `FAIL` in front when any row is FAILED (for example `FAIL INCOMPLETE: AC-2, AC-5`). An infra `verify` whose profile configures no throwaway cluster writes `PASS (static-only)` in place of `PASS` (see `infra-verification`). A `post-deploy` node keeps its own verdicts, above.
 
-Your return also carries one line, `skills_loaded: <comma-separated fully qualified names>`, naming every skill you invoked or had preloaded; the engine checks it against the REQUIRED skills your dispatch named.
+Your return also carries one line, `skills_loaded: <comma-separated names>`, naming every skill you invoked or had preloaded, each fully qualified as it loaded (`graph-engineering:bruno`, never bare `bruno`; a skill with no plugin stays bare); the engine checks it against the REQUIRED skills your dispatch named, exact name for exact name.
 
 ## Evidence and handoff
 

@@ -1,49 +1,41 @@
 """Skill receipt: every REQUIRED skill a dispatch named appears in the child's `skills_loaded:` line.
 
-Names compare by the part after the last colon, so `graph-engineering:bruno` and
-`bruno` are one skill. A bare loaded name that is also a host built-in proves
-nothing: the host may have resolved it to its own skill of that name (bare
-`security-review` did, in 7 of 7 measured reviews), so it counts as not loaded.
-Pure: no I/O.
+A required qualified name `ns:skill` is proven only by the identical qualified
+name: a loaded name in another namespace never counts, and a loaded bare name
+proves only a required bare name. So a bare REQUIRED name that a host built-in
+shares (bare `security-review` resolved to the host's own in 7 of 7 measured
+reviews) is the routing's problem, which check-routing-resolves and doctor's
+`routing-bare` flag. There is no host snapshot to go stale. Pure: no I/O.
 """
 
 import re
 
 from .common import require
 
-# Witness: the unprefixed skills a Claude Code 2.1.286 session listed on
-# 2026-10-01, minus the owner's ~/.claude/skills. The host ships these, so a
-# bare one may be the host's own. One list, for any check that meets bare names.
-HOST_BUILTINS = frozenset({
-    "artifact-capabilities", "artifact-design", "artifact-diagramming", "claude-api", "claude-in-chrome",
-    "code-review", "dataviz", "fewer-permission-prompts", "init", "keybindings-help", "loop", "run",
-    "schedule", "security-review", "simplify", "update-config", "workflow-authoring",
-})
-NAME = re.compile(r"(?:[A-Za-z0-9][\w.-]*:)*[A-Za-z0-9][\w.-]*")
+NAME = re.compile(r"[a-z0-9][a-z0-9_-]*(?::[a-z0-9][a-z0-9_-]*)?")
+NOTE = re.compile(r"\([^()]*\)")  # an annotation such as `(preloaded)`
 PREFIX = "skills_loaded:"
+FORMAT = "write the line as `skills_loaded: <plugin>:<skill>, ...`"
 
 
 def names(value: str) -> tuple[str, ...]:
-    """Comma-separated names, trimmed, empties dropped, first occurrence kept.
+    """Comma-separated names, lowercased, deduplicated in order; Invalid on a name the pattern rejects.
 
-    The child's whole return line is accepted too: a leading `skills_loaded:` is dropped."""
-    value = value.strip()
-    value = value[len(PREFIX):] if value.startswith(PREFIX) else value
-    result = []
-    for item in (part.strip() for part in value.split(",")):
+    Tolerant of how a model writes the line: the `skills_loaded:` prefix,
+    backticks, surrounding whitespace and parenthetical annotations are dropped."""
+    value = NOTE.sub(" ", value.replace("`", "")).strip()
+    value = value[len(PREFIX):] if value.lower().startswith(PREFIX) else value
+    result: list[str] = []
+    for item in (part.strip().lower() for part in value.split(",")):
         if not item:
             continue
-        require(NAME.fullmatch(item) is not None, f"not a skill name: {item!r}")
+        require(NAME.fullmatch(item) is not None, f"not a skill name: {item!r}; {FORMAT}")
         if item not in result:
             result.append(item)
     return tuple(result)
 
 
-def bare(name: str) -> str:
-    return name.rpartition(":")[2]
-
-
 def missing(required: tuple[str, ...], loaded: tuple[str, ...]) -> list[str]:
-    """The required names, in order, that the loaded names do not prove."""
-    proven = {bare(name) for name in loaded if ":" in name or name not in HOST_BUILTINS}
-    return [name for name in required if bare(name) not in proven]
+    """The required names, in order, that no identical loaded name proves."""
+    proven = set(loaded)
+    return [name for name in required if name not in proven]
