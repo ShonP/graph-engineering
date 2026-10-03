@@ -206,6 +206,15 @@ class GuardDestructive(unittest.TestCase):
                 self.assertEqual(self.run_guard(command, cwd=cwd, mode='bypassPermissions'), '')
         self.assertEqual(self.run_guard('rm -rf "/', mode='bypassPermissions'), '')
 
+    def test_missing_or_malformed_mode_still_asks(self):
+        base = {'session_id': 'synthetic', 'hook_event_name': 'PreToolUse', 'tool_name': 'Bash',
+                'tool_input': {'command': 'git push -f'}, 'cwd': str(self.repo)}
+        for mode in (None, ['bypassPermissions'], 'BypassPermissions'):
+            with self.subTest(mode=mode):
+                payload = dict(base) if mode is None else {**base, 'permission_mode': mode}
+                out = self.run_guard(None, raw=json.dumps(payload))
+                self.assertEqual(json.loads(out)['hookSpecificOutput']['permissionDecision'], 'ask')
+
     def test_other_modes_still_ask(self):
         for mode in ('default', 'acceptEdits', 'auto', 'dontAsk', 'plan'):
             with self.subTest(mode=mode):
