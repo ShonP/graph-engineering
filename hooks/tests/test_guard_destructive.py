@@ -68,10 +68,10 @@ class GuardDestructive(unittest.TestCase):
         out = subprocess.run(['git', '-C', str(cls.repo), *args], check=True, capture_output=True, text=True)
         return out.stdout.strip()
 
-    def run_guard(self, command, cwd=None, env=None, raw=None):
+    def run_guard(self, command, cwd=None, env=None, raw=None, mode='default'):
         payload = raw if raw is not None else json.dumps({
             'session_id': 'synthetic', 'hook_event_name': 'PreToolUse', 'tool_name': 'Bash',
-            'tool_input': {'command': command}, 'cwd': str(cwd or self.repo)})
+            'permission_mode': mode, 'tool_input': {'command': command}, 'cwd': str(cwd or self.repo)})
         result = subprocess.run([BASH, str(GUARD)], input=payload, env=env or self.env,
                                 capture_output=True, text=True, timeout=20)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -198,6 +198,18 @@ class GuardDestructive(unittest.TestCase):
         self.assertEqual(self.reason('git -C repo push -f "x'), PARSE)
         self.assertEqual(self.run_guard(None, raw='{"tool_input": {"command": "rm -rf /"'), '')
         self.assertEqual(self.run_guard(None, raw='["rm -rf /"]'), '')
+
+    def test_bypass_permissions_mode_is_silent(self):
+        """The owner chose bypass: a prompt there stops an unattended run, so the guard stands down."""
+        for command, cwd, _ in self.positives():
+            with self.subTest(command=command):
+                self.assertEqual(self.run_guard(command, cwd=cwd, mode='bypassPermissions'), '')
+        self.assertEqual(self.run_guard('rm -rf "/', mode='bypassPermissions'), '')
+
+    def test_other_modes_still_ask(self):
+        for mode in ('default', 'acceptEdits', 'auto', 'dontAsk', 'plan'):
+            with self.subTest(mode=mode):
+                self.assertTrue(self.reason('git push -f', mode=mode).startswith('force push'))
 
     def test_registered_if_rules_reach_every_positive(self):
         """Each AC-01 positive must reach the script through a hooks.json `if` rule.

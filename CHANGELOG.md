@@ -10,6 +10,13 @@ commits.
 
 ## [Unreleased]
 
+### Changed
+
+- **The destructive-command guard is silent in `bypassPermissions` mode.** A
+  hook's `ask` forced a prompt even under bypass and stopped unattended runs.
+  The guard now reads `permission_mode` from the PreToolUse input and stands
+  down there; every other mode still asks.
+
 ## [0.15.0] - 2026-09-30
 
 Efficiency, a front door, parallelism and the full loop. `/graph-ship` routes

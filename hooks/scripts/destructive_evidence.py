@@ -5,7 +5,8 @@ the first segment of tool_input.command that matches a rule, or nothing. Rules:
 R1 git remote remove|rm; R2 git push forced without a lease; R3 docker volume
 rm|prune and docker system prune -a|--all|--volumes; R4 recursive rm on a
 protected target. Evidence is local state only (git refs, `docker volume ls`),
-2 s per probe. Stdlib only; never denies, never allows, never writes a file.
+2 s per probe. Silent in bypassPermissions mode. Stdlib only; never denies,
+never allows, never writes a file.
 """
 import json
 import os
@@ -237,6 +238,9 @@ def main():
     except (ValueError, KeyError, TypeError, AttributeError):
         return
     if not isinstance(command, str) or not isinstance(cwd, str):
+        return
+    # A hook `ask` prompts even in bypass mode; the owner chose no prompts, so stand down.
+    if payload.get('permission_mode') == 'bypassPermissions':
         return
     try:
         reason = evaluate(command, cwd)
