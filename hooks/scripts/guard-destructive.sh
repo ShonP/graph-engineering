@@ -3,7 +3,8 @@
 # PreToolUse hook on Bash: turn a small set of destructive commands into a
 # permission `ask` that carries the evidence the owner needs, and cost nothing
 # on every other command. It never denies, never allows, never writes a file,
-# and exits 0 on every path.
+# and exits 0 on every path. Silent when the input's permission_mode is
+# bypassPermissions: an `ask` would still prompt there and stop an unattended run.
 #
 # Contract, from the docs fetched 2026-09-30:
 #   Hooks reference, https://code.claude.com/docs/en/hooks

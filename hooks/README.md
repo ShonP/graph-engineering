@@ -10,7 +10,7 @@ hook: agents call it by path to wait on a long suite (see wait-run below).
 | Event, matcher | Script | Mode | What it does |
 | --- | --- | --- | --- |
 | `PostToolUse`, `Edit\|Write` | `scripts/lint-touched-file.sh` | `async`, timeout 130 | Runs the configured lint on the file Claude just wrote and hands findings back on the next turn. Exit `0` always: it informs, it never blocks |
-| `PreToolUse`, `Bash` | `scripts/guard-destructive.sh` | sync, timeout 10, three handlers gated by `if` | Asks before a destructive command, with evidence. Never denies |
+| `PreToolUse`, `Bash` | `scripts/guard-destructive.sh` | sync, timeout 10, three handlers gated by `if` | Asks before a destructive command, with evidence. Never denies. Silent in `bypassPermissions` mode |
 | `PreToolUse`, `Agent\|Task` | `scripts/guard-agent.sh` | sync, timeout 15 | Enforces the profile's `policy:` block on subagent calls |
 | `Stop`, no matcher | `scripts/test-before-stop.sh` | `asyncRewake`, timeout 620 | Runs the configured test after the turn ends and wakes Claude only when it fails. On an unchanged tree it replays the stored verdict instead (`<git common dir>/graph-engineering/checks-state.json`); any nonempty `GRAPH_CHECKS_NO_MEMO` turns that off |
 | `SessionStart`, `startup\|clear\|compact` | `scripts/print-handoff.sh` | sync, timeout 15 | Prints the head of `docs/HANDOFF.md` into the new context, a warning when that file is over 150 lines, the reply contract when the repo has a profile, and one line when a run's success measures are due. Silent on resume, fork and `--agent` sessions. Exit `0` always |
@@ -112,6 +112,12 @@ human or the harness decides. It asks for:
 - `docker system prune -a` and `docker system prune --volumes`.
 - A recursive `rm` of `/`, `$HOME`, a repository root, a `.git` path or the Docker
   data directories.
+
+In `bypassPermissions` mode it says nothing. A hook's `ask` forces a prompt
+even there (hooks reference, "PreToolUse decision control"), so an unattended
+run would stop and wait for a human the owner chose not to have. The check reads
+`permission_mode` from the hook input. Every other mode still asks, including
+`auto`, where the classifier cannot approve past a hook's `ask`.
 
 Registration is three handlers, one per `if`: `Bash(git *)`, `Bash(rm *)` and
 `Bash(docker *)`. The git rule is the whole tool, not `git push*`, because git
@@ -275,7 +281,8 @@ remove hooks"). The ways out, in order of least collateral damage:
 - Let them no-op. No `.claude/graph-checks.json`, no `policy:` block in the profile
   and no `docs/HANDOFF.md` means the lint, the Stop gate, the agent guard and the
   handoff all do nothing. The destructive-command guard still asks on the commands
-  above; answer it, or use the next two.
+  above unless the session runs in `bypassPermissions` mode; answer it, or use
+  the next two.
 - `policy-override: <reason>` in one agent prompt skips the agent guard for that call.
 - `claude plugin disable graph-engineering` turns off the plugin, hooks included.
 - `"disableAllHooks": true` in a settings file turns off every hook from every
