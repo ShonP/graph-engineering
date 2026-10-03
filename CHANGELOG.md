@@ -10,6 +10,10 @@ commits.
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-10-03
+
+The destructive-command guard no longer interrupts bypass-mode runs.
+
 ### Changed
 
 - **The destructive-command guard is silent in `bypassPermissions` mode.** A
