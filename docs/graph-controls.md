@@ -20,6 +20,7 @@ uv run scripts/graph-control.py status [--line] [--root /absolute/repo] [--sessi
 uv run scripts/graph-control.py depth --root /absolute/candidate --base <rev> --profile /absolute/repo/.claude/graph-profile.yaml [--plan /absolute/run/plan.json]
 uv run scripts/graph-control.py findings /absolute/run/review-1.md [/absolute/run/review-2.md ...] [--counts]
 uv run scripts/graph-control.py waves /absolute/run/plan.json [--max-width 4]
+uv run scripts/graph-control.py ready /absolute/run/plan.json --done <ids> [--running <ids>] [--max-width 4]
 uv run scripts/graph-control.py validate-briefs /absolute/run
 uv run scripts/graph-control.py digest --root /absolute/candidate --base <rev> [--plan /absolute/run/plan.json] [--profile /absolute/repo/.claude/graph-profile.yaml]
 uv run scripts/graph-control.py render [--root /absolute/plugin] [--write|--check]
@@ -33,7 +34,7 @@ uv run scripts/graph-control.py skills-check --required graph-engineering:bruno,
 
 ## Plan schema (versions 1 and 2)
 
-`schema_version` is 1 or 2; any other value is rejected. Version 2 is version 1 plus the optional success signals below. All fields in this example are required in both versions. Unknown/duplicate keys and duplicate IDs are rejected. Arrays below may be empty unless the example/comment says otherwise.
+`schema_version` is 1 or 2; any other value is rejected. Version 2 is version 1 plus the optional success signals and task budget keys below. Every field in this example is required in both versions; the only optional task keys are `estimate_min`, `path_cap_reason` and `proof`, version 2 only, with the rules under [Task budget](#task-budget-version-2). Unknown/duplicate keys and duplicate IDs are rejected. Arrays below may be empty unless the example/comment says otherwise.
 
 ```json
 {
@@ -95,6 +96,26 @@ number    := [ "-" ] digits [ "." digits ]
 ```
 
 `SP` is exactly one space, `digits` are ASCII 0-9, and nothing may precede or follow. `value` is the command's result; `baseline` is the value the measuring step recorded before the change shipped. Accepted: `value <= 0.01`, `value >= baseline * 1.1 + 5`, `value < baseline * 2 + -0.5`. Rejected: `value < foo`, `x > 1`, `value != 1`, `value<=1`, `value >= 1.1 * baseline`, `value > 1e3`. graph_control validates and stores signals; it never runs a signal's command.
+
+### Task budget (version 2)
+
+A version 2 task may add three optional keys (shown alone below, merged into the example tasks above by `id`): a time estimate, a bounded write surface and a proof class. A plan without them validates unchanged.
+
+```json
+{
+  "schema_version": 2,
+  "tasks": [
+    {"id": "FE3", "estimate_min": 30, "proof": "focused"},
+    {"id": "FE4", "estimate_min": 20}
+  ]
+}
+```
+
+- `estimate_min`: an integer from 1 to 45, in minutes (a bool or a float is rejected); a task that cannot fit is split.
+- `path_cap_reason`: nonempty text, required once an estimated task names more than 8 `writable_paths`.
+- `proof`: exactly `focused`, `full_device` or `cluster`. A `full_device` or `cluster` task proves on real devices or a cluster and builds nothing, so its `produces` must be empty; building and proving are separate tasks.
+- `path_cap_reason` and `proof` are valid only beside `estimate_min`; the path cap binds only a task that carries `estimate_min`.
+- An explicit `null` for any of the three is rejected (omit the key instead), and a version 1 plan carrying any of them is rejected. Every rejection starts with `task <id>:` and names the limit.
 
 ## Run schema (version 1)
 
@@ -248,7 +269,7 @@ The Stop hook (`hooks/scripts/configured_check.py test`) memoizes the verdict of
 
 `graph-control check <root> --reuse` reads `<root>/.claude/graph-checks.json`, where `<root>` is the directory holding that config (the Git worktree root, or a monorepo package with its own), computes the same key and returns `{"status":"PASS","verdict":"pass|fail|timeout","observed_at":"...","exit_code":0}`. It never executes anything. A tree with no stored verdict returns BLOCKED `no memo for the current tree`; a missing config, a config with no test block or a malformed `test.argv`, a root outside any Git worktree, and a set `GRAPH_CHECKS_NO_MEMO` are BLOCKED with the reason. `--reuse` is required: graph-control never runs project commands, so replay is the only mode. The memo is a speed cache, not merge evidence: the merge gate still proves checks with receipts (`record-receipt`, `verify`).
 
-## doctor, status, depth, findings, waves, validate-briefs, digest, render, host-check, skills-check
+## doctor, status, depth, findings, waves, ready, validate-briefs, digest, render, host-check, skills-check
 
 Read-only plug-in commands; like every control, none executes project commands.
 
@@ -256,7 +277,8 @@ Read-only plug-in commands; like every control, none executes project commands.
 - `status [--line] [--root <repo>] [--session <id>]` reports run status; `--line` is the one-line form for a status line. Stdlib only, so it also runs as `python3 -m graph_control.status` with `PYTHONPATH=<plugin>/scripts`, without uv or PyYAML. The session is `--session`, else, with `--line`, the `transcript_path` or `session_id` of the JSON the host pipes to a `statusLine` command (pipe it through: `printf '%s' "$input" | ... --line`), else the newest session of the root. A named session that is not found prints nothing rather than another session's agents. The full form (no `--line`) adds DONE since the last look and NEXT, read from each run's `plan.json`, `run.json` and `receipts.json`; it never opens `ledger.md`.
 - `depth --root <candidate> --base <rev> --profile <profile.yaml> [--plan <plan.json>]` picks the review depth for a diff and returns `{depth: lint|single|panel, changed_lines, files, risk_rows, reasons, untracked_excluded, regex_skipped_long_lines}`. `risk:` is a list of `{id, paths, keywords}` rows, the template's shape; any other shape (a mapping keyed by id, bare ids) is BLOCKED with the message `doctor` reports as `risk-shape`. A row matches on a path glob or on a keyword found, spelled exactly (case-sensitive), in an added line of a file that is not prose (the `lint` file types below); a keyword starting with `re:` is a Python regex instead, and an invalid one is BLOCKED with the message `doctor` reports as `risk-keyword`. A `re:` pattern must have no nested quantifiers (doctor warns `risk-nested` on shapes like `(a+)+`), runs per added line, skips lines over 4,096 characters (counted in `regex_skipped_long_lines`), and matching past 5 s is BLOCKED naming the row. A row with neither is a placeholder and matches nothing, except `outside-the-run`: with `--plan`, it matches when a changed path is in no task's `writable_paths` (repo-relative globs). One row is built in and reserved, `agent-control`: `**/.claude/**`, `**/CLAUDE.md`, `**/AGENTS.md`, `**/.mcp.json`, `.github/**` and the profile's `instructionPaths`, so a diff to the agent's own checks, hooks, permissions, gates or prompts is never class `none` and never `lint`; a profile row with that id is BLOCKED. `lint` is prose by file type only (`*.md`, `*.markdown`, `*.rst`, `*.adoc`, and README, CHANGELOG, LICENSE and similar named files, bare or `.txt`), never by directory: `docs/conf.py`, `requirements.txt` and `CMakeLists.txt` are code, and MDX is not prose.
 - `findings <files...> [--counts]` reads reviewer finding files; an absent file is BLOCKED.
-- `waves <plan.json> [--max-width N]` returns `{waves: [[task ids]], max_width}`: the plan's topological levels from `depends_on` (`Plan.levels()`, the same loop `validate` uses), with tasks in plan order within a level. A level wider than `N` splits into consecutive sub-waves, still in plan order, so a diamond (A; B and C depend on A; D on both) gives `[[A],[B,C],[D]]`, and five independent tasks at `--max-width 2` give `[[1,2],[3,4],[5]]`. The default 4 is the engine's sub-cap on concurrent opus agents; `N` must be a positive integer (argparse exit 2 otherwise). Tasks in one wave never claim overlapping `writable_paths`, because validation rejects overlaps between unordered tasks. The plan is fully validated first, so an invalid plan is BLOCKED with the `validate-plan` message.
+- `waves <plan.json> [--max-width N]` returns `{waves: [[task ids]], max_width}`: the plan's topological levels from `depends_on` (`Plan.levels()`, the same loop `validate` uses), with tasks in plan order within a level. A level wider than `N` splits into consecutive sub-waves, still in plan order, so a diamond (A; B and C depend on A; D on both) gives `[[A],[B,C],[D]]`, and five independent tasks at `--max-width 2` give `[[1,2],[3,4],[5]]`. The default 4 is the engine's sub-cap on concurrent opus agents; `N` must be a positive integer (argparse exit 2 otherwise). Tasks in one wave never claim overlapping `writable_paths`, because validation rejects overlaps between unordered tasks. The plan is fully validated first, so an invalid plan is BLOCKED with the `validate-plan` message. `waves` stays for display only (the plan's shape at a glance); the engine schedules with `ready`.
+- `ready <plan.json> --done <ids> [--running <ids>] [--max-width N]` returns `{ready: [task ids], running: [task ids], remaining: n, critical_path: n, max_width: N}`: the tasks that may start now. Ids are comma-separated; `--done` is required and `--done ""` means nothing is done; `--running` defaults to none; `--max-width` defaults to 4, like `waves`, and must be a positive integer. A task is in `ready` when it is neither done nor running and every `depends_on` id is done; `ready` is ordered longest remaining chain first, then plan order, and capped at `--max-width` minus the running count (empty when that is zero or less). `running` echoes the running ids in plan order; `remaining` counts the tasks not done (running ones included); `critical_path` is the number of tasks on the plan's longest `depends_on` chain (a lone task is 1); `max_width` echoes the width used. BLOCKED cases, in order: an invalid plan, with the `validate-plan` message, before any id is checked; `unknown task id 'X'`; `task id 'X' is both done and running`. `validate-plan` prints the same `critical_path` beside `tasks` and `cases`.
 - `validate-briefs <run-dir>` returns `{briefs: N}` when every task in `<run-dir>/plan.json` has a brief at `<run-dir>/tasks/<id>.md` of at most 300 lines, with at most 35% of its lines in fenced code blocks (fence lines included). Otherwise it is BLOCKED, naming every failing task in plan order with the file and the limit, for example `T2: tasks/T2.md has 8 of 20 lines fenced (limit 35%)`; a missing or blank brief, and a task id that is not a plain file name under `tasks/`, are BLOCKED the same way. Fences follow CommonMark: up to three spaces of indent, then three or more backticks or tildes; the closing fence uses the same character, is at least as long and has nothing after it; an unclosed fence runs to the end of the file. The plan is fully validated first, so an invalid plan is BLOCKED with the `validate-plan` message.
 - `digest --root <candidate> --base <rev> [--plan <plan.json>] [--profile <profile.yaml>]` prints markdown, not JSON: the merge exhibit's change digest of the working tree against `<rev>`, at most 60 lines, from git alone. A small diff (at most 10 files and 300 changed lines) gets its per-file stat grouped by plan task, with `unplanned` last; a large one gets its size split by the profile's `digest.exclude` globs, files added under the `api-surface` risk row's globs, the top 5 hotspots (90-day churn times lines changed) and files added under `uxEvidence.path`. It passes `diff.autoRefreshIndex=false`, so it never rewrites the index.
 - `render [--root <plugin>] [--write|--check]` draws one Mermaid `flowchart LR` per `graphs/*.md`, parsed by the same `read_graph` the engine uses: gate nodes as hexagons, `when:` labels on the edges into conditional nodes. No flag prints `docs/playbooks.md`; `--write` writes it; `--check` is BLOCKED when the file on disk differs, and `tests/graph_control/test_render.py` runs that check on every suite run.
