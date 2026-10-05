@@ -19,9 +19,11 @@ inner loop is fast: focused tests while iterating, the full suite once.
 **Upgrading.** `preflight` requires a run's `plugin_version` to equal the
 installed plugin's, so a run opened on 0.15.1 fails it after the upgrade with
 `run plugin version differs from executing helper`. Finish in-flight runs before
-upgrading, or continue them with `--resume <run-id>` once their `run.json`
-names 0.16.0. A plan that uses the new task budget keys needs 0.16.0: 0.15.1
-rejects unknown task keys.
+upgrading. To continue one on 0.16.0 anyway, set `plugin_version` in its
+`run.json` by hand, then re-run every recorded check with `graph-control
+record-receipt`: the edit changes the run fingerprint, so earlier receipts fail
+with `receipt belongs to a different run contract`. A plan that uses the new
+task budget keys needs 0.16.0: 0.15.1 rejects unknown task keys.
 
 ### Added
 
@@ -42,7 +44,8 @@ rejects unknown task keys.
   per task: `findings.<task>.json` and `findings.<task>.r<N>.json`, named in the
   playbooks and the `retro` skill. `waves` stays as a display aid; status NEXT
   shows the ready set.
-- **Task budget.** Plan tasks take optional `estimate_min` (1-45),
+- **Task budget.** Plans at `schema_version` 2 take optional task keys
+  `estimate_min` (1-45),
   `path_cap_reason` (required once an estimated task names more than 8
   `writable_paths`) and `proof` (`focused`, `full_device` or `cluster`; a
   proving task builds nothing). The planner sizes every task, splits one that
