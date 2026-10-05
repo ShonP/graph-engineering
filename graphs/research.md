@@ -25,18 +25,17 @@ writes the brief and the report itself; only the leaves are dispatched.
 - **Fan-out.** Every leaf is dispatched at depth 1 in ONE message: the same
   agent type, only the brief varies (graph-ship step 3). No lead; leaves never
   have the Agent tool.
-- **Budget.** Each leaf's dispatch states its tool budget of 10-20 calls (10
-  for a narrow dimension, 20 for a broad one) and its `maxTurns` (the budget
-  plus 5 for the report). A leaf that runs out reports `PARTIAL` with what
-  remains; it is never extended.
-- **Firewall.** Leaves get the brief only: `.graph/<run>/tasks/research-<k>.md`.
-  No transcript, no owner context past the brief, no other leaf's output, so
-  leaves do not anchor on each other and nothing private reaches a search query.
-- **Claims to disk.** Each leaf appends to `.graph/<run>/research/claims.jsonl`
-  one JSON line per claim, `{claim, source, pub_date, rung, confidence}` (`rung`
-  on the `prior-art` ladder, `confidence` high, medium or low), every 5 items
-  (sources read), with a shell `>>` append and never a rewrite: the leaves
-  share the file, and a leaf that dies mid-way still leaves what it found.
+- **Budget.** Each dispatch states a tool budget of 10-20 calls (10 narrow, 20
+  broad) and `maxTurns` (budget plus 5). A leaf out of budget reports `PARTIAL`
+  and is never extended.
+- **Firewall.** The coordinator gives each leaf brief only:
+  `.graph/<run>/tasks/research-<k>.md`. No transcript, no other leaf's output,
+  so leaves do not anchor on each other.
+- **Claims to disk.** The coordinator joins `.graph/<run>/research/claims.jsonl`,
+  which every leaf appends to with `>>`, one line per claim,
+  `{claim, source, pub_date, rung, confidence}` (`rung` on the `prior-art`
+  ladder, `confidence` high, medium or low), every 5 items (sources read); the
+  file is shared, so no rewrites.
 - **Fetch blocklist.** Leaves never WebFetch login-walled domains (linkedin.com,
   x.com, twitter.com, facebook.com, instagram.com, tiktok.com): they return a
   login page, not the content. A claim that only such a page holds goes to the

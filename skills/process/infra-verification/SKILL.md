@@ -12,10 +12,6 @@ smoke-tested there. This skill is that recipe. The stack competencies (`helm`,
 `kustomize`, `argocd`, `kubectl`, `cloudnativepg`, `envoy-gateway`) say how to
 write the change; this says how to prove it.
 
-Versions this was written and spiked against (2026-09-23): helm v4.2.4,
-kubeconform v0.8.0 (release binary), kind v0.32.0 installed. conftest v0.69.0
-and kube-linter v0.8.3 are current upstream but were not installed or run here.
-
 ## Safety first
 
 - **The run owns its kubeconfig.** Every cluster command passes
@@ -69,21 +65,14 @@ cannot be proven live: the API server accepts it and nothing reconciles it.
 List those kinds as `SKIPPED (no controller in prereqs)` rather than calling an
 accepted object a working one.
 
-Why the CRD catalog in step 2: kubeconform knows only core Kubernetes schemas.
-Spiked: an Argo CD `Application` without the catalog is an **error** (exit 1,
-"could not find schema"); with `-ignore-missing-schemas` it is **skipped**
-(exit 0) - silently unvalidated, which in a GitOps repo means most of the diff.
-With the datree CRDs-catalog location it is actually validated: a spec missing
-`destination` and `project` failed (exit 1), a complete one passed (exit 0).
-Use `-ignore-missing-schemas` only for a kind the catalog lacks, and name each
-such kind in the report.
+Why the CRD catalog in step 2: kubeconform knows only core Kubernetes schemas,
+so without the catalog a CRD kind (an Argo CD `Application`, say) is an
+**error**, and `-ignore-missing-schemas` **skips** it silently - unvalidated,
+which in a GitOps repo means most of the diff. Use `-ignore-missing-schemas`
+only for a kind the catalog lacks, and name each such kind in the report.
 
-Spiked 2026-09-23: `helm create` chart, `helm lint` clean, 4 objects rendered,
-kubeconform `Valid: 4` exit 0; the same chart with `containerPort` quoted to a
-string failed `got string, want integer` exit 1. The review round's spike on
-the same helm: a chart with a `crds/` file renders 0 CRDs without
-`--include-crds` and 1 with it, and without `--namespace` no resource carries
-a namespace - hence both flags in step 1.
+Why both flags in step 1: `helm template` renders a chart's `crds/` only with
+`--include-crds`, and without `--namespace` no resource carries a namespace.
 
 ## Anti-patterns
 

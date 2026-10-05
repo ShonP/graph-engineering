@@ -4,7 +4,6 @@ description: Apply for backend services, APIs, NestJS, FastAPI, Python, TypeScri
 ---
 
 # Backend Rules
-Harvested from the owner's global rule packs on 2026-09-10 (spec 4.3); the plugin copy is the portable one.
 
 Use for NestJS, FastAPI, service, worker, API, DB, and backend TypeScript/Python work.
 

@@ -48,7 +48,7 @@ Lines 12 to 15 say:
 instantiated classes are `BaseModel` subclasses too. Those are the only two passages in the
 vendored file that mention dataclasses or vanilla classes.
 
-Precedence, spec 4.5 (`docs/superpowers/specs/2026-08-31-graph-engineering-plugin-design.md`):
+Precedence:
 **house > vault-generated > community.** The vendored skill is community, so on this one
 point it loses. Everything it says that this skill does not contradict is still binding, and
 the vendored file is never edited to express the override.
