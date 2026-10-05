@@ -90,7 +90,7 @@ class EngineParallelTests(unittest.TestCase):
 
     def test_ac_w3_ep_02_ready_queue_host_check_background_gate_lanes(self):
         self.assert_tokens(self.steps[3], (
-            "graph-control ready <run>/plan.json --done <ids> --running <ids> --max-width <n>",
+            "graph-control ready <run>/plan.json --done <ids> --running <ids> --hold <ids> --max-width <n>",
             "Semaphore, not barrier: at most 4 concurrent writers",
             "Reviewers and qa do not",
             "graph-control host-check --root <run worktree> --profile <profile>",
@@ -108,6 +108,38 @@ class EngineParallelTests(unittest.TestCase):
             "`lanes:`",
             "scripts/lane-run.sh <lane> --slots <n> -- <cmd>",
         ))
+
+    def test_ac_en_1_task_states_pick_the_ready_flag(self):
+        # Fix round 1, F1: with --running undefined, a task in review was offered again (a second
+        # implementer on the same branch), or parked tasks held every slot (starvation).
+        rows = dict(re.findall(r"^\s*\| `([^`]+)` \| [^|]+ \| (`--\w+`|omitted) \|", self.steps[3], re.M))
+        self.assertEqual(rows, {
+            "pending": "omitted", "implementing": "`--running`", "in review": "`--hold`",
+            "in fix": "`--running`", "merge queued": "`--hold`", "merged, awaiting gate": "`--hold`",
+            "parked": "`--hold`", "gated": "`--done`",
+        })
+        self.assert_tokens(self.steps[3], (
+            "`<n>` is 4 minus the run-branch fix writers in flight",
+            "without counting against it",
+            "A held task does not release its dependents",
+        ))
+        self.assertNotIn("`--done` lists the merged tasks", self.steps[3])
+
+    def test_ac_en_1_red_gate_is_a_card_naming_the_batch(self):
+        # Fix round 1, F2: a red batch gate had no owner and stalled every later merge.
+        self.assert_tokens(self.steps[3], (
+            "A red gate is a decision card naming the batch",
+            "its tasks stay `parked`",
+            "fix loop (step 7) on the run branch",
+            "tasks that do not depend on the batch keep running",
+        ))
+
+    def test_ac_en_1_conflict_aborts_before_parking(self):
+        # Fix round 1, F3: an unaborted conflict leaves unmerged files, so every later merge exits 128.
+        step = self.steps[2]
+        self.assertIn("`git merge --abort`", step)
+        self.assertLess(step.index("`git merge --abort`"), step.index("parks that task and its dependents only"))
+        self.assert_tokens(step, ("its branch is kept for resolution", "continues with the next queued merge"))
 
     def test_ac_en_1_no_wave_barrier_survives(self):
         for token in ("No pipelining", "once per wave", "Implementation waves", "run_in_background: false",
@@ -160,6 +192,24 @@ class EngineParallelTests(unittest.TestCase):
             "counts as merged with no change",
             "`<id>b` is ready at once",
         ))
+
+    def test_ac_en_1_remainder_is_wired_into_the_original_dependents(self):
+        # Fix round 1, F4: consumers of <id> started while <id>b's cases were still unbuilt.
+        step = self.steps[4]
+        rewire = "adds `<id>b` to the `depends_on` of every task that names `<id>`"
+        self.assertIn(rewire, step)
+        self.assertLess(step.index(rewire), step.index("re-runs `validate-plan`"))
+
+    def test_ac_en_1_nothing_green_gets_an_engine_findings_file(self):
+        # Fix round 1, F6: gate (b) and the retro fast path read every task's findings file; an
+        # absent one is BLOCKED. The schema has no reviewer field, so the receipt goes to the ledger.
+        self.assert_tokens(self.steps[4], (
+            "the engine writes `findings.<id>.json` itself",
+            "`PASS`",
+            "`reviewed.base` and `reviewed.head` both the dispatch base SHA",
+            "`- <ts> review <id> engine PASS (no change merged)`",
+        ))
+        self.assertIn("engine-written", self.steps[5])
 
     def test_ac_en_1_ids_per_writer_dispatch(self):
         self.assert_tokens(self.steps[4], (
