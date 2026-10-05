@@ -40,10 +40,9 @@ docsPath: "docs/superpowers"
 uxEvidence:
   path: "docs/ux/changes"
 
-# How qa stands this repo up. The qa node runs the change against a live stack,
-# never against a shared environment; without this block it returns BLOCKED and
-# the merge gate does not open. Each field is a shell command run from the repo
-# root, so any stack works: compose, kind, `uv run`, `npm run dev`.
+# How qa stands this repo up, on a live stack and never a shared environment;
+# without it qa returns BLOCKED and the merge gate stays shut. Each field is a
+# repo-root shell command, any stack: compose, kind, `uv run`, `npm run dev`.
 #   up      start the stack and wait until it is healthy
 #   seed    load deterministic data, once, after health passes
 #   port    the port `up` binds; qa checks it is free before `up`
@@ -56,11 +55,10 @@ uxEvidence:
 # Compose: `up` and `down` run `docker compose -p ge-${GRAPH_RUN_ID:?}` with the
 # same `-p` and `-f` files. qa refuses to start while `compose_isolation.sh`
 # finds a shared name, an external network or volume, host networking or a bind
-# mount from outside the worktree. The `compose.qa.yaml` override recipe:
-# `/graph-init` step 4. Health poll flags, port check and isolation rationale:
-# `qa-verification` step 2.
-# Every field ships empty: /graph-init fills what it detects and lists the
-# rest as gaps. An empty required field is qa `BLOCKED` naming that field.
+# mount from outside the worktree. `compose.qa.yaml` override recipe: `/graph-init`
+# step 4; health poll flags, port check, isolation rationale: `qa-verification`
+# step 2. Every field ships empty: /graph-init fills what it detects and lists
+# the rest as gaps. An empty required field is qa `BLOCKED` naming that field.
 runtime:
   # Optional bounded harness owns setup, public checks, reports and cleanup.
   # If set, it replaces standalone up/seed/health/baseUrl/down below.
