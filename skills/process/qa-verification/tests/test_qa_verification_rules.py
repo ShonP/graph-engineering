@@ -52,8 +52,9 @@ class VerdictRules(unittest.TestCase):
 
     def test_once_per_merge_unit(self):
         text = flat(SKILL)
-        for needle in ("once per merge unit or wave", "stood up once", "never once per task"):
+        for needle in ("once per merge unit", "stood up once", "never once per task"):
             self.assertIn(needle, text)
+        self.assertNotIn("or wave", text)
 
     def test_findings_file_uses_the_review_protocol_schema(self):
         text = flat(SKILL)
