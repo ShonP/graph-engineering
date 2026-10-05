@@ -9,7 +9,7 @@ from .status import _json, _store, _tmp
 
 def progress(root: Path, now: float) -> tuple[list[str], list[str]]:
     """DONE rows (tasks passing since the look stored in `$TMPDIR/graph-engineering-status-seen-<root hash>`) and
-    the NEXT row (the first run with ready tasks: open tasks whose depends_on all pass, longest chain first). A case
+    NEXT rows (one per run with ready tasks: open tasks whose depends_on all pass, longest chain first). A case
     passes when each check's latest receipt for this run.json that lists it passes it with no blocking or important
     findings, and a task from the receipt that made all its cases pass. Running tasks are unknown here (they have no
     receipt yet), so a running task still shows as ready, and an unfinished plan always has a ready task. Stores this
@@ -38,7 +38,7 @@ def progress(root: Path, now: float) -> tuple[list[str], list[str]]:
                      for task in plan.tasks if set(task.case_ids) <= passing}
         done += [(at, f"  {name}: {key} at {rev}") for key, (at, rev) in since.items() if at.timestamp() > last]
         ready = ready_set(plan, done=since.keys(), running=(), width=len(plan.tasks))
-        upcoming += [f"  {name}: ready: {', '.join(ready)}"] if ready and not upcoming else []
+        upcoming += [f"  {name}: ready: {', '.join(ready)}"] if ready else []
     if plans:
         _store(seen, now)
     return [row for _, row in sorted(done, key=lambda pair: pair[0])], upcoming

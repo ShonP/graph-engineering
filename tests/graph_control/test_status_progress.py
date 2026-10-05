@@ -123,12 +123,12 @@ class Progress(unittest.TestCase):
         self.assertEqual(self.section(lines, "NEXT"), ["NEXT (0)", "  none"])
         self.assertEqual(self.section(lines, "DONE")[0], "DONE since last look (0)", "seen by the call before")
 
-    def test_next_shows_only_the_first_run_with_ready_tasks(self):
+    def test_next_shows_one_row_per_run_with_ready_tasks(self):
         earlier = self.run_dir.parent / "0192f3ab-0000-7000-8000-000000000001"  # sorts before RUN, nothing passing
         earlier.mkdir()
         (earlier / "plan.json").write_text(json.dumps(plan({"T9": []})))
         lines = self.space.run().stdout.splitlines()
-        self.assertEqual(self.section(lines, "NEXT"), ["NEXT (1)", "  0192f3ab: ready: T9"])
+        self.assertEqual(self.section(lines, "NEXT"), ["NEXT (2)", "  0192f3ab: ready: T9", "  0192f3ac: ready: T3"])
 
     def test_ledger_is_never_opened(self):  # AC-W4-ST2-01
         env = {**os.environ, **self.space.env, "PYTHONPATH": str(SCRIPTS)}
