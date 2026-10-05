@@ -47,7 +47,8 @@ uxEvidence:
 #   up      start the stack and wait until it is healthy
 #   seed    load deterministic data, once, after health passes
 #   port    the port `up` binds; qa checks it is free before `up`
-#   health  readiness: `url` polled until its body contains `expect`, or `command`
+#   health  readiness: `url` polled until its body contains `expect`, or `command`;
+#           `expect` is a raw substring, so pick a token like `ok`, not `"status":"ok"`
 #   baseUrl what Bruno's `local` environment and Playwright point at
 #   down    always run afterwards, pass or fail
 #   env     NAMES (never values) of the variables qa must have exported
