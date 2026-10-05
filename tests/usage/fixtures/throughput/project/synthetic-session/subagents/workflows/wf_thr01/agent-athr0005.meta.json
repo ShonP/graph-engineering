@@ -1,0 +1,7 @@
+{
+  "agentType": "graph-engineering:reviewer",
+  "description": "w1:T1 review",
+  "requestShape": "background",
+  "spawnDepth": 1,
+  "workflowPhase": "review"
+}

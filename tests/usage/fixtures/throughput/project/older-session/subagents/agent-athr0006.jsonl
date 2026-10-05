@@ -1,0 +1,11 @@
+{"type": "user", "timestamp": "2026-09-01T10:00:00.000Z", "message": {"role": "user", "content": "SENTINEL-PROMPT-thr7 synthetic task"}}
+{"type": "assistant", "timestamp": "2026-09-01T10:10:00.000Z", "message": {"role": "assistant", "content": [{"type": "text", "text": "SENTINEL-RESPONSE-thr9"}]}}
+{"type": "user", "timestamp": "2026-09-01T10:20:00.000Z", "message": {"role": "user", "content": "SENTINEL-PROMPT-thr7"}}
+{"type": "assistant", "timestamp": "2026-09-01T10:30:00.000Z", "message": {"role": "assistant", "content": [{"type": "text", "text": "SENTINEL-RESPONSE-thr9"}]}}
+{"type": "user", "timestamp": "2026-09-01T10:40:00.000Z", "message": {"role": "user", "content": "SENTINEL-PROMPT-thr7"}}
+{"type": "assistant", "timestamp": "2026-09-01T10:50:00.000Z", "message": {"role": "assistant", "content": [{"type": "text", "text": "SENTINEL-RESPONSE-thr9"}]}}
+{"type": "user", "timestamp": "2026-09-01T11:00:00.000Z", "message": {"role": "user", "content": "SENTINEL-PROMPT-thr7"}}
+{"type": "assistant", "timestamp": "2026-09-01T11:10:00.000Z", "message": {"role": "assistant", "content": [{"type": "text", "text": "SENTINEL-RESPONSE-thr9"}]}}
+{"type": "user", "timestamp": "2026-09-01T11:20:00.000Z", "message": {"role": "user", "content": "SENTINEL-PROMPT-thr7"}}
+{"type": "assistant", "timestamp": "2026-09-01T11:30:00.000Z", "message": {"role": "assistant", "content": [{"type": "text", "text": "SENTINEL-RESPONSE-thr9"}]}}
+{"type": "assistant", "timestamp": "2026-09-01T11:40:00.000Z", "message": {"role": "assistant", "content": [{"type": "text", "text": "DONE SENTINEL-RESPONSE-thr9"}]}}
