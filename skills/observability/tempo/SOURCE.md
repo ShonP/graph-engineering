@@ -14,4 +14,4 @@
   cp $S/grafana-skills/LICENSE $P/skills/observability/tempo/LICENSE
   # rewrite SOURCE.md, then run the recipe's step 5
   ```
-- Local changes: none. The plugin wrapper is not vendored; only the skill directory is. House overrides, if any, live in a separate `skills/observability/*-house-rules` skill (spec 4.5 precedence); none exists today.
+- Local changes: none. The plugin wrapper is not vendored; only the skill directory is. House overrides, if any, live in a separate `skills/observability/*-house-rules` skill (house > vault-generated > community precedence); none exists today.

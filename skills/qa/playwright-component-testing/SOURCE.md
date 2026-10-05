@@ -17,7 +17,7 @@
   ```
 - Local changes: none. The upstream frontmatter is kept byte-identical.
 - Grant: this skill's frontmatter sets no `allowed-tools`, so it grants nothing on its own. The sibling `playwright-cli` and `playwright-trace` skills vendored from the same upstream do; the note below applies to them and is repeated here so a reader of any one of the three sees the same ruling.
-- Tool grant, and how it is closed: `allowed-tools` lets the skill run those commands without a permission prompt for the turn that invokes it, and workspace trust does not gate the field. A sibling `*-house-rules` skill cannot narrow it: a skill's `allowed-tools` (and `disallowed-tools`) apply only while that same skill is active, so spec 4.5 precedence has no purchase on this field. The binding control is a host permission rule, because a matching `ask` or `deny` rule aborts the invocation regardless of `allowed-tools`. This plugin's recommendation, shipped in the README and the `/graph-init` output by Task 18, is:
+- Tool grant, and how it is closed: `allowed-tools` lets the skill run those commands without a permission prompt for the turn that invokes it, and workspace trust does not gate the field. A sibling `*-house-rules` skill cannot narrow it: a skill's `allowed-tools` (and `disallowed-tools`) apply only while that same skill is active, so the house > vault-generated > community precedence has no purchase on this field. The binding control is a host permission rule, because a matching `ask` or `deny` rule aborts the invocation regardless of `allowed-tools`. This plugin's recommendation, shipped in the README and the `/graph-init` output by Task 18, is:
 
   ```json
   { "permissions": { "ask": ["Bash(npx:*)", "Bash(npm:*)"] } }

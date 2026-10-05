@@ -14,4 +14,4 @@
   cp $S/fastapi/LICENSE $P/skills/python/fastapi/LICENSE
   # rewrite SOURCE.md, then run the recipe's step 5
   ```
-- Local changes: none. House overrides, if any, live in a separate `skills/python/*-house-rules` skill (spec 4.5 precedence); none exists for FastAPI today.
+- Local changes: none. House overrides, if any, live in a separate `skills/python/*-house-rules` skill (house > vault-generated > community precedence); none exists for FastAPI today.
