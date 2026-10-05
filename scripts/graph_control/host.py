@@ -1,4 +1,4 @@
-"""Host inspection before a wave: free disk, load, a bare repo, base freshness, docker.
+"""Host inspection before an implementer dispatch: free disk, load, a bare repo, base freshness, docker.
 
 This is host inspection, not project execution; graph_control never runs a
 configured project command. The only processes started are:
