@@ -101,7 +101,7 @@ class Dispatch(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             plan = dump(Path(directory) / "plan.json", plan_data())
             result = subprocess.run([sys.executable, str(CLI), "validate-plan", plan], capture_output=True, text=True)
-        self.assertEqual((result.returncode, result.stdout), (0, '{"cases": 1, "status": "PASS", "tasks": 1}\n'))
+        self.assertEqual((result.returncode, result.stdout), (0, '{"cases": 1, "critical_path": 1, "status": "PASS", "tasks": 1}\n'))
 
 
 class Help(unittest.TestCase):
