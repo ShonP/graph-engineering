@@ -90,13 +90,13 @@ class Progress(unittest.TestCase):
         lines = first.stdout.splitlines()
         self.assertEqual(self.section(lines, "DONE"), ["DONE since last look (2)", f"  0192f3ac: T1 at {REV_A[:8]}",
                                                        f"  0192f3ac: T2 at {REV_B[:8]}"])
-        self.assertEqual(self.section(lines, "NEXT"), ["NEXT (1)", "  0192f3ac: wave 2/3: T3"])
+        self.assertEqual(self.section(lines, "NEXT"), ["NEXT (1)", "  0192f3ac: ready: T3"])
         self.assertEqual([line for line in lines if not line.startswith("  ")],
                          [lines[0], "RUNNING (3)", "DONE since last look (2)", "NEEDS YOU (2)", "NEXT (1)", "COST"])
         self.assertNotIn("LEDGER-TRAP", first.stdout)
         second = self.space.run().stdout.splitlines()
         self.assertEqual(self.section(second, "DONE"), ["DONE since last look (0)", "  none"])
-        self.assertEqual(self.section(second, "NEXT"), ["NEXT (1)", "  0192f3ac: wave 2/3: T3"])
+        self.assertEqual(self.section(second, "NEXT"), ["NEXT (1)", "  0192f3ac: ready: T3"])
 
     def test_done_lists_only_tasks_passing_since_the_stored_time(self):
         self.seen.write_text(str(datetime.fromisoformat("2026-09-30T10:30:00+00:00").timestamp()))
@@ -112,12 +112,12 @@ class Progress(unittest.TestCase):
         self.write(DIAMOND, receipts)
         lines = self.space.run().stdout.splitlines()
         self.assertEqual(self.section(lines, "DONE"), ["DONE since last look (0)", "  none"])
-        self.assertEqual(self.section(lines, "NEXT"), ["NEXT (1)", "  0192f3ac: wave 1/3: T1"])
+        self.assertEqual(self.section(lines, "NEXT"), ["NEXT (1)", "  0192f3ac: ready: T1"])
 
     def test_no_receipts_yet_and_every_task_passing(self):
         (self.run_dir / "receipts.json").unlink()
         lines = self.space.run().stdout.splitlines()
-        self.assertEqual(self.section(lines, "NEXT"), ["NEXT (1)", "  0192f3ac: wave 1/3: T1"])
+        self.assertEqual(self.section(lines, "NEXT"), ["NEXT (1)", "  0192f3ac: ready: T1"])
         self.write(DIAMOND, [receipt("implement", "2026-09-30T10:00:00Z", REV_A, {f"AC-{k}": True for k in DIAMOND})])
         lines = self.space.run().stdout.splitlines()
         self.assertEqual(self.section(lines, "NEXT"), ["NEXT (0)", "  none"])
