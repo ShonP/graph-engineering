@@ -130,14 +130,28 @@ Your first command inside it is git merge-base --is-ancestor $sha HEAD; non-zero
 Return status (${STATUSES.join(', ')}) and summary; for PARTIAL also green_commit, done_cases, remaining_cases, remaining_scope, elapsed_min.`
 }
 
-function reviewPrompt(input, task) {
-  const { branch, worktree } = where(input, task)
-  return `Review task ${task.id} of run ${input.run_id}: the diff of branch ${branch} (worktree ${worktree}) against git merge-base ${branch} ${input.run_branch}, held to the brief ${task.brief}. Return findings with severity blocking, important or nit per review-protocol; an empty list when clean.`
+function scopeNote(task, latest) {
+  const list = ids => (ids && ids.length ? ids.join(', ') : '(none listed)')
+  const remainder = task.remainder_of
+    ? `\nThis is the remainder of ${task.remainder_of}, whose work is already merged; the scope here is only: ${task.remaining_scope} (cases ${list(task.remaining_cases)}).`
+    : ''
+  if (latest.status !== 'PARTIAL') return remainder
+  return `${remainder}\nThe work is PARTIAL by design. Built (done_cases): ${list(latest.done_cases)}. Not built, and queued as a separate remainder task: remaining_scope ${latest.remaining_scope || '(none given)'}, remaining_cases ${list(latest.remaining_cases)}.`
 }
 
-function fixPrompt(input, task, findings, round) {
+function reviewPrompt(input, task, latest) {
+  const { branch, worktree } = where(input, task)
+  return `Review task ${task.id} of run ${input.run_id}: the diff of branch ${branch} (worktree ${worktree}) against git merge-base ${branch} ${input.run_branch}, held to the brief ${task.brief}.${scopeNote(task, latest)}
+Judge only what is in scope and built; the absence of the not-built remaining scope is not a finding. Return findings with severity blocking, important or nit per review-protocol; an empty list when clean.`
+}
+
+function fixPrompt(input, task, findings, round, latest) {
   const { worktree } = where(input, task)
-  return `Fix round ${round} of ${FIX_ROUNDS} for task ${task.id} of run ${input.run_id}. Work in the existing worktree ${worktree}; do not create another. Brief: ${task.brief}. Fix every finding below test-first, commit, and return status and summary.\n${JSON.stringify(findings, null, 2)}`
+  const last = round === FIX_ROUNDS
+    ? '\nThis is the last round and a fresh diagnosis: superpowers:systematic-debugging is REQUIRED. Load it and state a new hypothesis for why earlier rounds did not clear these findings before any edit.'
+    : ''
+  return `Fix round ${round} of ${FIX_ROUNDS} for task ${task.id} of run ${input.run_id}. Work in the existing worktree ${worktree}; do not create another. Brief: ${task.brief}.${scopeNote(task, latest)}${last}
+Fix every finding below test-first and commit. Return DONE or DONE_WITH_CONCERNS only when the whole scope is built; if part of it is still not built, return PARTIAL with green_commit, done_cases, remaining_cases and remaining_scope as they stand now.\n${JSON.stringify(findings, null, 2)}`
 }
 
 function mergePrompt(input, task) {
@@ -154,22 +168,30 @@ async function runTask(input, task, merge) {
     type = FULL
     result = await agent(implementPrompt(input, task), { label: 'implement ' + label, phase: 'Run', agentType: FULL, schema: IMPL })
   }
-  if (!result) return { parked: 'implementer returned no result' }
-  if (!GREEN.includes(result.status) && result.status !== 'PARTIAL') return { parked: `${result.status}: ${result.summary}` }
-  if (result.status === 'PARTIAL' && task.remainder_of) return { parked: 'PARTIAL again on a remainder: ' + result.summary }
+  let latest = result
+  let stop = unusable(task, latest, 'implementer')
+  if (stop) return { parked: stop }
   for (let round = 1; ; round++) {
-    const review = await agent(reviewPrompt(input, task), { label: 'review ' + label, phase: 'Run', agentType: REVIEWER, schema: REVIEW })
+    const review = await agent(reviewPrompt(input, task, latest), { label: 'review ' + label, phase: 'Run', agentType: REVIEWER, schema: REVIEW })
     if (!review) return { parked: 'reviewer returned no result' }
     const open = review.findings.filter(f => f.severity !== 'nit')
     if (!open.length) break
     if (round > FIX_ROUNDS) return { parked: `${open.length} blocking or important findings after ${FIX_ROUNDS} fix rounds` }
-    log(`${label}: fix round ${round}, ${open.length} findings`)
-    const fix = await agent(fixPrompt(input, task, open, round), { label: `fix ${label} r${round}`, phase: 'Run', agentType: type, schema: IMPL })
-    if (!fix || !GREEN.includes(fix.status)) return { parked: `fix round ${round}: ${fix ? fix.status + ': ' + fix.summary : 'no result'}` }
+    const fixType = round === FIX_ROUNDS ? FULL : type
+    log(`${label}: fix round ${round} on ${fixType}, ${open.length} findings`)
+    latest = await agent(fixPrompt(input, task, open, round, latest), { label: `fix ${label} r${round}`, phase: 'Run', agentType: fixType, schema: IMPL })
+    stop = unusable(task, latest, 'fix round ' + round)
+    if (stop) return { parked: stop }
   }
   const merged = await merge(task)
   if (!merged || !merged.merged) return { parked: 'merge: ' + (merged ? merged.detail : 'no result') }
-  return { merge_sha: merged.merge_sha, result }
+  return { merge_sha: merged.merge_sha, result: latest }
+}
+
+function unusable(task, result, step) {
+  if (!result) return step + ' returned no result'
+  if (result.status === 'PARTIAL') return task.remainder_of ? `${step}: PARTIAL again on a remainder: ${result.summary}` : null
+  return GREEN.includes(result.status) ? null : `${step}: ${result.status}: ${result.summary}`
 }
 
 async function schedule(input, width) {
@@ -204,14 +226,20 @@ async function schedule(input, width) {
     merged.push({ id, merge_sha: outcome.merge_sha })
     trace.push({ id, event: 'merged' })
     log(`merged ${id}`)
-    if (outcome.result.status === 'PARTIAL') enqueueRemainder(tasks, id, outcome.result, remainders, trace, park)
+    if (outcome.result.status === 'PARTIAL') enqueueRemainder(tasks, id, outcome.result, remainders, trace)
   }
   return { merged, parked: Array.from(parked.values()), remainders, trace }
 }
 
-function enqueueRemainder(tasks, id, result, remainders, trace, park) {
-  const rid = id + 'b'
-  if (tasks.some(t => t.id === rid)) return park(rid, `remainder id ${rid} is taken; remaining scope: ${result.remaining_scope}`)
+function remainderId(tasks, id) {
+  for (let n = 0; ; n++) {
+    const rid = id + (n < 25 ? String.fromCharCode(98 + n) : 'b' + (n - 23))
+    if (!tasks.some(t => t.id === rid)) return rid
+  }
+}
+
+function enqueueRemainder(tasks, id, result, remainders, trace) {
+  const rid = remainderId(tasks, id)
   const task = tasks.find(t => t.id === id)
   for (const t of tasks) if (t.depends_on.includes(id)) t.depends_on.push(rid)
   tasks.push(Object.assign({}, task, { id: rid, depends_on: [id], remainder_of: id,

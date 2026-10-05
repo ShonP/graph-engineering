@@ -123,6 +123,35 @@ class SddReadyQueue(unittest.TestCase):
         self.assertIn("readySet", reachable(bodies, "simulate"))
         self.assertIn("readySet(", bodies.get("schedule", ""))
 
+    def test_fix_round_three_escalates_one_tier(self):
+        # review-protocol Re-review: small moves to implementer; standard gets a fresh
+        # diagnosis on implementer with superpowers:systematic-debugging REQUIRED.
+        body = STRING.sub("''", functions(self.text)["runTask"])
+        self.assertRegex(body, r"round === FIX_ROUNDS \? FULL : type")
+        self.assertIn("superpowers:systematic-debugging", functions(self.text)["fixPrompt"])
+
+    def test_partial_review_is_scoped_to_the_built_cases(self):
+        bodies = functions(self.text)
+        review = "".join(bodies[name] for name in reachable(bodies, "reviewPrompt"))
+        for field in ("done_cases", "remaining_scope"):
+            with self.subTest(field=field):
+                self.assertIn(field, review)
+
+    def test_remainder_never_parks_a_plan_task(self):
+        # A taken <id>b is the owner's own task; the remainder takes the next free suffix.
+        body = STRING.sub("''", functions(self.text)["enqueueRemainder"])
+        self.assertNotIn("park(", body)
+        self.assertIn("remainderId(", body)
+
+    def test_doc_states_the_escalation_and_partial_rules(self):
+        doc = " ".join(DOC.read_text(encoding="utf-8").split())
+        escalate = re.search(r"\| `ESCALATE` \|([^|]*)\|", doc)
+        self.assertIsNotNone(escalate, "no ESCALATE row")
+        self.assertIn("implementer-simple", escalate.group(1))
+        for needle in ("superpowers:systematic-debugging", "done_cases", "first free"):
+            with self.subTest(needle=needle):
+                self.assertIn(needle, doc)
+
     def test_doc_covers_invocation_and_the_why(self):
         doc = " ".join(DOC.read_text(encoding="utf-8").split())
         for needle in ("/graph-ship", "/graph-engineering:sdd-ready-queue",

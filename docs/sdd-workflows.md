@@ -74,7 +74,11 @@ nothing.
    `git merge-base --is-ancestor`. The host's `isolation: 'worktree'` is not used: it branches from
    the default branch, not the run branch.
 2. A `graph-engineering:reviewer` reviews the branch. Blocking or important findings go to up to 3
-   fresh fix rounds, each followed by a new review.
+   fresh fix rounds, each followed by a new review. Rounds 1 and 2 run on the tier that built the
+   task; round 3 moves up one tier, as `review-protocol` requires: a `small` task moves from
+   `graph-engineering:implementer-simple` to `graph-engineering:implementer`, and a standard task
+   gets a fresh diagnosis on `graph-engineering:implementer` with `superpowers:systematic-debugging`
+   required. Findings that survive round 3 park the task.
 3. A merge step, serialized across all tasks, runs `git merge --no-ff <run_id>-<id>` in the
    worktree holding the run branch, then removes that task's worktree and branch only
    (`git worktree remove`, `git branch -d`, no force). It does not run `worktree-gc.sh --prefix`:
@@ -84,8 +88,8 @@ nothing.
 | Implementer status | What happens |
 | --- | --- |
 | `DONE`, `DONE_WITH_CONCERNS` | review, fix rounds, merge |
-| `PARTIAL` | the green work is reviewed and merged, then `<id>b` is queued with the remaining scope and cases; it depends on `<id>`, and every dependent of `<id>` also waits for `<id>b`. A remainder that returns `PARTIAL` again is parked. |
-| `ESCALATE` | one re-dispatch to `graph-engineering:implementer`; a second `ESCALATE` parks |
+| `PARTIAL` | the green work is reviewed against its `done_cases` only (the reviewer is told the `remaining_scope` is deliberately unbuilt) and merged, then a remainder task is queued with the remaining scope and cases. Its id is the first free of `<id>b`, `<id>c`, ... (a plan task already named `<id>b` is never touched); it depends on `<id>`, and every dependent of `<id>` also waits for it. The latest result decides: a fix round that builds the rest returns `DONE` and no remainder is queued; a fix round that returns `PARTIAL` updates the remainder. A remainder that returns `PARTIAL` again, from its implementer or a fix round, is parked. |
+| `ESCALATE` | from `graph-engineering:implementer-simple` (a `small` task): one re-dispatch to `graph-engineering:implementer`, and a second `ESCALATE` parks. From `graph-engineering:implementer`: parked at once. |
 | `BLOCKED`, `NEEDS_CONTEXT`, `NEEDS_SETUP`, no result | parked |
 
 A parked task parks its dependents; independent tasks continue. Every dispatch, merge, park and
