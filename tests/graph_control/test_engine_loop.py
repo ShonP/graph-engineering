@@ -168,9 +168,27 @@ class ClassesTests(Tokens):
 
     def test_classes_append_rule(self):
         step = steps(engine_text())[7]
-        self.assert_tokens(step, (".graph/<run>/classes.md", "`- <class> | <finding id> | round <n>`",
+        self.assert_tokens(step, (".graph/<run>/classes.md",
+                                  "`- <class> | <finding id> | <task> round <n>`",
                                   "blocking or important", "`rule`", "no dispatch",
                                   "every later dispatch in the run"))
+
+    def test_ac_en_2_round_files_are_per_task(self):
+        # Parallel tasks each run their own review rounds; run-global files would overwrite each other.
+        step = steps(engine_text())[7]
+        self.assert_tokens(step, (".graph/<run>/findings.<task>.json", "`findings.<task>.r<N>.json`",
+                                  "that task's first review", "qa rows use `qa` as the task"))
+        self.assertNotIn("| round <n>`", step.replace("<task> round <n>`", ""))
+
+    def test_ac_en_2_gates_and_fast_path_count_every_task(self):
+        all_steps = steps(engine_text())
+        self.assertIn("every task's latest `findings.<task>.json`", all_steps[5])
+        self.assertIn("`findings.<task>.r<N>.json`", all_steps[10])
+        self.assertIn("an absent file is not zero", all_steps[10])
+
+    def test_ac_en_2_remainder_and_round_ids(self):
+        step = steps(engine_text())[4]
+        self.assert_tokens(step, ("`<id>b`", "-r<N>"))
 
 
 class SignalsAndDigestTests(Tokens):
