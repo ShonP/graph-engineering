@@ -29,9 +29,9 @@ runs only when something leaked.
   finding, appended by the engine after each review or qa round. Absent:
   derive the classes from the findings files.
 - `ledger.md` and every round of review and qa output: the engine keeps
-  earlier rounds as `findings.r<N>.json`, `qa-findings.r<N>.json` and
-  `qa.r<N>.md` beside the final `findings.json`, `qa-findings.json` and
-  `qa.md`.
+  earlier rounds per task as `findings.<task>.r<N>.json` beside each task's
+  latest `findings.<task>.json`, and at run level `qa-findings.r<N>.json`
+  and `qa.r<N>.md` beside the final `qa-findings.json` and `qa.md`.
 - `post-deploy.md` when it exists, `followups.md`, and the implementer
   reports the ledger points to.
 - Earlier runs' `.graph/*/retro.md`, for the classes seen before.
