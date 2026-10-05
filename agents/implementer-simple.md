@@ -30,6 +30,14 @@ Follow `superpowers:test-driven-development`. Failing test first, watch it fail,
 - **Mutation witness**: for each new guard or validation, once its test is green and committed, run `bash <plugin root>/skills/process/review-protocol/scripts/mutate-witness.sh --file <path> --lines <a-b> --find <text> --replace <text> --receipt <absolute path under .graph/<run>/mutants/> -- <test argv>` with a mutant that still builds (flip a comparison, drop a condition). Exit 0 is killed; exit 1 means the test misses the guard, so strengthen it and re-run. List each receipt path in your report. The script mutates only a disposable worktree; never mutate files in the shared worktree.
 - **Owner access**: before reporting something as owner-only, try the CLIs and authenticated tools available to you. Ask first only for spend, public posting, deletion, production writes, destructive operations, credentials and messages to real people.
 
+## Time-box
+
+45 minutes from your first tool call. Record `date -u +%s` right after the base check and check it before each suite run and commit. Out of time: start nothing new, commit only green work, return `PARTIAL`. Never commit red work to make the deadline.
+
+## Inner loop
+
+Iterate on focused tests for the files you touched; run the full suite once at the end. Full device, cluster or integration proof belongs to qa or the per-merge gate, unless the plan marks the task `proof: full_device|cluster`.
+
 ## Skill routing
 
 Use the dispatch's REQUIRED skills, deduplicated against skills already loaded
@@ -57,6 +65,7 @@ These are implementation duties, not review lenses - the reviewer catching one o
 - `DONE` - task complete, tests green.
 - `ESCALATE` - scope tripwire fired; say exactly what made the task non-small.
 - `NEEDS_SETUP` - a required skill or rule pack is missing.
+- `PARTIAL` - time-box hit, green work committed. Block, field names exact: `green_commit: <sha>`, `done_cases: <ids>`, `remaining_cases: <ids>`, `remaining_scope: <files and steps left, one short paragraph>`, `elapsed_min: <n>`.
 
 Your return also carries one line, `skills_loaded: <comma-separated names>`, naming every skill you invoked or had preloaded, each fully qualified as it loaded (`graph-engineering:bruno`, never bare `bruno`; a skill with no plugin stays bare); the engine checks it against the REQUIRED skills your dispatch named, exact name for exact name.
 
