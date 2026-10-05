@@ -4,7 +4,6 @@ description: Apply for AI agents, LLM workflows, Microsoft Agent Framework, mode
 ---
 
 # AI Agent + Workflow Rules
-Harvested from the owner's global rule packs on 2026-09-10 (spec 4.3); the plugin copy is the portable one.
 
 Framework default: Microsoft Agent Framework unless a project explicitly says otherwise.
 
