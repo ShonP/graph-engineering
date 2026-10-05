@@ -10,6 +10,7 @@ GRAPH_WAIT_RUN_DIR so no real cache is touched. Every job is a synthetic
 `python3 -c` one-liner; tearDown kills whatever a failed case left running.
 """
 
+import fcntl
 import os
 import re
 import signal
@@ -197,6 +198,29 @@ class Edges(Base):
         for thread in threads:
             thread.join(timeout=30)
         self.assertEqual(self.numbers(), list(range(1, 17)))
+
+    def test_a_writer_waits_for_the_lock(self):
+        path = wait_count.counter_path({"GRAPH_WAIT_RUN_DIR": str(self.counts), "GRAPH_RUN_ID": RUN_ID})
+        self.counts.mkdir(parents=True, mode=0o700)
+        done = threading.Event()
+        with open(path, "a+", encoding="utf-8") as held:
+            fcntl.flock(held, fcntl.LOCK_EX)
+            writer = threading.Thread(target=lambda: (wait_count.count_and_check(path, None), done.set()))
+            writer.start()
+            self.assertFalse(done.wait(0.5), "count_and_check ran while another holder had the lock")
+            held.write("2026-01-01T00:00:00Z full 1\n")
+            held.flush()
+            fcntl.flock(held, fcntl.LOCK_UN)
+        writer.join(timeout=10)
+        self.assertEqual(self.numbers(), [1, 2])
+
+    def test_a_start_on_a_busy_log_is_refused_and_not_counted(self):
+        log = self.log()
+        self.assertEqual(self.wait_run("--max-block", "0", "--full", "--", *SLEEP_2, log=log).returncode, 75)
+        again = self.wait_run("--max-block", "0", "--full", "--", *OK, log=log)
+        self.assertEqual(again.returncode, 2, again.stdout + again.stderr)
+        self.assertIn("still running", again.stderr)
+        self.assertEqual(self.numbers(), [1])
 
     def test_attach_never_counts(self):
         log = self.log()
