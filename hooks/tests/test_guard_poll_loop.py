@@ -134,5 +134,16 @@ class FastPath(unittest.TestCase):
         self.assertTrue(started, 'control: the stub is on the path the hook takes')
 
 
+class AgentsWaitThroughWaitRun(unittest.TestCase):
+    """The guarded agents are told the full-suite form of the wait the deny reason names."""
+
+    def test_full_suite_form_and_reason_budget(self):
+        for name in ('implementer', 'implementer-simple'):
+            text = (PLUGIN / 'agents' / f'{name}.md').read_text(encoding='utf-8')
+            with self.subTest(name):
+                self.assertIn('wait-run.sh --full --log <absolute path> -- <argv>', text)
+                self.assertIn('--reason "<why>"', text)
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)
