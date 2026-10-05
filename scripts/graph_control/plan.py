@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .common import array, boolean, choice, obj, require, strings, text, unique, version
+from .plan_budget import KEYS as BUDGET_KEYS, budget_fields, check_budget
 
 NUMBER = r"-?[0-9]+(?:\.[0-9]+)?"
 CONDITION = re.compile(rf"value (<=|>=|==|<|>) (?:({NUMBER})|baseline \* ({NUMBER})(?: \+ ({NUMBER}))?)")
@@ -88,18 +89,24 @@ class Task:
     writable_paths: tuple[str, ...]
     case_ids: tuple[str, ...]
     stateful: bool
+    estimate_min: int | None = None
+    path_cap_reason: str | None = None
+    proof: str | None = None
 
     @classmethod
-    def parse(cls, value: Any) -> "Task":
-        row = obj(value, "id depends_on produces consumes writable_paths case_ids stateful")
+    def parse(cls, value: Any, schema: int) -> "Task":
+        row = obj(value, "id depends_on produces consumes writable_paths case_ids stateful", " ".join(BUDGET_KEYS))
         paths = strings(row["writable_paths"], empty=False)
         for path in paths:
             require(not path.startswith("/") and ".." not in path.split("/"),
                     "writable_paths must be relative, repo-qualified paths without '..'")
-        return cls(text(row["id"]), strings(row["depends_on"]),
+        task = cls(text(row["id"]), strings(row["depends_on"]),
                    tuple(Contract.parse(item) for item in array(row["produces"])),
                    tuple(Contract.parse(item) for item in array(row["consumes"])),
-                   paths, strings(row["case_ids"], empty=False), boolean(row["stateful"]))
+                   paths, strings(row["case_ids"], empty=False), boolean(row["stateful"]),
+                   **budget_fields(row))
+        check_budget(task, schema)
+        return task
 
 
 @dataclass(frozen=True)
@@ -125,7 +132,7 @@ class Plan:
         for key in keys:
             require(keys.count(key) == 1, f"duplicate success signal goal {key!r}: each is measured by its goal")
         result = cls(tuple(Case.parse(x) for x in array(row["cases"])),
-                     tuple(Task.parse(x) for x in array(row["tasks"])),
+                     tuple(Task.parse(x, schema) for x in array(row["tasks"])),
                      tuple(Contract.parse(x) for x in array(row["external_contracts"])),
                      signals, reason)
         result.validate()
