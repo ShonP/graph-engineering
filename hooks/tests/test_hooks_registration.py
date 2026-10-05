@@ -52,13 +52,20 @@ class RegistrationContract(unittest.TestCase):
         groups = load()["PreToolUse"]
         self.assertEqual([g["matcher"] for g in groups], ["Bash", "Agent|Task"])
         ifs = ["Bash(git *)", "Bash(rm *)", "Bash(docker *)"]
+        # The sleep-loop guard has no `if`: a permission rule matches a command
+        # prefix and would miss `cd x && until ...`.
         self.assertEqual(
             groups[0]["hooks"],
-            [handler("guard-destructive.sh", timeout=10, **{"if": i}) for i in ifs],
+            [handler("guard-destructive.sh", timeout=10, **{"if": i}) for i in ifs]
+            + [handler("guard-poll-loop.sh", timeout=5)],
         )
         self.assertEqual(
             groups[1]["hooks"], [handler("guard-agent.sh", timeout=15)]
         )
+
+    def test_description_names_the_sleep_loop_guard(self):
+        description = json.loads((HOOKS_DIR / "hooks.json").read_text(encoding="utf-8"))["description"]
+        self.assertIn("sleep-loop", description)
 
     def test_stop_rewakes_and_has_no_matcher(self):
         self.assertEqual(
@@ -99,8 +106,8 @@ class RegistrationContract(unittest.TestCase):
                         self.assertNotIn("statusMessage", h)
 
     def test_command_shape_is_plugin_root_relative(self):
-        # The scripts are written by sibling tasks in the same wave, so
-        # only the command shape is asserted here, not the file.
+        # Only the command shape is asserted here; each script's behaviour is
+        # covered by its own test module.
         for groups in load().values():
             for group in groups:
                 for h in group["hooks"]:
