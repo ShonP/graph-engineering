@@ -20,8 +20,10 @@ inner loop is fast: focused tests while iterating, the full suite once.
 installed plugin's, so a run opened on 0.15.1 fails it after the upgrade with
 `run plugin version differs from executing helper`. Finish in-flight runs before
 upgrading. To continue one on 0.16.0 anyway, set `plugin_version` in its
-`run.json` by hand, then re-run every recorded check with `graph-control
-record-receipt`: the edit changes the run fingerprint, so earlier receipts fail
+`run.json` to `0.16.0` by hand, then run each of the run's checks again and
+record each fresh receipt with `graph-control record-receipt`; each new receipt
+carries the new fingerprint (`graph-control fingerprint <run>/run.json`) as
+`run_sha256`. The edit changes the run fingerprint, so earlier receipts fail
 with `receipt belongs to a different run contract`. A plan that uses the new
 task budget keys needs 0.16.0: 0.15.1 rejects unknown task keys.
 
