@@ -36,8 +36,10 @@ class PlannerSizing(unittest.TestCase):  # AC-PS-1
         self.text = flat(PLANNER.read_text(encoding="utf-8"))
 
     def test_estimate_and_split(self):
-        self.assertIn(f"`estimate_min` (1-{MAX_ESTIMATE_MIN})", self.text)
-        self.assertRegex(self.text, r"cannot fit[^.]*is split")
+        ranges = re.findall(r"`estimate_min` \((\d+)-(\d+)\)", self.text)
+        self.assertTrue(ranges)
+        self.assertEqual(set(ranges), {("1", str(MAX_ESTIMATE_MIN))})
+        self.assertRegex(self.text, rf"cannot fit in {MAX_ESTIMATE_MIN} minutes is split")
 
     def test_path_cap(self):
         self.assertIn(f"at most {MAX_WRITABLE_PATHS} `writable_paths`", self.text)
