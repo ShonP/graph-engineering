@@ -1,6 +1,6 @@
 """Bounded blocking wait for a long command: start it detached, or attach to it.
 
-  wait_run.py --log <absolute path> [--max-block S] [-- <argv...>]
+  wait_run.py --log <absolute path> [--max-block S] [--full [--reason TEXT]] [-- <argv...>]
 
 With argv: refuse (exit 2) while <log>.pid names a live job that has not
 written <log>.exit; otherwise start argv as an orphan in its own session
@@ -17,6 +17,10 @@ elapsed is the job's age. A completed nonzero job adds the last 20 lines of the
 log (at most 2000 chars). Exit: the job's code when complete, 75 when partial,
 2 on a usage error, a refusal, no job, or a job that died without an exit code.
 Argv is spawned directly: no shell, no network.
+
+--full declares a full-suite start. Each GRAPH_RUN_ID gets two free full runs;
+a later one needs --reason or is refused (exit 2) before anything starts.
+wait_count.py owns the count; attach calls and starts without --full never count.
 """
 import argparse
 import fcntl
@@ -26,6 +30,9 @@ import subprocess
 import sys
 import time
 
+import wait_count
+from wait_count import open_private
+
 DEFAULT_BLOCK, MAX_BLOCK = 270, 590
 PARTIAL, ERROR = 75, 2
 POLL_SECONDS = 0.2
@@ -33,29 +40,31 @@ TAIL_LINES, TAIL_CHARS = 20, 2000
 REFUSAL = 'a job for this log is still running; call again without a command to attach'
 
 
-def parse(argv: list[str]) -> tuple[Path, int, list[str]]:
+def parse(argv: list[str]) -> tuple[argparse.Namespace, list[str]]:
     split = argv.index('--') if '--' in argv else len(argv)
     parser = argparse.ArgumentParser(prog='wait-run.sh')
     parser.add_argument('--log', required=True, type=Path)
     parser.add_argument('--max-block', type=int, default=DEFAULT_BLOCK, metavar='S')
+    parser.add_argument('--full', action='store_true', help='a full-suite run: counted per GRAPH_RUN_ID')
+    parser.add_argument('--reason', metavar='TEXT', help='why a full run past the free budget is needed')
     args = parser.parse_args(argv[:split])
     command = argv[split + 1:]
+    if args.reason is not None and not args.reason.strip():
+        parser.error('--reason must not be empty')
+    if args.reason is not None and not args.full:
+        parser.error('--reason needs --full')
     if not args.log.is_absolute():
         parser.error('--log must be an absolute path')
     if args.max_block < 0:
         parser.error('--max-block must be 0 or more')
     if split < len(argv) and not command:
         parser.error('nothing to run after --')
-    return args.log, min(args.max_block, MAX_BLOCK), command
+    args.max_block = min(args.max_block, MAX_BLOCK)
+    return args, command
 
 
 def sibling(log: Path, suffix: str) -> Path:
     return log.with_name(log.name + suffix)
-
-
-def open_private(path: Path, flags: int) -> int:
-    """Create or open mode 0600, never through a symlink planted in a shared temp dir."""
-    return os.open(path, flags | os.O_CREAT | os.O_NOFOLLOW, 0o600)
 
 
 def read_pid(path: Path) -> int | None:
@@ -83,6 +92,10 @@ def read_exit(path: Path) -> int | None:
         return int(path.read_text(encoding='ascii').strip())
     except (OSError, ValueError):
         return None
+
+
+def busy(log: Path) -> bool:
+    return alive(read_pid(sibling(log, '.pid'))) and read_exit(sibling(log, '.exit')) is None
 
 
 def detach_descriptors(log_fd: int) -> None:
@@ -153,7 +166,7 @@ def start(log: Path, argv: list[str]) -> int:
     try:
         with os.fdopen(open_private(pid_path, os.O_RDWR), 'r+', encoding='ascii') as handle:
             fcntl.flock(handle, fcntl.LOCK_EX)  # two starts on one log: the second one refuses
-            if alive(read_pid(pid_path)) and read_exit(exit_path) is None:
+            if busy(log):
                 print(f'wait-run: {REFUSAL}', file=sys.stderr)
                 return ERROR
             exit_path.unlink(missing_ok=True)
@@ -215,10 +228,12 @@ def wait(log: Path, block: int) -> int:
 
 
 def main(argv: list[str]) -> int:
-    log, block, command = parse(argv)
-    if command and (status := start(log, command)):
+    args, command = parse(argv)
+    if command and args.full and not busy(args.log) and not wait_count.allow_full_run(os.environ, args.reason):
+        return ERROR
+    if command and (status := start(args.log, command)):
         return status
-    return wait(log, block)
+    return wait(args.log, args.max_block)
 
 
 if __name__ == '__main__':
