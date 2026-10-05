@@ -84,25 +84,21 @@ verified what did not run - still holds.
      --reporter-junit "$REPO_ROOT/.graph/<run>/post-deploy/bru-<name>.xml"
    ```
 
-   One `--env-var NAME="$NAME"` per name in `deploy.env`. Spiked 2026-09-23 on nine `.bru` files: `RUN` for a smoke GET and a smoke
-   POST to `/tenants/{{testTenant}}/users`; `REFUSE` (exit 1) for an unscoped
-   POST, a POST naming `{{testTenant}}` only in `docs`, a PUT naming it only in
-   the body, a DELETE naming it only in the query string, and a GraphQL
-   request; a `smoke-extended` tag and an untagged DELETE ignored. With
-   `--test-tenant` empty, the tenant-scoped POST is refused too. The review's
-   18 adversarial files added: a GET block followed by a DELETE block (Bruno
-   merges them and sends the DELETE) - refused; `..` path segments - refused;
-   Python 3.9 (macOS `/usr/bin/python3`) - runs. Scripts are refused outright:
-   any non-empty `script:*` or `tests` block in the request, or in a
-   `folder.bru` / `collection.bru` above it, because Bruno scripts run
-   arbitrary JavaScript with axios and fetch, and a denylist of calls was
-   bypassed four ways in review. A `vars` block mentioning `testTenant`, a
-   second method block or `url` key, and a stray carriage return are refused
-   (blocks end only at a column-0 `}`, as Bruno parses them; checked against
-   `@usebruno/lang` 0.39.0); a missing collection or zero
-   smoke requests exits 2. All of it is pinned by `tests/test_vet_smoke.py`.
-   Keep smoke requests declarative: `assert` blocks for checks, an `auth:*`
-   block reading a `--env-var` for credentials.
+   One `--env-var NAME="$NAME"` per name in `deploy.env`. A smoke write is
+   `RUN` only when `{{testTenant}}` is a URL path segment (e.g.
+   `/tenants/{{testTenant}}/users`); with an empty `--test-tenant` every write
+   is refused. Refused: an unscoped write; the tenant named only in `docs`,
+   the body or the query string; a GraphQL request; `..` path segments; a
+   second method block or `url` key; a `vars` block mentioning `testTenant`; a
+   stray carriage return; and any non-empty `script:*` or `tests` block in the
+   request or in a `folder.bru` / `collection.bru` above it, because Bruno
+   scripts run arbitrary JavaScript and a denylist of calls was bypassed.
+   `smoke-extended` and untagged requests are ignored. Blocks end only at a
+   column-0 `}`, as Bruno parses them. A missing collection or zero smoke
+   requests exits 2. It runs on the macOS system Python 3.9. All of it is
+   pinned by `tests/test_vet_smoke.py`. Keep smoke requests declarative:
+   `assert` blocks for checks, an `auth:*` block reading a `--env-var` for
+   credentials.
 3. **Metrics against a baseline.** Each `deploy.checks` entry has
    `source: prometheus | sentry | sql-readonly | command` (default `prometheus`),
    `initialDelay`, `interval`, `count`, `failureLimit` (default 0, as in Argo)
