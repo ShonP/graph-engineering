@@ -64,6 +64,7 @@ ALLOW = [
     ('loop without sleep', payload('for f in a b; do echo $f; done', 'implementer')),
     ('sleep after the loop closed', payload('for f in a b; do echo $f; done; sleep 1', 'implementer')),
     ('loop word not in command position', payload('echo for; do_sleep', 'implementer')),
+    ('loop words as plain arguments', payload("printf '%s\\n' for do sleep done", 'implementer')),
     ('unclosed quote', payload('echo "while true; do sleep 1; done', 'implementer')),
     ('unparsable stdin', 'not json, but it says sleep'),
     ('non-object json', '["sleep"]'),
@@ -91,6 +92,15 @@ class PollLoopDecisions(unittest.TestCase):
             with self.subTest(name):
                 result = run_hook(stdin)
                 self.assertEqual((result.returncode, result.stdout), (0, ''), result.stderr)
+
+
+class DecideDirectly(unittest.TestCase):
+    def test_unclosed_quote_is_no_decision_not_an_exception(self):
+        sys.path.insert(0, str(PLUGIN / 'hooks' / 'scripts'))
+        self.addCleanup(sys.path.remove, str(PLUGIN / 'hooks' / 'scripts'))
+        import poll_loop
+        command = 'until false; do sleep 1; done; echo "open'
+        self.assertIsNone(poll_loop.decide(json.loads(payload(command, 'implementer'))))
 
 
 class KillSwitchAndFailOpen(unittest.TestCase):
