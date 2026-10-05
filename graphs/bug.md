@@ -1,6 +1,6 @@
 # bug - reproduce, root-cause, find the siblings, fix them all
 
-The spec's bug graph (§5.2) was reproduce -> diagnose -> fix -> review ->
+The original bug graph was reproduce -> diagnose -> fix -> review ->
 verify -> merge. This version keeps its agents and its `compose:` of
 `superpowers:systematic-debugging`, and adds three things it lacked: the
 reproduction is a **failing test** before anyone touches code, a **sibling

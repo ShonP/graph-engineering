@@ -34,7 +34,7 @@ Normally your dispatch names your REQUIRED skills (the spine derives them from t
 | Anything a user sees (`*.tsx`, `*.swift`, Compose `*.kt`, templates, styles) | ux-evidence |
 | Any task, any stack | review-testing-rules (definition-of-done and impact-map are preloaded) |
 
-`pydantic-house-rules` is the house overlay on the vendored `pydantic` skill: load both, and where they disagree the house rule wins (spec 4.5 precedence, house > vault-generated > adopted community).
+`pydantic-house-rules` is the house overlay on the vendored `pydantic` skill: load both, and where they disagree the house rule wins (house precedence: house > vault-generated > adopted community).
 
 ## qa
 
@@ -65,7 +65,7 @@ Normally your dispatch names your REQUIRED skills (the spine derives them from t
 | Anything a user sees (`*.tsx`, `*.swift`, Compose `*.kt`, templates, styles) | ux-evidence |
 | Any task, any stack | review-testing-rules |
 
-`pydantic-house-rules` is the house overlay on the vendored `pydantic` skill: load both, and where they disagree the house rule wins (spec 4.5 precedence, house > vault-generated > adopted community).
+`pydantic-house-rules` is the house overlay on the vendored `pydantic` skill: load both, and where they disagree the house rule wins (house precedence: house > vault-generated > adopted community).
 
 ## reviewer
 
@@ -92,4 +92,4 @@ Your dispatch names the conditional stack lenses (the spine derives them from th
 | Server-side API surface (`routers/`, `controllers/`, `endpoints/`, server-language `routes/` / `handlers/`, NestJS `*.controller.ts`, Next.js `app/api/**/route.ts`, OpenAPI/AsyncAPI spec - never frontend `src/routes/`) | api-contract (+ schemathesis when judging the qa evidence) |
 | `observability/**`, `dashboards/**/*.json` | promql, loki, tempo |
 
-`pydantic-house-rules` is the house overlay on the vendored `pydantic` skill: read both, and a diff that follows the community skill against the house rule is a finding, not a tie (spec 4.5 precedence, house > vault-generated > adopted community). `security-review` and `privacy-review` are already on and are not repeated per row.
+`pydantic-house-rules` is the house overlay on the vendored `pydantic` skill: read both, and a diff that follows the community skill against the house rule is a finding, not a tie (house precedence: house > vault-generated > adopted community). `security-review` and `privacy-review` are already on and are not repeated per row.

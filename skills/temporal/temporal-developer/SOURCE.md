@@ -12,5 +12,5 @@
   rsync -a --delete --exclude .git --exclude .github $S/skill-temporal-developer/ $P/skills/temporal/temporal-developer/
   # LICENSE is in-tree; rewrite SOURCE.md, then run the recipe's step 5
   ```
-- Local changes: none. `.github/**` (2 files) is excluded as CI belonging to the upstream repo, not to the skill. House overrides, if any, live in `skills/temporal/temporal-house-rules` (spec 4.5 precedence); none exists today.
+- Local changes: none. `.github/**` (2 files) is excluded as CI belonging to the upstream repo, not to the skill. House overrides, if any, live in `skills/temporal/temporal-house-rules` (house > vault-generated > community precedence); none exists today.
 - Note for Task 9: `references/python/data-handling.md` is the Pydantic data-converter reference that `skills/python/pydantic-house-rules` cites.
