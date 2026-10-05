@@ -2,7 +2,7 @@
 
 Date: 2026-10-05. Window: the 14 days to 2026-10-05.
 Data: 1,045 subagent transcripts and 36 Workflow runs from `~/.claude/projects/**`, covering
-forge-platform, fitness, game-studio, ninth-forge and graph-engineering, plus the `.graph/<run>/`
+project A, project B, project C, project D and graph-engineering, plus the `.graph/<run>/`
 ledgers and `plan.json` files.
 
 **Verdict: both complaints are real and measurable.** Implementers often run past 45 minutes,
@@ -35,12 +35,12 @@ The 59 runs over 45 minutes are 14% of runs but **43% of all implementer hours**
 
 The worst cases:
 
-- 222m: game-studio `T15` (device classes + runtime.sh)
-- 185m: forge `Plan 6 task 17`
-- 149m: fitness `impl-T4`
-- 143m: forge `Plan 6 task 28`
-- 141m: forge `Plan 6 task 23`
-- 127m: forge `Plan 6 task 20`
+- 222m: project C `T15` (device classes + runtime.sh)
+- 185m: project A `task 17`
+- 149m: project B `impl-T4`
+- 143m: project A `task 28`
+- 141m: project A `task 23`
+- 127m: project A `task 20`
 
 ## Finding 2: long implementers mostly wait; they are not thinking
 
@@ -52,14 +52,14 @@ The worst cases:
 There were 158 Bash calls of 5 minutes or more (23.4h in total), and 36 calls hit the 10-minute
 Bash ceiling. The transcripts show three patterns.
 
-- **The full proof is used as the dev loop.** game-studio T15 ran 12+ edit → full simulator and
-  emulator cycle (15-29 min each, through `wait-run.sh`) → fail → edit iterations. forge task 17
-  ran `scripts/integration.sh` in full at least 7 times, plus "run twice" flake checks. fitness T4
+- **The full proof is used as the dev loop.** project C T15 ran 12+ edit → full simulator and
+  emulator cycle (15-29 min each, through `wait-run.sh`) → fail → edit iterations. project A task 17
+  ran `scripts/integration.sh` in full at least 7 times, plus "run twice" flake checks. project B T4
   repeated 4.5-minute `wait-run` attaches for about 2 hours.
-- **Poll loops persist.** `until grep -q ...; do sleep 10; done` is still common in the forge
+- **Poll loops persist.** `until grep -q ...; do sleep 10; done` is still common in the project A
   runs, even though `agents/implementer.md:79` forbids it. The rule is prose, so nothing enforces
   it.
-- **Shared-resource locks serialize work.** `lane-run.sh xcodebuild --slots 1` and the forge
+- **Shared-resource locks serialize work.** `lane-run.sh xcodebuild --slots 1` and the project A
   "you hold the cluster turn" briefs force tasks that look parallel to queue on one simulator or
   one cluster ("lane xcodebuild busy after 200 s").
 
@@ -67,7 +67,7 @@ Bash ceiling. The transcripts show three patterns.
 
 | workflow | wall | avg concurrency | time with exactly 1 agent | longest agent |
 |---|---|---|---|---|
-| sdd-graph (ninth-forge) | 561m | 1.2 | 88% | 31m |
+| sdd-graph (project D) | 561m | 1.2 | 88% | 31m |
 | sdd-lanes | 440m | **1.0** | 100% | 72m |
 | sdd-graph | 400m | 1.8 | 18% | 124m |
 | sdd-graph | 321m | **1.0** | 100% | 68m |
@@ -85,14 +85,14 @@ There are two causes.
    wave's fix loop exits." The slowest task in a wave therefore gates every task in the next
    wave, including tasks that do not depend on it.
 
-**Live example (game-studio run `01a10bff`, today).** Wave 1 was T01, T15 and T21. T21 finished
+**Live example (project C run `01a10bff`, today).** Wave 1 was T01, T15 and T21. T21 finished
 at 14:14Z and T01 at 14:53Z. T15 ran until about 18:05Z (232m wall). Wave 2 holds T02, T03 and
 T06, whose only dependency is T01, plus T07, which also needs T15. T02, T03 and T06 sat idle for
 **about 3h10m** after their only dependency was done.
 
 ## Finding 4: plans are deep chains with oversized tasks
 
-The game-studio plan has 23 tasks in **10 waves**, with a 9-deep critical path:
+The project C plan has 23 tasks in **10 waves**, with a 9-deep critical path:
 T01 → T03 → T04 → T05 → T12 → T13 → T14 → T16 → T18. Because the barrier runs per wave, the floor
 on wall time is 10 × (slowest task + review + fix).
 
