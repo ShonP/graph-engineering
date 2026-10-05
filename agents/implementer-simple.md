@@ -65,7 +65,7 @@ These are implementation duties, not review lenses - the reviewer catching one o
 - `DONE` - task complete, tests green.
 - `ESCALATE` - scope tripwire fired; say exactly what made the task non-small.
 - `NEEDS_SETUP` - a required skill or rule pack is missing.
-- `PARTIAL` - time-box hit, green work committed. Block, field names exact: `green_commit: <sha>`, `done_cases: <ids>`, `remaining_cases: <ids>`, `remaining_scope: <files and steps left, one short paragraph>`, `elapsed_min: <n>`.
+- `PARTIAL` - time-box hit, green work committed. Block, field names exact: `green_commit: <sha>`, `done_cases: <ids>`, `remaining_cases: <ids>`, `remaining_scope: <files and steps left, one short paragraph>`, `elapsed_min: <n>`; with nothing green, `green_commit` is the dispatch base SHA, never `none` or absent.
 
 Your return also carries one line, `skills_loaded: <comma-separated names>`, naming every skill you invoked or had preloaded, each fully qualified as it loaded (`graph-engineering:bruno`, never bare `bruno`; a skill with no plugin stays bare); the engine checks it against the REQUIRED skills your dispatch named, exact name for exact name.
 

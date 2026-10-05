@@ -93,6 +93,27 @@ class ReadySet(unittest.TestCase):
             self.assertIn(needle, str(raised.exception))
 
 
+class Held(unittest.TestCase):
+    """Started but holding no writer slot: in review, merged awaiting the gate, or parked."""
+
+    def test_held_is_excluded_but_takes_no_slot(self):
+        plan = Plan.parse(GAME)
+        self.assertEqual(ready_set(plan, {"T01", "T21"}, {"T15"}, 2, held=["T02", "T03"]), ["T06"])
+
+    def test_held_does_not_release_dependents(self):
+        self.assertEqual(ready_set(Plan.parse(CHAIN), {"A"}, set(), 4, held=["B"]), ["D"])
+
+    def test_bad_held_ids_name_the_id(self):
+        plan = Plan.parse(GAME)
+        for done, running, held, needle in ((set(), set(), ["T99"], "T99"),
+                                            ({"T01"}, set(), ["T01"], "both held and done"),
+                                            (set(), {"T15"}, ["T15"], "both held and running"),
+                                            (set(), set(), ["T02", "T02"], "held twice")):
+            with self.subTest(needle=needle), self.assertRaises(Invalid) as raised:
+                ready_set(plan, done, running, 4, held=held)
+            self.assertIn(needle, str(raised.exception))
+
+
 class ReadyCommand(unittest.TestCase):
     def setUp(self):
         temp = tempfile.TemporaryDirectory()
@@ -122,6 +143,21 @@ class ReadyCommand(unittest.TestCase):
     def test_running_fills_width(self):  # AC-RQ-3
         code, result = self.ready(GAME, "--done", "T01", "--running", "T02,T03", "--max-width", "2")
         self.assertEqual((code, result["ready"], result["running"]), (0, [], ["T02", "T03"]))
+
+    def test_hold_keeps_the_contract_keys(self):
+        # SYNTHETIC: T02 in review and T03 merged awaiting the gate hold no writer slot.
+        self.assertEqual(self.ready(GAME, "--done", "T01,T21", "--running", "T15", "--hold", "T02,T03",
+                                    "--max-width", "2"),
+                         (0, {"status": "PASS", "ready": ["T06"], "running": ["T15"],
+                              "remaining": 5, "critical_path": 2, "max_width": 2}))
+
+    def test_bad_hold_blocked_naming_the_id(self):
+        for extra, needle in ((["--hold", "T99"], "T99"), (["--hold", "T01"], "T01"),
+                              (["--running", "T02", "--hold", "T02"], "T02"), (["--hold", "T03,T03"], "T03")):
+            with self.subTest(extra=extra):
+                code, result = self.ready(GAME, "--done", "T01", *extra)
+                self.assertEqual((code, result["status"]), (1, "BLOCKED"))
+                self.assertIn(needle, result["reason"])
 
     def test_bad_ids_blocked_naming_the_id(self):  # AC-RQ-3
         for extra, needle in ((["--done", "T01,T99"], "T99"), (["--done", "T01", "--running", "T01"], "T01")):

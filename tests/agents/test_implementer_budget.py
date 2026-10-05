@@ -64,6 +64,14 @@ class ImplementerBudget(unittest.TestCase):
             for field in PARTIAL_FIELDS:
                 self.assertIn(f"`{field}: ", report, f"{name}: missing field {field}")
 
+    def test_nothing_green_reports_the_base_sha(self):  # contract partial-status
+        # The engine keys "nothing green" on green_commit equal to the dispatch base SHA,
+        # so `none` or a missing field would send a commitless task to review.
+        for name in IMPLEMENTERS:
+            report = section(body(name), "Report")
+            self.assertIn("with nothing green, `green_commit` is the dispatch base SHA, never `none` or absent",
+                          report, name)
+
 
 if __name__ == "__main__":
     unittest.main()
