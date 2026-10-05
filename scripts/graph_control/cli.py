@@ -14,6 +14,7 @@ from .commands import Output, iter_commands
 from .common import Invalid, fingerprint, load
 from .identity import snapshot
 from .plan import Plan
+from .plan_queue import critical_path
 from .preflight import preflight
 from .receipts import Receipt, verify
 from .run import Run
@@ -63,7 +64,7 @@ def main(argv: list[str] | None = None, modules: Iterable[ModuleType] | None = N
                 return result.exit_code
         elif args.command == "validate-plan":
             plan = Plan.parse(load(args.artifact))
-            result = {"tasks": len(plan.tasks), "cases": len(plan.cases)}
+            result = {"tasks": len(plan.tasks), "cases": len(plan.cases), "critical_path": critical_path(plan)}
         elif args.command == "validate-attempts":
             result = validate_attempts(load(args.artifact))
         elif args.command == "fingerprint":
