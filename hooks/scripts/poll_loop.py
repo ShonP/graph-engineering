@@ -7,7 +7,9 @@ Stdlib only; any parse problem means no decision (fail open).
 The command is tokenized with shlex rather than matched by one regex, so quoted
 prose ("while waiting, do not sleep") is a single word and never a loop. Loop
 keywords, `do` and `done` count only in command position, as the shell reads
-them. shlex is a single-pass state machine, so the cost is linear in the input.
+them, and so does `sleep` (bare or path-qualified), so `grep -n sleep "$f"`
+inside a loop is a search, not a wait. Known gap: a wrapper such as
+`timeout 5 sleep 1` puts sleep in argument position and is not counted. shlex is a single-pass state machine, so the cost is linear in the input.
 Known limitation: a heredoc body is tokenized as commands, so writing a script
 that holds a sleeping loop through `cat <<EOF` is denied; the reason points at
 the Write tool.
@@ -16,6 +18,7 @@ the Write tool.
 import json
 import shlex
 import sys
+from pathlib import Path
 
 IMPLEMENTER_TYPES = frozenset({
     "graph-engineering:implementer",
@@ -26,9 +29,10 @@ IMPLEMENTER_TYPES = frozenset({
 LOOP_KEYWORDS = frozenset({"until", "while", "for"})
 COMMAND_PREFIXES = frozenset({"do", "then", "else", "elif", "if", "while", "until", "!", "{", "}", "time"})
 OPERATOR_CHARS = frozenset("();<>|&\n")
+WAIT_RUN = Path(__file__).resolve().parent / "wait-run.sh"
 REASON = (
     "Shell loops that sleep are blocked for implementer subagents. To wait for a long "
-    "command, run it through hooks/scripts/wait-run.sh --log <absolute path> -- <argv> "
+    f"command, run it through {WAIT_RUN} --log <absolute path> -- <argv> "
     "and call it again without argv to attach while it reports exit 75. To create a "
     "script file that contains a loop, use the Write tool instead of a heredoc."
 )
@@ -63,7 +67,7 @@ def has_sleep_loop(command: str) -> bool:
             saw_do, saw_sleep = open_loops.pop()
             if saw_do and saw_sleep:
                 return True
-        elif word.rsplit("/", 1)[-1] == "sleep":
+        elif at_command and word.rsplit("/", 1)[-1] == "sleep":
             for loop in open_loops:
                 loop[1] = True
     return any(saw_do and saw_sleep for saw_do, saw_sleep in open_loops)

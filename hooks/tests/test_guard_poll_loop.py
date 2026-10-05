@@ -14,6 +14,7 @@ from pathlib import Path
 
 PLUGIN = Path(__file__).resolve().parents[2]
 HOOK = PLUGIN / 'hooks' / 'scripts' / 'guard-poll-loop.sh'
+WAIT_RUN = PLUGIN / 'hooks' / 'scripts' / 'wait-run.sh'
 PYTHON_DIR = str(Path(sys.executable).parent)
 SUBAGENT_ID = 'a1b2c3d4e5f6a7b8c'
 
@@ -51,6 +52,8 @@ DENY = [
     ('sleep in the condition', payload('while sleep 3; do test -f x && break; done', 'implementer')),
     ('nested loop', payload('while :; do for f in a b; do echo $f; done; sleep 1; done', 'implementer')),
     ('absolute sleep path', payload('until false; do /bin/sleep 1; done', 'implementer')),
+    ('sleep after then inside a loop', payload('until x; do if y; then sleep 1; fi; done', 'implementer')),
+    ('sleep in a command substitution', payload('until x; do y=$(sleep 1); done', 'implementer')),
     ('known limitation: heredoc writing a looping script', payload(HEREDOC, 'implementer')),
 ]
 
@@ -66,6 +69,9 @@ ALLOW = [
     ('loop word not in command position', payload('echo for; do_sleep', 'implementer')),
     ('loop words as plain arguments', payload("printf '%s\\n' for do sleep done", 'implementer')),
     ('unclosed quote', payload('echo "while true; do sleep 1; done', 'implementer')),
+    ('grep for sleep in a loop', payload('for f in hooks/scripts/*.sh; do grep -n sleep "$f"; done', 'implementer')),
+    ('quoted sleep argument in a loop', payload("for f in a b; do grep -n 'sleep' $f; done", 'implementer')),
+    ('git log --grep sleep in a loop', payload('for p in a b; do git log --grep sleep -- $p; done', 'implementer')),
     ('unparsable stdin', 'not json, but it says sleep'),
     ('non-object json', '["sleep"]'),
     ('command not a string', json.dumps({'tool_name': 'Bash', 'agent_id': 'x', 'agent_type': 'implementer',
@@ -84,7 +90,7 @@ class PollLoopDecisions(unittest.TestCase):
                 out = json.loads(result.stdout)['hookSpecificOutput']
                 self.assertEqual(out['hookEventName'], 'PreToolUse')
                 self.assertEqual(out['permissionDecision'], 'deny')
-                self.assertIn('hooks/scripts/wait-run.sh', out['permissionDecisionReason'])
+                self.assertIn(f' {WAIT_RUN} ', out['permissionDecisionReason'])
                 self.assertIn('Write tool', out['permissionDecisionReason'])
 
     def test_allows_everything_else_silently(self):
