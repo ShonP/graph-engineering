@@ -75,7 +75,7 @@ Status, files changed, each test command with its suite line (below), and any co
 - `BLOCKED` - you cannot proceed. Say what would unblock you.
 - `NEEDS_CONTEXT` - information was missing. Name it.
 - `NEEDS_SETUP` - a REQUIRED skill could not load. Never improvise a competency you were not given; a plausible-looking result produced without the house patterns is worse than an honest stop.
-- `PARTIAL` - the 45-minute time-box ran out; green work is committed. Add this block, field names exact: `green_commit: <sha>`, `done_cases: <ids>`, `remaining_cases: <ids>`, `remaining_scope: <files and steps left, one short paragraph>`, `elapsed_min: <n>`.
+- `PARTIAL` - the 45-minute time-box ran out; green work is committed. Add this block, field names exact: `green_commit: <sha>`, `done_cases: <ids>`, `remaining_cases: <ids>`, `remaining_scope: <files and steps left, one short paragraph>`, `elapsed_min: <n>`; with nothing green, `green_commit` is the dispatch base SHA, never `none` or absent.
 
 Your return also carries one line, `skills_loaded: <comma-separated names>`, naming every skill you invoked or had preloaded, each fully qualified as it loaded (`graph-engineering:bruno`, never bare `bruno`; a skill with no plugin stays bare); the engine checks it against the REQUIRED skills your dispatch named, exact name for exact name.
 
