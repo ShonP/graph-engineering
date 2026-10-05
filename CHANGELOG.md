@@ -10,6 +10,83 @@ commits.
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-10-06
+
+Throughput. Implementation runs as a ready queue instead of waves, every task
+carries a budget, implementers stop at a time-box with their green work, and the
+inner loop is fast: focused tests while iterating, the full suite once.
+
+**Upgrading.** `preflight` requires a run's `plugin_version` to equal the
+installed plugin's, so a run opened on 0.15.1 fails it after the upgrade with
+`run plugin version differs from executing helper`. Finish in-flight runs before
+upgrading, or continue them with `--resume <run-id>` once their `run.json`
+names 0.16.0. A plan that uses the new task budget keys needs 0.16.0: 0.15.1
+rejects unknown task keys.
+
+### Added
+
+- **Ready queue.** `graph-control ready <plan.json> --done <ids> [--running
+  <ids>] [--max-width N] [--hold <ids>]` prints the tasks that may start now,
+  longest remaining chain first, capped at the width minus the running count.
+  `--hold` lists started tasks that hold no writer slot (in review, merged
+  awaiting their gate, parked): never offered again, not counted against the
+  width, and not releasing their dependents. `validate-plan` prints
+  `critical_path` beside `tasks` and `cases`. The engine (`docs/engine/run.md`
+  step 3) keeps at most 4 writers in flight, dispatches implementers with
+  `run_in_background: true` and refills a slot on every completion. A
+  task-state table names the flag each state is passed under; a writer that
+  returns BLOCKED, NEEDS_CONTEXT or NEEDS_SETUP is `parked`. Each task gets its
+  own worktree, review leg and fix loop, merges in completion order behind a
+  repo gate per merge batch, and releases its dependents only after that gate
+  passes. qa runs once per merge unit. Review rounds and `classes.md` rows are
+  per task: `findings.<task>.json` and `findings.<task>.r<N>.json`, named in the
+  playbooks and the `retro` skill. `waves` stays as a display aid; status NEXT
+  shows the ready set.
+- **Task budget.** Plan tasks take optional `estimate_min` (1-45),
+  `path_cap_reason` (required once an estimated task names more than 8
+  `writable_paths`) and `proof` (`focused`, `full_device` or `cluster`; a
+  proving task builds nothing). The planner sizes every task, splits one that
+  cannot fit, keeps the critical path short and shows its depth at the plan
+  gate. `docs/graph-controls.md` documents the keys and `ready`.
+- **Implementer time-box and `PARTIAL`.** Implementers work inside 45 minutes
+  from their first tool call. At the limit they commit green work and return
+  `PARTIAL` with `green_commit`, `done_cases`, `remaining_cases`,
+  `remaining_scope` and `elapsed_min`; the engine turns the rest into a
+  remainder task `<id>b` wired into the original's dependents. Nothing green
+  reports the dispatch base SHA as `green_commit`. `implementer-simple` follows
+  the same rules and keeps `ESCALATE`.
+- **Fast inner loop.** Implementers run focused tests while iterating and the
+  full suite once at the end; full device, cluster and integration proof moves
+  to qa or the merge gate unless the plan marks `proof`. `wait-run.sh --full`
+  counts full-suite starts per `GRAPH_RUN_ID` in
+  `${GRAPH_WAIT_RUN_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/graph-engineering/wait-run}/<GRAPH_RUN_ID>.full`:
+  two are free, a third needs `--reason "<why>"`. A new PreToolUse hook,
+  `guard-poll-loop.sh`, denies an implementer subagent's shell loop that runs
+  `sleep` and points it at `wait-run.sh`; it fails open and never blocks the
+  main thread. Kill switch: `GRAPH_POLL_GUARD=off` under `env` in Claude Code
+  settings.
+- **Lane slots and per-task namespaces.** A lane's slots count independent
+  instances; a task that can have its own namespace (from `GRAPH_RUN_ID`, as
+  `<run>-t<n>`) uses one instead of a lane, and whole-cluster work is a qa
+  proving task or the merge gate. `/graph-init` proposes slots from evidence,
+  and `host-check` runs before each implementer dispatch.
+- **`/graph-engineering:sdd-ready-queue`**, a plugin workflow that runs a
+  hand-written plan on a ready queue: one worktree per task from the run branch
+  head, at most 4 writers, review with up to 3 fix rounds, serialized merges,
+  `PARTIAL` remainders, and an agent-free dry run. See `docs/sdd-workflows.md`.
+- **`scripts/throughput.py`**, the success-signal adapter for this release:
+  `implementer-p90-active`, `implementer-over-90` and `workflow-concurrency`
+  over local subagent transcripts, one aggregate per call.
+
+### Changed
+
+- The `host-check` load warning says to lower the ready-queue width
+  (`--max-width`) instead of narrowing a wave.
+- Repository noise removed: dated plans, runs, spikes, sourcing notes and the
+  original design spec (git keeps them); dated spike narration cut from loaded
+  prompts; the rule-pack provenance line dropped; the profile template's
+  runtime and deploy comments shortened.
+
 ## [0.15.1] - 2026-10-03
 
 The destructive-command guard no longer interrupts bypass-mode runs.

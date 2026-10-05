@@ -176,7 +176,7 @@ signal once its window has passed, writes `measure.md` and a ledger line, and a
 
 ## Hooks
 
-Installing this plugin registers six hooks. The two that run your repository's
+Installing this plugin registers seven hooks. The two that run your repository's
 own commands (lint and test) are opt-in: they do nothing until the repo commits
 `.claude/graph-checks.json` (copy `templates/graph-checks.json` and edit the argv
 lists). Read this before enabling it on a repo you did not write.
@@ -185,6 +185,7 @@ lists). Read this before enabling it on a repo you did not write.
 |---|---|---|
 | after every `Edit` or `Write`, async | `lint.argv` from `graph-checks.json` on the file just touched, only for a listed extension | nothing is blocked. Findings arrive on the next turn |
 | before a `Bash` command that pushes, removes a remote, runs `rm` or `docker` | the destructive-command guard (a bash filter; python only on a match) | Claude Code asks the owner, showing the evidence it gathered (force push without a lease, remote removal, Docker volume delete, recursive `rm` of a protected path). It never denies, and it is silent in `bypassPermissions` mode |
+| before every `Bash` command | the sleep-loop guard (a bash filter; python only when the command says `sleep`) | an implementer subagent's shell loop that runs `sleep` is denied and pointed at `hooks/scripts/wait-run.sh`; the main thread is never blocked, and it fails open. The owner turns it off with `GRAPH_POLL_GUARD=off` under `env` in Claude Code settings |
 | before an `Agent` call | the policy guard, only when the profile has a `policy:` block | `general-purpose` and `policy.never` models are denied; each role runs on its `policy.roles` tier; a `policy-override: <reason>` line in the prompt skips it and is logged |
 | after Claude stops, `asyncRewake` | `test.argv` from `graph-checks.json`, after an optional `precheck` | Claude is woken with the failure, at most once per prompt. A precheck failure or timeout reports "not verified" and does not wake it. An unchanged tree replays its stored verdict instead of rerunning; `GRAPH_CHECKS_NO_MEMO=1` turns that off |
 | at session start (`startup`, `clear`, `compact`) | the first 40 lines of `docs/HANDOFF.md`, when that file exists, the reply contract when the repo has a profile, and one line when a run's success measures are due (python starts only when `.graph/*/plan.json` exists); silent on resume, fork and `--agent` sessions | a warning line when `HANDOFF.md` is over 150 lines |
@@ -239,21 +240,32 @@ The engine picks the implementer by the task's `size` in the plan: `small` goes
 to `implementer-simple`, everything else to `implementer`. Every agent below its
 skill floor returns `NEEDS_SETUP` instead of improvising.
 
-**Parallelism and nesting.** The implement node runs `plan.json` in the waves
-`graph-control waves` prints: tasks at one dependency level, at most 4
-concurrent opus writers, all dispatched in one message in the foreground.
-`graph-control host-check` runs before each wave (free disk below the profile's `host.min_free_gb`, default 20 GB, blocks it). A wave
-with 2+ writers gives each task its own worktree, branched from the run branch
-head SHA and set up by the profile's `bootstrap:` commands; branches merge back
-in plan order and `scripts/worktree-gc.sh --apply --base <run branch> --prefix
-<run-id>-` removes that run's merged, clean task worktrees without forcing
-(never another session's; the full run id, since runs opened in the same
-minute share a UUIDv7's first 8 characters). A command on a resource the profile declares under `lanes:`
-(a device build, a shared database, a cluster) runs through
-`scripts/lane-run.sh <lane> --slots <n> -- <cmd>`, whose lock dies with the
-command. A suite longer than one tool call runs through
-`hooks/scripts/wait-run.sh`, which blocks at most 270 s per call and never
-polls. Nesting stops at depth 2: only `qa-lead` and `reviewer-lead` have the
+**Parallelism and nesting.** The implement node runs `plan.json` as a ready
+queue: `graph-control ready` names the tasks whose dependencies are done,
+longest remaining chain first, and the engine keeps at most 4 opus writers in
+flight, dispatched with `run_in_background: true` and refilled on every
+completion. `graph-control host-check` runs before each implementer dispatch
+(free disk below the profile's `host.min_free_gb`, default 20 GB, blocks it).
+Each task gets its own worktree, branched from the run branch head SHA and set
+up by the profile's `bootstrap:` commands, its own review and fix loop, and
+merges in completion order behind a repo gate per merge batch; dependents start
+only after that gate passes, and qa runs once per merge unit. After a merge only
+that task's worktree is removed; at run end `scripts/worktree-gc.sh --apply
+--base <run branch> --prefix <run-id>-` removes the run's merged, clean task
+worktrees without forcing (never another session's; the full run id, since runs
+opened in the same minute share a UUIDv7's first 8 characters). Implementers
+work inside a 45-minute time-box and return `PARTIAL` with their green work; the
+rest becomes a remainder task `<id>b`. A command on a resource the profile
+declares under `lanes:` (a device build, a shared database, a cluster) runs
+through `scripts/lane-run.sh <lane> --slots <n> -- <cmd>`, whose lock dies with
+the command; slots count independent instances, and a task that can have its
+own namespace (from `GRAPH_RUN_ID`) uses one instead of a lane. A suite longer
+than one tool call runs through `hooks/scripts/wait-run.sh`, which blocks at
+most 270 s per call and never polls; `--full` counts full-suite runs per task.
+Have a finished plan and want it run by hand? `/graph-engineering:sdd-ready-queue`
+runs it on a ready queue (dry run first); see
+[docs/sdd-workflows.md](docs/sdd-workflows.md). Prefer `/graph-ship` when you
+want its gates. Nesting stops at depth 2: only `qa-lead` and `reviewer-lead` have the
 Agent tool, the engine dispatches them at depth 1, and leaves never nest.
 `/graph-init` proposes `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=2` and
 `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS=8` for the repo's settings. Opt-in, for a
