@@ -196,9 +196,22 @@ class EngineParallelTests(unittest.TestCase):
     def test_ac_en_1_remainder_is_wired_into_the_original_dependents(self):
         # Fix round 1, F4: consumers of <id> started while <id>b's cases were still unbuilt.
         step = self.steps[4]
-        rewire = "adds `<id>b` to the `depends_on` of every task that names `<id>`"
+        rewire = "adds `<id>b` to the `depends_on` of every other task that names `<id>`"
         self.assertIn(rewire, step)
         self.assertLess(step.index(rewire), step.index("re-runs `validate-plan`"))
+
+    def test_ac_en_1_remainder_wiring_excludes_itself(self):
+        # Fix round 2, F7: <id>b names <id> too; wiring it to itself is a cycle.
+        self.assertIn("(never `<id>b` itself, which would be a cycle)", self.steps[4])
+
+    def test_ac_en_1_blocked_writer_is_parked(self):
+        # Fix round 2, F8: a writer returning BLOCKED, NEEDS_CONTEXT or NEEDS_SETUP had no state.
+        text = (ENGINE.parents[1] / "docs" / "engine" / "run.md").read_text()
+        row = next(l for l in text.splitlines() if l.lstrip().startswith("| `parked`"))
+        for token in ("BLOCKED", "NEEDS_CONTEXT", "NEEDS_SETUP", "`--hold`"):
+            self.assertIn(token, row)
+        self.assertIn("frees its writer slot", text)
+        self.assertIn("branch and worktree are kept", text)
 
     def test_ac_en_1_nothing_green_gets_an_engine_findings_file(self):
         # Fix round 1, F6: gate (b) and the retro fast path read every task's findings file; an
