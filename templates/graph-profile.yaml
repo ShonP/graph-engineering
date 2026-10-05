@@ -44,72 +44,21 @@ uxEvidence:
 # never against a shared environment; without this block it returns BLOCKED and
 # the merge gate does not open. Each field is a shell command run from the repo
 # root, so any stack works: compose, kind, `uv run`, `npm run dev`.
-#   up      start the stack. Compose repos:
-#             docker compose -p ge-${GRAPH_RUN_ID:?} up -d --wait --wait-timeout 120
-#           `:?` makes an unset id fail loudly: agents pass it inline on each
-#           call (a fresh shell per call), and a bare `${GRAPH_RUN_ID}`
-#           left empty would run - and later `down -v` - project `ge-`.
-#           `--wait` blocks on every service's healthcheck (a service with no
-#           `healthcheck:` counts as ready the moment it starts). `-p` is not
-#           optional: it overrides a top-level `name:` and the directory name,
-#           so project-scoped containers and volumes are qa's own instead of
-#           the developer's. It does NOT rename a volume or network with its
-#           own `name:`, a service's `container_name:`, or anything
-#           `external: true` - those stay shared, so qa's app could resolve
-#           `db` to the developer's database, seed and fuzz it, and `down -v`
-#           it. Rename or drop them in a committed override and pass it too:
-#             docker compose -p ge-${GRAPH_RUN_ID:?} -f compose.yaml -f compose.qa.yaml up ...
-#           compose.qa.yaml, BLOCK style (`${...}` inside a `{ }` flow map is
-#           a YAML parse error):
-#             services:
-#               db:
-#                 container_name: ge-${GRAPH_RUN_ID}-db
-#                 networks: !override [appnet]      # drop external networks
-#             networks:
-#               appnet:
-#                 name: ge-${GRAPH_RUN_ID}_net
-#               corp_shared: !reset null            # an external network
-#             volumes:
-#               pgdata:
-#                 name: ge-${GRAPH_RUN_ID}_pgdata
-#           qa refuses to start while `compose_isolation.sh` (`qa-verification`)
-#           finds any name without the `ge-${GRAPH_RUN_ID}` prefix, anything
-#           external, host networking, a host-backed volume or a bind mount
-#           from outside the worktree. The engine names GRAPH_RUN_ID in every
-#           dispatch that stands the stack up.
-#   seed    load deterministic data, once, after health passes. No spec has
-#           this field (compose and devcontainer both lack it); it is ours.
-#   port    the port `up` binds. qa checks it is FREE before `up`
-#           (`lsof -nP -iTCP:<port> -sTCP:LISTEN` prints nothing); a port
-#           already taken means health would be answered by some other process.
-#   health  readiness. `url` is polled with
-#           `curl -fsS --max-time 5 --retry <n> --retry-delay 2
-#           --retry-max-time <timeout> --retry-connrefused --retry-all-errors`
-#           (--max-time stops a listener that accepts and never answers from
-#           holding the poll past `timeout`), and the body must contain
-#           `expect`, matched as a substring of the raw body - so pick a token
-#           without JSON spacing, e.g. `ok`, not `"status":"ok"`. A 200
-#           proves something answered, `expect` proves it is this service.
-#           `command` is the escape hatch for images with no curl or checks
-#           that are not HTTP. Give one of url or command.
-#   baseUrl what Bruno's `local` environment and Playwright point at.
-#   down    always run afterwards, pass or fail. Compose:
-#             docker compose -p ge-${GRAPH_RUN_ID:?} -f compose.yaml -f compose.qa.yaml down -v
-#           Same -p and -f files as `up`: torn down with a different config,
-#           the renamed volumes leak and `-v` targets the original names.
-#   env     NAMES (never values) of the variables qa must have exported:
-#           the API token Bruno passes as `--env-var` and Schemathesis as `-H`,
-#           and anything `up` needs. Say in a comment where a local token
-#           comes from - printed by `seed`, a fixture user, a dev-only signer.
-#   none    a reason string, for a repo with nothing to stand up (a library,
-#           a CLI, a plugin). Set, it replaces every field above: qa skips the
-#           stand-up and verifies through the repo's own public surface - the
-#           CLI invoked as a user would, the package imported from a clean
-#           venv, the documented commands - and never returns BLOCKED for a
-#           missing runtime. Empty for any repo that serves something.
+#   up      start the stack and wait until it is healthy
+#   seed    load deterministic data, once, after health passes
+#   port    the port `up` binds; qa checks it is free before `up`
+#   health  readiness: `url` polled until its body contains `expect`, or `command`
+#   baseUrl what Bruno's `local` environment and Playwright point at
+#   down    always run afterwards, pass or fail
+#   env     NAMES (never values) of the variables qa must have exported
+#   none    a reason string: nothing to stand up; set, it replaces every field
+# Compose: `up` and `down` run `docker compose -p ge-${GRAPH_RUN_ID:?}` with the
+# same `-p` and `-f` files. qa refuses to start while `compose_isolation.sh`
+# finds a shared name, an external network or volume, host networking or a bind
+# mount from outside the worktree. Override recipe, health poll flags, port
+# check and the isolation rationale: `qa-verification` and `/graph-init` step 4.
 # Every field ships empty: /graph-init fills what it detects and lists the
-# rest as gaps. An empty required field is qa `BLOCKED` naming that field,
-# which is clearer than a guessed command failing.
+# rest as gaps. An empty required field is qa `BLOCKED` naming that field.
 runtime:
   # Optional bounded harness owns setup, public checks, reports and cleanup.
   # If set, it replaces standalone up/seed/health/baseUrl/down below.
@@ -130,33 +79,15 @@ runtime:
 # qa never rolls back; `rollback` is the text it fills in for the owner. Leave
 # `wait` empty and the deploy checks report SKIPPED (the whole node too when the
 # plan has no `success_signals`); retro still runs.
-#   wait        blocks until the merged commit serves, e.g.
-#               argocd app wait <app> --sync --health --timeout 600
+#   wait        blocks until the merged commit serves, e.g. `argocd app wait`
 #   startedAt   prints (RFC3339) when the merged revision ${SHA} started rolling
-#               out - the baseline ends there. Argo CD:
-#               kubectl get application <app> -n argocd -o json | jq -r
-#                 --arg s "$SHA" '[.status.history[] | select(.revision == $s)
-#                 | .deployStartedAt] | min // empty'
-#               Empty: the merge commit's time, which is never after the rollout.
+#               out; empty means the merge commit's time
 #   bruEnv      the Bruno environment for the deployed target
 #   env         NAMES of credential variables (never values)
 #   testTenant  the tenant smoke writes may touch - a write runs only if
 #               `{{testTenant}}` is a segment of its URL path; "" = reads only
-#   checks      AnalysisTemplate-shaped checks, compared with the window
-#               before the deploy (an absolute threshold alone lets a
-#               0.1% -> 0.9% error ratio pass). `source` is prometheus
-#               (default, reads `query`), or sentry, sql-readonly or command,
-#               which read a `command` argv instead: the repo's own adapter,
-#               run with no shell, printing one number or {"value": <n>} for
-#               the window ending at $GRAPH_MEASURE_AT; rows are rejected:
-#               - name: error-ratio
-#                 source: prometheus
-#                 query: '<ratio over [10m]>'
-#                 initialDelay: 10m     # >= the query window
-#                 interval: 60s
-#                 count: 5
-#                 failureLimit: 0
-#                 successCondition: 'result[0] <= baseline[0] * 1.5 + 0.001'
+#   checks      AnalysisTemplate-shaped checks compared with the window before
+#               the deploy; sources and fields in `post-deploy-verification`
 #   rollback    the command the owner would run, filled in on FAIL
 deploy:
   wait: ""
@@ -551,8 +482,8 @@ routing:
     # review-testing-rules is the pack every task in every stack reads; it is
     # portable now that it ships in the plugin instead of one machine's ~/.claude.
     # definition-of-done and impact-map are NOT listed here: they apply to every
-    # task, so implementers, planner and reviewer preload them in frontmatter
-    # (spec 2.3). That also covers profiles written before 0.10.0.
+    # task, so implementers, planner and reviewer preload them in frontmatter.
+    # That also covers profiles written before 0.10.0.
     impl: [graph-engineering:prior-art, graph-engineering:review-testing-rules]
     review: [graph-engineering:review-protocol, graph-engineering:security-review, graph-engineering:privacy-review]
     design: [graph-engineering:ux-journey, graph-engineering:ui-ux-pro-max]
