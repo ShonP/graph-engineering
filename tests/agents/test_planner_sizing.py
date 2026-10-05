@@ -51,7 +51,7 @@ class PlannerSizing(unittest.TestCase):  # AC-PS-1
         self.assertRegex(self.text, r"`validate-plan` prints[^.]*`critical_path`")
 
     def test_build_and_proof_are_separate_tasks(self):
-        self.assertIn("`proof: full_device|cluster`", self.text)
+        self.assertIn("`proof: full_device` or `proof: cluster`", self.text)
         self.assertRegex(self.text, r"produces no contract")
         self.assertRegex(self.text, r"builders use focused tests")
 
