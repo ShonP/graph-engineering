@@ -1,7 +1,7 @@
 # Plugin hooks
 
-Six scripts ship with `graph-engineering`, registered in `hooks/hooks.json` as
-eight handlers. They are generic: nothing in them names a repo, a stack or a
+Seven scripts ship with `graph-engineering`, registered in `hooks/hooks.json` as
+nine handlers. They are generic: nothing in them names a repo, a stack or a
 package manager. What to run is declared by the project in
 `.claude/graph-checks.json`; how agents are tiered is declared in the project's
 `.claude/graph-profile.yaml`. One more script, `scripts/wait-run.sh`, is not a
@@ -11,6 +11,7 @@ hook: agents call it by path to wait on a long suite (see wait-run below).
 | --- | --- | --- | --- |
 | `PostToolUse`, `Edit\|Write` | `scripts/lint-touched-file.sh` | `async`, timeout 130 | Runs the configured lint on the file Claude just wrote and hands findings back on the next turn. Exit `0` always: it informs, it never blocks |
 | `PreToolUse`, `Bash` | `scripts/guard-destructive.sh` | sync, timeout 10, three handlers gated by `if` | Asks before a destructive command, with evidence. Never denies. Silent in `bypassPermissions` mode |
+| `PreToolUse`, `Bash` | `scripts/guard-poll-loop.sh` | sync, timeout 5, no `if` | Denies a shell loop that sleeps, only for an implementer subagent, and points it at `wait-run.sh`. Fails open. `GRAPH_POLL_GUARD=off` disables it |
 | `PreToolUse`, `Agent\|Task` | `scripts/guard-agent.sh` | sync, timeout 15 | Enforces the profile's `policy:` block on subagent calls |
 | `Stop`, no matcher | `scripts/test-before-stop.sh` | `asyncRewake`, timeout 620 | Runs the configured test after the turn ends and wakes Claude only when it fails. On an unchanged tree it replays the stored verdict instead (`<git common dir>/graph-engineering/checks-state.json`); any nonempty `GRAPH_CHECKS_NO_MEMO` turns that off |
 | `SessionStart`, `startup\|clear\|compact` | `scripts/print-handoff.sh` | sync, timeout 15 | Prints the head of `docs/HANDOFF.md` into the new context, a warning when that file is over 150 lines, the reply contract when the repo has a profile, and one line when a run's success measures are due. Silent on resume, fork and `--agent` sessions. Exit `0` always |
@@ -131,6 +132,33 @@ best-effort (Claude Code runs the hook when it cannot parse the command), the
 script re-checks the command itself. For a hard stop, put the fixed string in
 `permissions.deny`; a hook is the wrong tool for an absolute rule.
 
+## Sleep-loop guard
+
+`guard-poll-loop.sh` denies a shell loop (`until`, `while` or `for` ... `do`)
+whose condition or body runs `sleep`, and the deny reason points at
+`hooks/scripts/wait-run.sh`. The harness already blocks a bare `sleep N`; a
+loop around one is the same wait with no bound and no way to attach again,
+which is what wait-run gives.
+
+- **Gate.** It acts only when the call comes from an implementer subagent: the
+  payload must carry `agent_id`, and `agent_type` must be
+  `graph-engineering:implementer`, `graph-engineering:implementer-simple`,
+  `implementer` or `implementer-simple`. The main thread, including a
+  `claude --agent` session, is never blocked. A deny also applies in
+  `bypassPermissions` mode, on purpose: the agents it targets run there.
+- **Fast path.** It runs on every Bash call with no `if`, so input without the
+  word `sleep` exits in bash before any interpreter starts.
+- **Parsing.** `scripts/poll_loop.py` (stdlib) tokenizes the command with
+  `shlex`, so quoted text is one word and a commit message that mentions loops
+  passes. Loop keywords and `sleep` count only in command position. Known gaps:
+  a heredoc body is read as commands, so writing a looping script through
+  `cat <<EOF` is denied (use the Write tool); `bash -c '...'`, `eval` and
+  script files hide the loop in one word and are allowed.
+- **Fails open.** No Python 3.11+, unparsable input or an error means no
+  decision. Exit `0` always.
+- **Kill switch.** The owner sets `GRAPH_POLL_GUARD=off` under `env` in Claude
+  Code settings; no deploy is needed. Unset or `on` means active.
+
 ## Agent policy guard
 
 `guard-agent.sh` is a no-op unless the project's profile has a `policy:` block.
@@ -210,7 +238,7 @@ idle. The harness also blocks a bare `sleep N`. So a suite longer than one tool
 call runs through
 
 ```
-<plugin root>/hooks/scripts/wait-run.sh --log <absolute path> [--max-block S] [-- <argv...>]
+<plugin root>/hooks/scripts/wait-run.sh --log <absolute path> [--max-block S] [--full [--reason TEXT]] [-- <argv...>]
 ```
 
 - With argv: starts it detached, then waits. Refused with exit `2` and `a job
@@ -242,6 +270,30 @@ call runs through
   environment and stdin from `/dev/null`: no shell, no network. The logic is
   `scripts/wait_run.py`, stdlib only, run by the interpreter
   `python-runtime.sh` selects.
+
+### `--full`: a budget of full-suite runs
+
+The fast inner loop runs focused tests while iterating and the full suite once
+at the end. `--full` marks a start as a full-suite run and counts it against
+`GRAPH_RUN_ID` (the dispatch's per-task id):
+
+- Runs 1 and 2 are free. Run 3 and later without `--reason` exit `2` with one
+  line, `wait-run: refused: full-suite run <n> for <id> needs --reason "<why>"`,
+  and write no log, `.pid` or `.exit`. With `--reason TEXT` the run goes ahead
+  and the reason is recorded.
+- Only a start counts: an attach (no argv), a start without `--full`, and a
+  start refused because the log's job is still running never do.
+- Counter: `${GRAPH_WAIT_RUN_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/graph-engineering/wait-run}/<GRAPH_RUN_ID>.full`,
+  directory 0700, file 0600, opened without following a symlink and appended
+  under `flock`. Each counted start adds `<UTC ISO> full <n>[ reason=<text>]`;
+  the reason is folded to one line and capped at 200 characters. `scripts/wait_count.py`
+  owns it.
+- Usage errors (exit `2`): an empty or whitespace-only `--reason`, and
+  `--reason` without `--full`.
+- Fails open: a missing `GRAPH_RUN_ID`, an id outside `[A-Za-z0-9._-]{1,128}`
+  (or `.`/`..`), or a counter that cannot be written runs the suite uncounted
+  with one stderr line, `wait-run: note: <why>; full-suite run not counted`.
+- A plugin older than 0.16.0 rejects `--full` as a usage error.
 
 ## Scope and least privilege
 
@@ -284,6 +336,8 @@ remove hooks"). The ways out, in order of least collateral damage:
   above unless the session runs in `bypassPermissions` mode; answer it, or use
   the next two.
 - `policy-override: <reason>` in one agent prompt skips the agent guard for that call.
+- `GRAPH_POLL_GUARD=off` under `env` in Claude Code settings turns off the
+  sleep-loop guard.
 - `claude plugin disable graph-engineering` turns off the plugin, hooks included.
 - `"disableAllHooks": true` in a settings file turns off every hook from every
   source for that scope; `--settings '{"disableAllHooks": true}'` does it for one
@@ -303,6 +357,8 @@ python3 hooks/tests/test_configured_checks.py
 python3 hooks/tests/test_hooks_registration.py
 python3 hooks/tests/test_doctor_on_start.py
 python3 hooks/tests/test_wait_run.py
+python3 hooks/tests/test_wait_count.py
+python3 hooks/tests/test_guard_poll_loop.py
 python3 -m unittest discover -s tests/measure
 ```
 

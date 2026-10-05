@@ -61,7 +61,8 @@ def _load() -> list[Finding]:
     if load < cores:
         return []
     return [Finding("warn", "load-high", f"1-minute load average {load:.2f} is at or above the {cores} cores",
-                    "let running builds or agents finish before dispatching more, or narrow the wave")]
+                    "let running builds or agents finish before dispatching more, "
+                    "or lower the ready-queue width (--max-width)")]
 
 
 def _git(root: Path, *args: str) -> str | None:
