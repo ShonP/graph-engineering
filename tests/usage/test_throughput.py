@@ -93,6 +93,9 @@ class CliTests(unittest.TestCase):
     def test_days_narrows_the_window(self):
         result = run('implementer-over-90', '--days', '1', at='2026-09-29T12:30:00+00:00')
         self.assertEqual(result.stdout, '1\n')
+        # From 09-29 11:00: 95, 120 and 40 active minutes remain, so only the two long ones count.
+        result = run('implementer-over-90', '--days', '1', at='2026-09-30T11:00:00Z')
+        self.assertEqual(result.stdout, '2\n')
 
     def test_empty_window_is_no_data_never_a_fake_zero(self):
         for metric in ('implementer-p90-active', 'workflow-concurrency'):
