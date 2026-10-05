@@ -1,4 +1,4 @@
-"""host-check: host inspection before a wave (AC-W3-HC-01) and its CLI command.
+"""host-check: host inspection before an implementer dispatch (AC-W3-HC-01) and its CLI command.
 
 Fixtures are SYNTHETIC: throwaway repos (plain, bare, and a clone behind its
 origin) and inline profiles. Load is patched because the real load average
@@ -10,6 +10,7 @@ import contextlib
 import io
 import json
 import os
+import re
 import subprocess
 import tempfile
 import unittest
@@ -24,6 +25,7 @@ from graph_control.commands.host import floor
 GIT_VARS = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR")
 ENV = {key: value for key, value in os.environ.items() if key not in GIT_VARS}
 REAL_RUN = subprocess.run
+WAVE = re.compile(r"\bwaves?\b")
 
 
 def git(cwd, *args):
@@ -202,6 +204,16 @@ class Load(Fixture):
 
     def test_load_below_core_count_is_silent(self):
         self.assertNotIn("load-high", self.load(7.9, 8))
+
+    def test_load_fix_names_the_ready_queue_width(self):
+        # The engine schedules a ready queue, a semaphore with no barrier between batches.
+        fix = self.load(8.0, 8)["load-high"]["fix"]
+        self.assertIn("lower the ready-queue width", fix)
+        self.assertNotRegex(fix, WAVE)
+
+    def test_host_check_source_and_this_docstring_name_no_barrier_batch(self):
+        self.assertNotRegex(Path(host.__file__).read_text(), WAVE)
+        self.assertNotRegex(__doc__, WAVE)
 
 
 class Command(unittest.TestCase):
