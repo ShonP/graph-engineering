@@ -4,7 +4,6 @@ description: Apply for React, frontend UI, Tailwind, forms, routing, i18n, front
 ---
 
 # Frontend Rules
-Harvested from the owner's global rule packs on 2026-09-10 (spec 4.3); the plugin copy is the portable one.
 
 Use for React + Tailwind frontend work.
 
