@@ -48,7 +48,8 @@ task's criteria in that unit are rows of one report, never once per task.
    it is the run's copy. Tested by `tests/test_compose_isolation.sh` (Compose
    v2.40.3): each leak kind above, a leak hidden behind a profile, a clean
    file, and an unparseable file (exit 2). The fix for a leak is a committed
-   `compose.qa.yaml` override (template `runtime.up` comment).
+   `compose.qa.yaml` override (recipe: `/graph-init` step 4,
+   `commands/graph-init.md`).
 
 3. **Verify each criterion end-to-end**, choosing the cheapest sufficient probe:
    - **UI flow**: drive the real browser (Playwright script, or chrome automation tools). Walk the journey a user would, not the shortcut a developer would.

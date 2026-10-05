@@ -56,8 +56,9 @@ uxEvidence:
 # Compose: `up` and `down` run `docker compose -p ge-${GRAPH_RUN_ID:?}` with the
 # same `-p` and `-f` files. qa refuses to start while `compose_isolation.sh`
 # finds a shared name, an external network or volume, host networking or a bind
-# mount from outside the worktree. Override recipe, health poll flags, port
-# check and the isolation rationale: `qa-verification` and `/graph-init` step 4.
+# mount from outside the worktree. The `compose.qa.yaml` override recipe:
+# `/graph-init` step 4. Health poll flags, port check and isolation rationale:
+# `qa-verification` step 2.
 # Every field ships empty: /graph-init fills what it detects and lists the
 # rest as gaps. An empty required field is qa `BLOCKED` naming that field.
 runtime:
