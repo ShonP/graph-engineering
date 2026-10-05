@@ -1,0 +1,5 @@
+{"type": "user", "timestamp": "2026-09-29T13:00:00.000Z", "message": {"role": "user", "content": "SENTINEL-PROMPT-thr7 synthetic task"}}
+{"type": "assistant", "timestamp": "2026-09-29T13:10:00.000Z", "message": {"role": "assistant", "content": [{"type": "text", "text": "SENTINEL-RESPONSE-thr9"}]}}
+{"type": "user", "timestamp": "2026-09-29T13:20:00.000Z", "message": {"role": "user", "content": "SENTINEL-PROMPT-thr7"}}
+{"type": "assistant", "timestamp": "2026-09-29T13:30:00.000Z", "message": {"role": "assistant", "content": [{"type": "text", "text": "SENTINEL-RESPONSE-thr9"}]}}
+{"type": "assistant", "timestamp": "2026-09-29T13:40:00.000Z", "message": {"role": "assistant", "content": [{"type": "text", "text": "DONE SENTINEL-RESPONSE-thr9"}]}}
