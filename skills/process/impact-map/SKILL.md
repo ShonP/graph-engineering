@@ -72,10 +72,6 @@ language it lacks: `rg` with the tightest regex you can write, and say so.
 Every hit gets a triage row; a true sibling on a user-reachable path is a
 must-fix.
 
-Spiked 2026-09-23, semgrep 1.174.0: a rule for `$X / $Y` and `$X // $Y`
-not inside `if $Y == 0:` found the seeded `100 // item.qty` and the one
-unguarded sibling, and skipped the guarded division.
-
 ## For implementers mid-task
 
 Something wrong next to your change is triaged with the same table, but you
