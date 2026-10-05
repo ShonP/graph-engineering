@@ -86,7 +86,7 @@ next: review, qa
 ## node: review
 agent: reviewer
 in: the worktree diff
-out: .graph/<run>/findings.json
+out: .graph/<run>/findings.<task>.json (one per task)
 gate: no
 next: fix
 
@@ -99,7 +99,7 @@ next: fix
 
 ## node: fix
 agent: implementer
-in: .graph/<run>/findings.json, .graph/<run>/qa-findings.json, the FAILED rows of .graph/<run>/qa.md
+in: .graph/<run>/findings.<task>.json (one per task), .graph/<run>/qa-findings.json, the FAILED rows of .graph/<run>/qa.md
 out: worktree commits, appended rows in .graph/<run>/followups.md
 gate: no
 next: merge
