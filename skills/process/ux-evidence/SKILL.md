@@ -48,10 +48,13 @@ the point; crop or highlight so the difference reads at thumbnail size.
    - Web: Playwright - fixed viewport, seeded deterministic data, no dev-tools
      chrome, `page.screenshot` / `recordVideo`.
    - iOS: `xcrun simctl io "$SIM_UDID" screenshot <file>.png`,
-     `xcrun simctl io "$SIM_UDID" recordVideo <file>.mp4`, with the whole
-     capture script run as `bash <plugin-root>/scripts/sim-session.sh -- <script>`
+     `xcrun simctl io "$SIM_UDID" recordVideo <file>.mp4`, with a capture
+     script run as `bash <plugin-root>/scripts/sim-session.sh -- <script>`
      (headless; it boots the device, exports `SIM_UDID` and shuts it down
-     after). Never `open -a Simulator`. Close what you open.
+     after). Captures spread over several tool calls: `sim-session.sh acquire`
+     once, each capture as `sim-session.sh run --lease <id> -- <command>`, then
+     `sim-session.sh release --lease <id>`. Never `open -a Simulator`.
+     Close what you open.
    - Android: `adb exec-out screencap -p > <file>.png`, `adb shell screenrecord`.
    - If the repo already has a capture pipeline (profile `rules`), extend it;
      never build a parallel one.

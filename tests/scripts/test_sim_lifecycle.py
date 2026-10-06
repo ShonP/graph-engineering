@@ -10,92 +10,12 @@ only when no live wrapper still holds it; the reaper never touches a device a
 live process owns; Simulator.app is quit only when nothing is booted.
 """
 
-import json
-import os
 import signal
 import subprocess
 import sys
-import tempfile
-import time
 import unittest
-from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-SESSION = ROOT / "scripts" / "sim-session.sh"
-REAPER = ROOT / "scripts" / "sim-reaper.sh"
-FAKE = Path(__file__).resolve().parent / "fixtures" / "fake_xcrun.py"
-RUNTIME = "com.apple.CoreSimulator.SimRuntime.iOS-26-5"
-A = "AAAAAAAA-0000-4000-8000-000000000001"
-B = "BBBBBBBB-0000-4000-8000-000000000002"
-OLD = "2026-01-01T00:00:00Z"
-# Holds the device until <file> appears; a plain wait, no network.
-HOLD = "import os, sys, time\nwhile not os.path.exists(sys.argv[1]): time.sleep(0.05)\n"
-
-
-class SimFixture(unittest.TestCase):
-    def setUp(self):
-        temp = tempfile.TemporaryDirectory()
-        self.addCleanup(temp.cleanup)
-        self.tmp = Path(temp.name).resolve()
-        bin_dir = self.tmp / "bin"
-        bin_dir.mkdir()
-        for tool in ("xcrun", "osascript", "pgrep", "open"):
-            (bin_dir / tool).symlink_to(FAKE)
-        FAKE.chmod(0o755)
-        self.state = self.tmp / "state.json"
-        self.log = self.tmp / "calls.log"
-        self.log.write_text("")
-        self.write_state({A: "Shutdown", B: "Shutdown"})
-        self.env = dict(os.environ, PATH=f"{bin_dir}{os.pathsep}{Path(sys.executable).parent}{os.pathsep}{os.environ['PATH']}",
-                        FAKE_SIM_STATE=str(self.state), FAKE_SIM_LOG=str(self.log),
-                        GRAPH_SIM_DIR=str(self.tmp / "sims"))
-
-    def write_state(self, states, gui=False, booted_at=None):
-        names = {A: "iPhone 17", B: "iPhone 17 Pro"}
-        devices = [{"udid": u, "name": names[u], "state": s, "isAvailable": True,
-                    **({"lastBootedAt": booted_at or OLD} if s == "Booted" else {})} for u, s in states.items()]
-        self.state.write_text(json.dumps({"devices": {RUNTIME: devices}, "gui": gui}))
-
-    def device_state(self, udid):
-        devices = json.loads(self.state.read_text())["devices"][RUNTIME]
-        return next(d["state"] for d in devices if d["udid"] == udid)
-
-    def gui(self):
-        return json.loads(self.state.read_text())["gui"]
-
-    def calls(self):
-        return self.log.read_text().splitlines()
-
-    def session(self, *args, timeout=30):
-        return subprocess.run(["bash", str(SESSION), *args], env=self.env, capture_output=True, text=True, timeout=timeout)
-
-    def start_holder(self, device, release):
-        process = subprocess.Popen(["bash", str(SESSION), "--device", device, "--", sys.executable, "-c", HOLD, str(release)],
-                                   env=self.env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        self.addCleanup(lambda: process.poll() is None and process.kill())
-        deadline = time.monotonic() + 10
-        while not list((self.tmp / "sims").glob("*.lease")):  # written after the boot, under the lock
-            self.assertLess(time.monotonic(), deadline, "holder never leased the device")
-            time.sleep(0.05)
-        return process
-
-    def mark_dead_owner(self, udid):
-        """A marker with no live lease: the wrapper that booted udid was killed."""
-        sims = self.tmp / "sims"
-        sims.mkdir(exist_ok=True)
-        (sims / f"{udid}.json").write_text(json.dumps({"udid": udid, "pid": 999999, "owner": "test"}))
-
-    def start_build(self, *destination):
-        """A SYNTHETIC `xcodebuild` process with the given destination on its command line."""
-        fake = self.tmp / "xcodebuild"
-        fake.write_text(HOLD)
-        release = self.tmp / f"release-build-{len(list(self.tmp.glob('release-build-*')))}"
-        build = subprocess.Popen([sys.executable, str(fake), str(release), *destination])
-        self.addCleanup(lambda: build.poll() is None and build.kill())
-        return build, release
-
-    def reap(self, *args):
-        return subprocess.run(["bash", str(REAPER), *args], env=self.env, capture_output=True, text=True, timeout=30)
+from sim_fixture import A, B, OLD, SESSION, SimFixture
 
 
 class Session(SimFixture):
@@ -181,7 +101,8 @@ class Reaper(SimFixture):
     def test_skips_a_device_whose_owner_is_alive(self):
         release = self.tmp / "release"
         holder = self.start_holder(A, release)
-        result = self.reap("--grace-minutes", "0")
+        self.at(60 * 24)  # a one-shot run's lease never idles out while its process lives
+        result = self.reap("--idle-minutes", "0")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.device_state(A), "Booted")
         release.touch()
@@ -216,34 +137,16 @@ class Reaper(SimFixture):
         release.touch()
         build.wait(timeout=10)
 
-    def test_reaps_an_unmarked_device_only_past_the_grace_period(self):
-        # Booted outside any wrapper (an evidence script, XcodeBuildMCP) and left running.
-        now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        self.write_state({A: "Booted", B: "Shutdown"}, booted_at=now)
-        self.reap("--grace-minutes", "30")
-        self.assertEqual(self.device_state(A), "Booted", "inside the grace period")
-        self.write_state({A: "Booted", B: "Shutdown"}, booted_at=OLD)
-        result = self.reap("--grace-minutes", "30")
-        self.assertEqual(self.device_state(A), "Shutdown")
-        self.assertIn(f"shut down {A} (iPhone 17) reason=unowned-past-grace", result.stdout)
-
-    def test_keep_unowned_never_shuts_down_an_unmarked_device(self):
-        self.write_state({A: "Booted", B: "Shutdown"}, booted_at=OLD)
-        result = self.reap("--keep-unowned", "--grace-minutes", "0")
+    def test_never_shuts_down_an_unmarked_device_however_old(self):
+        # Booted outside any wrapper: the owner's Xcode, XcodeBuildMCP. Nothing proves it abandoned.
+        self.write_state({A: "Booted", B: "Shutdown"}, gui=True, booted_at=OLD)
+        self.at(60 * 24 * 365)
+        result = self.reap("--idle-minutes", "0")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.device_state(A), "Booted")
-        self.assertIn(f"kept {A} (iPhone 17) reason=unowned", result.stdout)
-        self.env["GRAPH_SIM_REAP_UNOWNED"] = "off"
-        self.reap("--grace-minutes", "0")
-        self.assertEqual(self.device_state(A), "Booted", "the owner switch keeps them too")
-
-    def test_skips_an_unmarked_device_an_xcodebuild_picks_by_name(self):
-        self.write_state({A: "Booted", B: "Shutdown"}, booted_at=OLD)
-        build, release = self.start_build("-destination", "platform=iOS Simulator,name=iPhone 17")
-        self.reap("--grace-minutes", "0")
-        self.assertEqual(self.device_state(A), "Booted")
-        release.touch()
-        build.wait(timeout=10)
+        self.assertIn(f"kept {A} (iPhone 17) reason=unmarked", result.stdout)
+        self.assertNotIn(f"xcrun simctl shutdown {A}", self.calls())
+        self.assertTrue(self.gui(), "a device is booted, so Simulator.app stays")
 
     def test_keeps_a_live_wrappers_claim_while_its_device_reboots(self):
         release = self.tmp / "release"
@@ -256,12 +159,19 @@ class Reaper(SimFixture):
         self.assertEqual(self.device_state(A), "Shutdown", "the wrapper still closed what it booted")
 
     def test_dry_run_changes_nothing(self):
-        self.write_state({A: "Booted", B: "Shutdown"}, gui=True)
-        self.mark_dead_owner(A)
+        # A leaked one-shot run (dead holder) and an idle lease: both reapable, both left on disk.
+        result = self.session("--device", A, "--", "sh", "-c", "kill -9 $PPID")
+        self.assertNotEqual(result.returncode, 0)
+        self.at(0)
+        self.acquire("--device", A)
+        self.at(60)
+        before = self.files()
+        self.assertEqual(len([f for f in before if f.endswith(".lease")]), 2, before)
         result = self.reap("--dry-run")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(f"would shut down {A}", result.stdout)
         self.assertEqual(self.device_state(A), "Booted")
+        self.assertEqual(self.files(), before, "dry-run deletes no marker and no lease")
         self.assertFalse(any("shutdown" in c or c.startswith("osascript") for c in self.calls()))
 
     def test_quits_simulator_app_only_when_nothing_is_booted(self):

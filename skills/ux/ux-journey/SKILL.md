@@ -28,7 +28,9 @@ feature.
      step 2 conventions, with the `GRAPH_RUN_ID` your dispatch names) and
      capture with the same tooling `ux-evidence` uses (Playwright for web,
      `simctl` / `adb` for mobile; iOS captures run inside
-     `bash <plugin-root>/scripts/sim-session.sh -- <script>`, headless.
+     `bash <plugin-root>/scripts/sim-session.sh -- <script>`, headless, or
+     across tool calls as `sim-session.sh acquire`, then `run --lease <id> --
+     <command>` per capture, then `release --lease <id>`.
      Never `open -a Simulator`. Close what you open), at the viewport sizes the profile's
      platforms need, into `.graph/<run>/design/as-is/`. `runtime.none` or
      no runnable UI: read the screen components instead and say so in the

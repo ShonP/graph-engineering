@@ -6,8 +6,9 @@
 #
 #   - GRAPH_SIM_REAPER=off: nothing starts (owner kill switch, no deploy).
 #   - No xcrun on PATH (not a Mac, no Xcode): nothing starts.
-#   - Otherwise the reaper shuts down simulators no live process owns and quits
-#     an idle Simulator.app (rules in scripts/sim_reaper.py), appending what it
+#   - Otherwise the reaper shuts down only simulators a wrapper booted and no
+#     live lease or running build holds, then quits an idle Simulator.app
+#     (rules in scripts/sim_reaper.py), appending what it
 #     did to <sim dir>/reaper.log; the log rolls to reaper.log.1 past 1 MB.
 #
 # Prints nothing and exits 0 on every path.

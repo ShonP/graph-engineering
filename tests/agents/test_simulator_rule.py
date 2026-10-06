@@ -27,6 +27,16 @@ class SimulatorRule(unittest.TestCase):
                 self.assertIn("Never `open -a Simulator`", text)
                 self.assertIn("Close what you open", text)
 
+    def test_every_simulator_guide_teaches_the_lease_flow_for_multi_step_work(self):
+        # Multi-step qa spans tool calls: acquire once, run each step on the lease, release at the end.
+        for rel in GUIDES:
+            text = (ROOT / rel).read_text(encoding="utf-8")
+            with self.subTest(rel):
+                self.assertIn("sim-session.sh acquire", text)
+                self.assertIn("run --lease", text)
+                self.assertIn("release --lease", text)
+                self.assertNotIn("one script inside one wrapper call", text)
+
     def test_capture_targets_the_wrapped_device_not_whatever_is_booted(self):
         text = (ROOT / "skills/process/ux-evidence/SKILL.md").read_text(encoding="utf-8")
         self.assertNotIn("simctl io booted", text)

@@ -45,7 +45,7 @@ class ReapHook(unittest.TestCase):
         self.log.write_text("")
         self.env = dict(os.environ, PATH=f"{bin_dir}{os.pathsep}{Path(sys.executable).parent}{os.pathsep}{os.environ['PATH']}",
                         FAKE_SIM_STATE=str(self.state), FAKE_SIM_LOG=str(self.log), FAKE_SIM_DELAY="0.5",
-                        GRAPH_SIM_DIR=str(self.tmp / "sims"), GRAPH_SIM_GRACE_MIN="30")
+                        GRAPH_SIM_DIR=str(self.tmp / "sims"))
         self.env.pop("GRAPH_SIM_REAPER", None)
 
     def fire(self, env=None):
@@ -72,16 +72,16 @@ class ReapHook(unittest.TestCase):
             time.sleep(0.1)
         self.assertEqual(self.device_state(), "Shutdown")
 
-    def test_closes_a_device_booted_outside_any_wrapper_once_past_grace(self):
-        # No marker: an evidence script or XcodeBuildMCP booted it and walked away.
+    def test_never_closes_a_device_booted_outside_any_wrapper(self):
+        # No marker: the owner's Xcode or XcodeBuildMCP booted it, months ago by lastBootedAt.
         result, _ = self.fire()
         self.assertEqual(result.returncode, 0, result.stderr)
         log = self.tmp / "sims" / "reaper.log"
         deadline = time.monotonic() + 15
-        while f"shut down {UDID} (iPhone 17) reason=unowned-past-grace" not in (log.read_text() if log.exists() else ""):
-            self.assertLess(time.monotonic(), deadline, "the hook left an unowned device booted")
+        while f"kept {UDID} (iPhone 17) reason=unmarked" not in (log.read_text() if log.exists() else ""):
+            self.assertLess(time.monotonic(), deadline, "the detached reaper never judged the device")
             time.sleep(0.1)
-        self.assertEqual(self.device_state(), "Shutdown")
+        self.assertEqual(self.device_state(), "Booted")
 
     def test_kill_switch_starts_nothing(self):
         result, _ = self.fire(dict(self.env, GRAPH_SIM_REAPER="off"))

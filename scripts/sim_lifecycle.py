@@ -1,15 +1,16 @@
 """Shared state for sim_session.py and sim_reaper.py: who owns which simulator.
 
 Many agents, sessions and workflows share one Mac, so a simulator is shut down
-only by the last live holder of a device a wrapper booted, or by the reaper
-once nothing alive owns it. State lives in
+only when it can be proven abandoned: a wrapper booted it, every lease on it is
+released or idle past the window, and no running xcodebuild/XCTest/simctl
+names it. State lives in
 ${GRAPH_SIM_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/graph-engineering/sims}:
 
-  <udid>.json         marker: a wrapper booted this device (pid, started_at,
-                      owner label). No marker means someone else booted it,
-                      and no wrapper ever shuts it down.
-  <udid>.<pid>.lease  one per wrapper holding the device: its pid and the
-                      process start time, so a recycled pid reads as dead.
+  <udid>.json         marker: a wrapper booted this device (pid, name,
+                      started_at, owner label). No marker means someone else
+                      booted it (the owner's Xcode, XcodeBuildMCP), and
+                      nothing here ever shuts it down.
+  <udid>.<id>.lease   one per holder, see sim_leases.py.
   .lock               fcntl lock around every boot, lease and shutdown step.
 
 Stdlib only. `xcrun`, `osascript` and `pgrep` are looked up on PATH, which is
@@ -23,9 +24,11 @@ import json
 import os
 import re
 import subprocess
+import time
 from pathlib import Path
 
 TOOLS = ("xcodebuild", "xctest", "XCTest", "simctl")
+IDLE_MIN = 15.0
 
 
 def state_dir() -> Path:
@@ -85,32 +88,27 @@ def write_marker(udid: str, name: str, owner: str) -> None:
                                              "started_at": now, "owner": owner}))
 
 
-def write_lease(udid: str) -> Path:
-    path = state_dir() / f"{udid}.{os.getpid()}.lease"
-    path.write_text(json.dumps({"pid": os.getpid(), "started": start_time(os.getpid())}))
-    return path
+def marker_name(udid: str) -> str | None:
+    try:
+        return json.loads(marker_path(udid).read_text()).get("name")
+    except (OSError, ValueError, AttributeError):
+        return None
 
 
-def live_leases(udid: str) -> list[Path]:
-    """Leases on udid whose process is still the one that wrote them; dead ones are deleted."""
-    live = []
-    for path in state_dir().glob(f"{udid}.*.lease"):
-        try:
-            lease = json.loads(path.read_text())
-            alive = start_time(int(lease["pid"])) == lease["started"] and lease["started"] is not None
-        except (OSError, ValueError, KeyError, TypeError):
-            alive = False
-        if alive:
-            live.append(path)
-        else:
-            path.unlink(missing_ok=True)
-    return live
+def now() -> float:
+    """Epoch seconds. GRAPH_SIM_CLOCK overrides it: the tests' simulated clock."""
+    try:
+        return float(os.environ["GRAPH_SIM_CLOCK"])
+    except (KeyError, ValueError):
+        return time.time()
 
 
-def forget(udid: str) -> None:
-    marker_path(udid).unlink(missing_ok=True)
-    for path in state_dir().glob(f"{udid}.*.lease"):
-        path.unlink(missing_ok=True)
+def idle_minutes() -> float:
+    """How long an acquired lease may sit unused before it stops holding its device."""
+    try:
+        return float(os.environ.get("GRAPH_SIM_IDLE_MIN") or IDLE_MIN)
+    except ValueError:
+        return IDLE_MIN
 
 
 def processes() -> dict[str, tuple[str, str]]:

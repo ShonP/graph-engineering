@@ -1,59 +1,51 @@
-"""Shut down simulators nobody alive is using, then quit an idle Simulator.app.
+"""Shut down the simulators the wrappers provably abandoned, then quit an idle Simulator.app.
 
-    sim_reaper.py [--dry-run] [--keep-unowned] [--grace-minutes N]
+    sim_reaper.py [--dry-run] [--idle-minutes N]
 
-For each booted device, in order:
-  - a live sim-session lease holds it: skip (owned)
+The rule: never shut down a device it cannot prove is abandoned. For each
+booted device, in order:
+  - no sim-session marker (the owner's Xcode, XcodeBuildMCP, any script that
+    booted it itself): keep, `reason=unmarked`, however long it has been up
+  - a live lease holds it (a holder process runs a command on it, or an
+    acquired lease was used within N minutes, default $GRAPH_SIM_IDLE_MIN,
+    else 15): keep, `reason=leased`
   - a running xcodebuild, XCTest or simctl names it, by udid or by a
-    `name=<its name>` destination: skip (in use)
-  - a sim-session marker but no live lease (its wrapper was killed): shut down
-  - no marker (booted outside any wrapper: an evidence script, XcodeBuildMCP):
-    shut down once it booted more than N minutes ago (default
-    $GRAPH_SIM_GRACE_MIN, else 30), so a device an agent drives by separate
-    simctl calls survives the session that booted it. --keep-unowned or
-    GRAPH_SIM_REAP_UNOWNED=off keeps these and logs `kept ... reason=unowned`.
-Then markers of devices no longer booted are removed unless a live wrapper
-still holds them (a wrapped command may be rebooting the device), dead leases
-are dropped, and Simulator.app is quit when it runs and no device is booted.
+    `name=<its name>` destination: keep, `reason=in-use`
+  - otherwise shut it down: `reason=idle` (an acquired lease went unused past
+    the window), `dead-owner` (a one-shot wrapper was killed) or `released`
+Idle is measured from each lease's last_used_at, never from boot time.
+
+Then, unless --dry-run, leases that no longer hold anything are deleted,
+markers and leases of devices no longer booted are removed unless a live lease
+still holds them (a step may be rebooting the device), and Simulator.app is
+quit when it runs and no device is booted. --dry-run prints `would ...` and
+changes nothing, files included.
 
 Idempotent and safe to run from many sessions at once (one lock). Prints one
-line per action, `sim-reaper: <action> <udid> (<name>) reason=<why>`;
---dry-run prints `would ...` and changes nothing. Exit 0, or 1 when simctl
-cannot list devices.
+line per device, `sim-reaper: <action> <udid> (<name>) reason=<why>`. Exit 0,
+or 1 when simctl cannot list devices.
 """
 
 import argparse
 import datetime
-import os
 import sys
 
+import sim_leases as leases
 import sim_lifecycle as sims
 
 
-def age_minutes(device: dict) -> float | None:
-    stamp = device.get("lastBootedAt")
-    if not stamp:
-        return None
-    try:
-        booted_at = datetime.datetime.fromisoformat(stamp.replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    return (datetime.datetime.now(datetime.UTC) - booted_at).total_seconds() / 60
-
-
-def verdict(device: dict, grace: float, keep_unowned: bool) -> str | None:
-    """The reason to shut this device down, "unowned" to keep and log it, or None to keep it."""
+def verdict(device: dict, idle: float) -> tuple[bool, str]:
+    """(shut it down, why)."""
     udid = device["udid"]
-    if sims.live_leases(udid) or sims.referenced(udid, device.get("name")):
-        return None
-    if sims.marker_path(udid).exists():
-        return "dead-owner"
-    if keep_unowned:
-        return "unowned"
-    age = age_minutes(device)
-    if age is not None and age > grace:
-        return "unowned-past-grace"
-    return None
+    if not sims.marker_path(udid).exists():
+        return False, "unmarked"
+    held = [lease for _, lease in leases.on(udid) if lease]
+    if any(leases.live(lease, idle) for lease in held):
+        return False, "leased"
+    if sims.referenced(udid, device.get("name")):
+        return False, "in-use"
+    kinds = {lease.get("kind") for lease in held}
+    return True, "idle" if "lease" in kinds else "dead-owner" if kinds else "released"
 
 
 def say(text: str) -> None:
@@ -61,7 +53,18 @@ def say(text: str) -> None:
     print(f"{stamp} sim-reaper: {text}", flush=True)
 
 
-def reap(dry_run: bool, grace: float, keep_unowned: bool = False) -> int:
+def tidy(booted: set[str], idle: float) -> None:
+    """Drop leases that hold nothing, and the state of devices no longer booted."""
+    state = sims.state_dir()
+    known = {f.name.split(".", 1)[0] for f in state.glob("*.lease")} | {m.stem for m in state.glob("*.json")}
+    for udid in known:
+        if udid not in booted and not leases.live_on(udid, idle):
+            leases.forget(udid)
+        else:
+            leases.prune(udid, idle)
+
+
+def reap(dry_run: bool, idle: float) -> int:
     with sims.locked():
         try:
             booted = sims.booted()
@@ -70,29 +73,23 @@ def reap(dry_run: bool, grace: float, keep_unowned: bool = False) -> int:
             return 1
         kept = []
         for device in booted:
-            reason = verdict(device, grace, keep_unowned)
+            shut, reason = verdict(device, idle)
             label = f"{device['udid']} ({device.get('name', '?')}) reason={reason}"
-            if reason in (None, "unowned"):
+            if not shut:
                 kept.append(device["udid"])
-                if reason:
-                    say(f"kept {label}")
+                say(f"kept {label}")
             elif dry_run:
                 say(f"would shut down {label}")
             else:
                 sims.simctl("shutdown", device["udid"])
-                sims.forget(device["udid"])
+                leases.forget(device["udid"])
                 say(f"shut down {label}")
-        if not dry_run:
-            live = {d["udid"] for d in booted}
-            for marker in sims.state_dir().glob("*.json"):
-                if marker.stem not in live and not sims.live_leases(marker.stem):
-                    sims.forget(marker.stem)
-            for udid in {lease.name.split(".", 1)[0] for lease in sims.state_dir().glob("*.lease")} - live:
-                sims.live_leases(udid)  # drops the dead ones
         if dry_run:
             if not kept and sims.gui_running():
                 say("would quit Simulator.app")
-        elif sims.quit_gui_if_idle():
+            return 0
+        tidy({d["udid"] for d in booted}, idle)
+        if sims.quit_gui_if_idle():
             say("quit Simulator.app")
     return 0
 
@@ -100,12 +97,9 @@ def reap(dry_run: bool, grace: float, keep_unowned: bool = False) -> int:
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="sim-reaper.sh")
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--keep-unowned", action="store_true",
-                        default=os.environ.get("GRAPH_SIM_REAP_UNOWNED", "on") == "off")
-    parser.add_argument("--grace-minutes", type=float,
-                        default=float(os.environ.get("GRAPH_SIM_GRACE_MIN") or 30))
+    parser.add_argument("--idle-minutes", type=float, default=sims.idle_minutes())
     args = parser.parse_args(argv)
-    return reap(args.dry_run, args.grace_minutes, args.keep_unowned)
+    return reap(args.dry_run, args.idle_minutes)
 
 
 if __name__ == "__main__":

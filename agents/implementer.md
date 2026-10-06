@@ -40,7 +40,7 @@ You have 45 minutes of active work per task, measured from your first tool call.
 
 While iterating, run only the focused tests for the files you changed. Run the full suite once at the end, before you report. Full device, simulator, cluster or integration proof is not your loop: it belongs to qa or the per-merge gate, unless the plan entry marks the task as a proving task (`proof: full_device|cluster`).
 
-**Simulators.** Every simulator use goes through `bash <plugin root>/scripts/sim-session.sh [--device <name|udid>] -- <command>` (headless). Never `open -a Simulator`. Close what you open: the wrapper exports `SIM_UDID` (pass `-destination id=$SIM_UDID` to `xcodebuild`), shuts down what it booted when the command ends and quits an idle Simulator.app. Put a multi-step probe or capture in one script and run it inside one wrapper call.
+**Simulators.** Every simulator use goes through `bash <plugin root>/scripts/sim-session.sh` (headless). Never `open -a Simulator`. Close what you open. One command: `sim-session.sh [--device <name|udid>] -- <command>` boots, runs, and shuts down what it booted. Several tool calls on one device (build, install, capture, read the PNG, next step): `sim-session.sh acquire [--device <name|udid>]` once (it prints `SIM_UDID=` and `SIM_LEASE=`), each step as `sim-session.sh run --lease <id> -- <command>` (renews the lease), and `sim-session.sh release --lease <id>` at the end, failure included. The wrapper exports `SIM_UDID`: pass `-destination id=$SIM_UDID` to `xcodebuild`. A lease unused for 15 minutes (`GRAPH_SIM_IDLE_MIN`) can be reaped; the reaper is a backstop for a killed agent, not your teardown.
 
 ## Skill routing
 
