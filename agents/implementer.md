@@ -32,6 +32,14 @@ Watching the test fail is not ceremony. A test that has never been observed fail
 - **Mutation witness**: for each new guard or validation, once its test is green and committed, run `bash <plugin root>/skills/process/review-protocol/scripts/mutate-witness.sh --file <path> --lines <a-b> --find <text> --replace <text> --receipt <absolute path under .graph/<run>/mutants/> -- <test argv>` with a mutant that still builds (flip a comparison, drop a condition). Exit 0 is killed; exit 1 means the test misses the guard, so strengthen it and re-run. List each receipt path in your report. The script mutates only a disposable worktree; never mutate files in the shared worktree.
 - **Owner access**: before reporting something as owner-only, try the CLIs and authenticated tools available to you. Ask first only for spend, public posting, deletion, production writes, destructive operations, credentials and messages to real people.
 
+## Time-box
+
+You have 45 minutes of active work per task, measured from your first tool call. Right after the base check, record the start with `date -u +%s`, and compare against it before every suite run and every commit. At or past 45 minutes, start nothing new: commit what is green and return `PARTIAL` (see Report). Never commit red work to make the deadline; uncommitted red work is listed as remaining scope. The engine turns the remainder into a follow-on task; you do not re-plan or dispatch it.
+
+## Inner loop
+
+While iterating, run only the focused tests for the files you changed. Run the full suite once at the end, before you report. Full device, simulator, cluster or integration proof is not your loop: it belongs to qa or the per-merge gate, unless the plan entry marks the task as a proving task (`proof: full_device|cluster`).
+
 ## Skill routing
 
 Use the dispatch's REQUIRED skills, deduplicated against skills already loaded
@@ -67,6 +75,7 @@ Status, files changed, each test command with its suite line (below), and any co
 - `BLOCKED` - you cannot proceed. Say what would unblock you.
 - `NEEDS_CONTEXT` - information was missing. Name it.
 - `NEEDS_SETUP` - a REQUIRED skill could not load. Never improvise a competency you were not given; a plausible-looking result produced without the house patterns is worse than an honest stop.
+- `PARTIAL` - the 45-minute time-box ran out; green work is committed. Add this block, field names exact: `green_commit: <sha>`, `done_cases: <ids>`, `remaining_cases: <ids>`, `remaining_scope: <files and steps left, one short paragraph>`, `elapsed_min: <n>`; with nothing green, `green_commit` is the dispatch base SHA, never `none` or absent.
 
 Your return also carries one line, `skills_loaded: <comma-separated names>`, naming every skill you invoked or had preloaded, each fully qualified as it loaded (`graph-engineering:bruno`, never bare `bruno`; a skill with no plugin stays bare); the engine checks it against the REQUIRED skills your dispatch named, exact name for exact name.
 
@@ -77,4 +86,4 @@ Confirm consumed contracts are ready before editing. Synthetic examples must be
 labelled; domain claims require the plan's real witness and an independent oracle.
 
 Return at most 1,500 tokens: status, commits or artifact paths, case IDs and results, blockers. Keep logs in run artifacts. Report every suite you ran as `<command>: exit=<n> complete|partial`. Never wait with sleep or until loops. For a command that takes longer than one call, use run_in_background only if your dispatch says you run in the background; otherwise make one blocking call with an explicit timeout (at most 600000 ms). Never end your turn while you still need a result.
-For a suite longer than one call, use `<plugin root>/hooks/scripts/wait-run.sh --log <absolute path> -- <argv>` with a Bash timeout above its 270 s block; exit 75 means still running, so call it again without a command to attach.
+For a suite longer than one call, use `<plugin root>/hooks/scripts/wait-run.sh --log <absolute path> -- <argv>` with a Bash timeout above its 270 s block; exit 75 means still running, so call it again without a command to attach. Run the end-of-task full suite as `wait-run.sh --full --log <absolute path> -- <argv>`: two full runs per task are free, and a third needs `--reason "<why>"`. A shell loop that sleeps is denied by a hook in this role.

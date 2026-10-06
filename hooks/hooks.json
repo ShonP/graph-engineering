@@ -1,5 +1,5 @@
 {
-  "description": "graph-engineering: async lint on edit, destructive-command and agent-policy guards, test on stop, handoff on session start",
+  "description": "graph-engineering: async lint on edit, destructive-command, sleep-loop and agent-policy guards, test on stop, handoff on session start",
   "hooks": {
     "PostToolUse": [
       {
@@ -39,6 +39,12 @@
             "args": [],
             "if": "Bash(docker *)",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/guard-poll-loop.sh",
+            "args": [],
+            "timeout": 5
           }
         ]
       },

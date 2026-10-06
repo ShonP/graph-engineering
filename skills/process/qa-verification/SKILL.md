@@ -9,8 +9,10 @@ Review reads code; QA runs it. This skill verifies acceptance criteria against a
 
 ## Protocol
 
-qa runs once per merge unit or wave: the stack is stood up once and every
-task's criteria in that unit are rows of one report, never once per task.
+qa runs once per merge unit, on the run branch after the unit's last task
+merges: the stack is stood up once and every task's criteria in that unit are
+rows of one report, never once per task. With the ready queue the merge unit is
+the whole run unless the plan splits it.
 
 1. **Read the acceptance criteria** from the task/plan. Each becomes one checklist row. No criteria = `NEEDS_SETUP` (ask the planner, do not invent criteria).
 2. **Stand the system up from the profile's `runtime` block.** A nonempty

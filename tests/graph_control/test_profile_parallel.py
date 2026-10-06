@@ -14,6 +14,11 @@ from test_profile_template import ROOT, load_template
 from test_profile_v2 import comment_before
 
 COMMAND = ROOT / "commands" / "graph-init.md"
+LANES_DOC = ROOT / "docs" / "engine" / "lanes.md"
+TEMPLATE = ROOT / "templates" / "graph-profile.yaml"
+HOST = ROOT / "scripts" / "graph_control" / "host.py"
+SLOT_RULE = "independent instances"
+NAMESPACE_RULE = "per-task namespace"
 TIERS = {"opus", "sonnet"}
 NEW_ROLES = {"reviewer-lead": "opus", "qa-lead": "sonnet", "researcher-spike": "sonnet"}
 LANES_EXAMPLE = {"xcodebuild": 1, "cluster": 1, "local_db": 1}
@@ -120,6 +125,37 @@ class GraphInitTests(unittest.TestCase):
         section = paragraph("**Host floor.**")
         for needle in ("host.min_free_gb", "host-check", "20", "runtime.none", "docker", "lanes", "approv"):
             self.assertIn(needle, section, needle)
+
+
+class LaneSlotTests(unittest.TestCase):
+    """AC-LN-1: slots count the instances a host can run; a per-task namespace beats a lane."""
+
+    def test_lanes_doc_states_the_slot_and_namespace_rules(self):
+        doc = LANES_DOC.read_text()
+        for needle in (SLOT_RULE, NAMESPACE_RULE, "GRAPH_RUN_ID", "<run>-t<n>",
+                       "cannot be multiplied", "per-merge gate"):
+            self.assertIn(needle, doc, needle)
+
+    def test_template_lanes_comment_carries_both_rules(self):
+        comment = comment_before("lanes:")
+        self.assertIn(SLOT_RULE, comment)
+        self.assertIn(NAMESPACE_RULE, comment)
+
+    def test_graph_init_proposes_slots_from_evidence_not_one_by_default(self):
+        section = paragraph("**Lanes.**")
+        self.assertNotIn("each with 1 slot", section)
+        self.assertIn(SLOT_RULE, section)
+        self.assertIn(NAMESPACE_RULE, section)
+
+    def test_host_floor_is_held_per_dispatch(self):
+        self.assertIn("before each implementer dispatch", paragraph("**Host floor.**"))
+        self.assertIn("before each implementer dispatch", comment_before("host:"))
+
+    def test_no_wave_or_cluster_turn_wording(self):
+        for path in (LANES_DOC, COMMAND, TEMPLATE, HOST):
+            with self.subTest(path=path.name):
+                self.assertIsNone(re.search(r"implementation wave|cluster turn", path.read_text()))
+        self.assertNotIn("wave", HOST.read_text().split('"""')[1])
 
 
 if __name__ == "__main__":

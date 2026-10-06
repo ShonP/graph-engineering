@@ -1,4 +1,4 @@
-"""Host inspection before a wave: free disk, load, a bare repo, base freshness, docker.
+"""Host inspection before an implementer dispatch: free disk, load, a bare repo, base freshness, docker.
 
 This is host inspection, not project execution; graph_control never runs a
 configured project command. The only processes started are:
@@ -61,7 +61,8 @@ def _load() -> list[Finding]:
     if load < cores:
         return []
     return [Finding("warn", "load-high", f"1-minute load average {load:.2f} is at or above the {cores} cores",
-                    "let running builds or agents finish before dispatching more, or narrow the wave")]
+                    "let running builds or agents finish before dispatching more, "
+                    "or lower the ready-queue width (--max-width)")]
 
 
 def _git(root: Path, *args: str) -> str | None:

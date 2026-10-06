@@ -147,16 +147,19 @@ bootstrap: []
 # may hold the lane at once. The engine wraps each command that uses a lane as
 #   scripts/lane-run.sh <lane> --slots <n> -- <command>
 # which holds the lock for the life of that process, so a killed agent frees
-# it. Undeclared lanes are not serialized. It ships empty, e.g.:
+# it. Undeclared lanes are not serialized.
+# Slots = the independent instances the host can run at once (1 only if one).
+# Prefer a per-task namespace from GRAPH_RUN_ID (<run>-t<n>) over a lane.
+# It ships empty, e.g.:
 #   lanes: {xcodebuild: 1, cluster: 1, local_db: 1}
 #   xcodebuild  Xcode builds and tests (CPU, simulators, DerivedData)
 #   cluster     the `infra.cluster` throwaway cluster (memory, disk)
 #   local_db    a `runtime` stack not isolated per GRAPH_RUN_ID (one database)
 lanes: {}
 
-# The free-disk floor `graph-control host-check` holds before each
-# implementation wave: below `min_free_gb` GB (10^9 bytes) on the run
-# worktree's volume the wave is BLOCKED and becomes a decision card. /graph-init
+# The free-disk floor `graph-control host-check` holds
+# before each implementer dispatch: below `min_free_gb` GB (10^9 bytes) on the
+# run worktree's volume the dispatch is BLOCKED and becomes a decision card. /graph-init
 # proposes it from the stack: 20 for container runtimes, device builds or
 # `lanes`, less (5 is plenty) for a `runtime.none` library or CLI.
 host:

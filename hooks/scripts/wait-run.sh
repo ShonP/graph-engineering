@@ -5,7 +5,10 @@
 # foreground subagent's background jobs die when it ends its turn, so this
 # starts the command detached and blocks for at most S seconds per call.
 #
-#   wait-run.sh --log <absolute path> [--max-block S] [-- <argv...>]
+#   wait-run.sh --log <absolute path> [--max-block S] [--full [--reason TEXT]] [-- <argv...>]
+#
+# --full marks a full-suite start: each GRAPH_RUN_ID gets two free full runs,
+# and a later one without --reason is refused with exit 2 before it starts.
 #
 # With argv: start it (refused with exit 2 while a job for the log still runs),
 # then wait. Without argv: attach to the job and wait. S defaults to 270, so a
