@@ -101,10 +101,13 @@ class Lease(SimFixture):
         self.assertEqual(again.returncode, 0, again.stderr)
 
     def test_a_malformed_lease_id_is_a_usage_error(self):
-        for bad in ("../../etc/passwd", "*", ""):
+        # A real lease exists, so a wildcard or traversal id that reached the glob would match it.
+        self.acquire("--device", A)
+        for bad in ("*", "?" * 16, "../*", ""):
             with self.subTest(bad):
                 result = self.session("run", "--lease", bad, "--", "true")
                 self.assertEqual(result.returncode, 2)
+                self.assertIn("16 hex", result.stderr)
 
 
 if __name__ == "__main__":
