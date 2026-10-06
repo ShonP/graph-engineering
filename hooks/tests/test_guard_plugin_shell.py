@@ -113,6 +113,11 @@ class FastPath(unittest.TestCase):
     def test_clean_command_never_starts_python(self):
         self.assertFalse(self.started(fixture('clean-ls.json')))
 
+    def test_no_plugin_script_name_never_starts_python(self):
+        for command in ('echo "$HOME" && cd "$TMPDIR"', "bash -c 'make test' && echo rc=$?"):
+            with self.subTest(command):
+                self.assertFalse(self.started(bash_payload(command)))
+
     def test_trigger_reaches_python(self):
         self.assertTrue(self.started(fixture('trigger.json')), 'control: the stub is on the path')
 
