@@ -167,6 +167,20 @@ class Edges(Base):
         self.assertEqual(result.returncode, 127)
         self.assertIn("no-such-tool", result.stdout)
 
+    def test_header_script_file_shape_runs_a_non_executable_file(self):
+        # A file made with the Write tool is 0644: exec'd bare it is 127, so the header
+        # teaches passing it through its interpreter.
+        header = SCRIPT.read_text(encoding="utf-8").split("\nset ", 1)[0]
+        self.assertIn("`bash <absolute path>`", header)
+        job = self.work / "suite.sh"
+        job.write_text("set -o pipefail\necho piped | cat\n")
+        job.chmod(0o644)
+        bare = self.run_wait("--", str(job))
+        self.assertEqual(bare.returncode, 127, bare.stdout)
+        result = self.run_wait("--", "bash", str(job))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("piped", self.log.read_text())
+
     def test_job_holds_no_descriptor_of_the_caller(self):
         # A harness waits for EOF on the pipes it handed the shell; an orphan
         # holding one open would hang the call for the job's whole life.
