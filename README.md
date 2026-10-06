@@ -322,7 +322,7 @@ are vendored from upstream. A vendored tree carries a `SOURCE.md` naming the
 upstream repo, the pinned commit, the license, and a copy-paste refresh recipe,
 plus the upstream `LICENSE` (and `NOTICE` where the license requires it). A
 vendored file is never edited, not even to fix it: a house rule that contradicts
-one lives in a sibling skill, which spec 4.5 precedence (house >
+one lives in a sibling skill, which the house precedence (house >
 vault-generated > community) makes win. `skills/python/pydantic-house-rules` is
 the worked example.
 
@@ -351,12 +351,9 @@ prompt on first use in an interactive session, and in a non-interactive run
 body. Pre-allow `Bash(npx:*)` and `Bash(npm:*)` on the runner, or pass
 `--allowedTools`, wherever a headless run needs those two skills.
 
-How each skill was sourced, and what was rejected:
-`docs/superpowers/plans/2026-09-10-stack-skills.md` and
-`docs/research/2026-09-10-stack-skills-sourcing.md`; for `ruff`, `sqlalchemy`,
-`loguru` and `nats`, `docs/research/2026-09-23-python-skills-sourcing.md`; for
-`tailwind`, `forms-i18n` and `turborepo`,
-`docs/research/2026-09-24-frontend-skills-sourcing.md`.
+How each skill was sourced: a vendored skill's `SOURCE.md` records its
+upstream, pinned commit, license and refresh recipe, and the sourcing decisions
+(including what was rejected) are summarised per release in `CHANGELOG.md`.
 
 ## House rules
 
@@ -430,8 +427,9 @@ than a migration.
 
 ## Design
 
-`docs/superpowers/specs/2026-08-31-graph-engineering-plugin-design.md` records
-the decisions and, more usefully, what was rejected and why.
+How the engine runs is `docs/engine/run.md` and `docs/playbooks.md`. Why each
+change was made, and what was rejected, is in `CHANGELOG.md`, release by
+release. The original 2026-08-31 design spec is in git history.
 
 ## Efficient delivery with explicit evidence
 

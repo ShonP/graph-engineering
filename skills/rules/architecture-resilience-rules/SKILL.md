@@ -4,7 +4,6 @@ description: Apply for architecture, distributed systems, APIs, reliability, ide
 ---
 
 # Architecture + Resilience Rules
-Harvested from the owner's global rule packs on 2026-09-10 (spec 4.3); the plugin copy is the portable one.
 
 Use when designing or changing service architecture, APIs, distributed workflows, queue consumers, event systems, or external dependency handling.
 

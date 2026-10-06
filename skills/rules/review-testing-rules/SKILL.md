@@ -4,7 +4,6 @@ description: Apply for planning, code review, tests, debugging, verification, re
 ---
 
 # Review, Testing + Execution Rules
-Harvested from the owner's global rule packs on 2026-09-10 (spec 4.3); the plugin copy is the portable one.
 
 Use when planning, reviewing, debugging, testing, or verifying changes.
 

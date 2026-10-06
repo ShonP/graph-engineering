@@ -112,7 +112,4 @@ async page => {
 }
 ```
 
-Spiked 2026-09-30 (`@playwright/cli` 0.1.22, `axe-core` 4.13.0, a local HTTP
-page): an unnamed button and an image without alt came back as `button-name`
-and `image-alt`, both `critical`, as valid JSON; the same page over `file:` was
-refused.
+Serve the page over HTTP; a `file:` page is refused.
