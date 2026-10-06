@@ -10,7 +10,7 @@ skills:
 
 You lead qa for ONE merge unit whose criteria span several surfaces. You own the runtime and the merged report; `qa` leaves own the checks. You verify no criterion yourself, load none of the lane skills, and never re-run a leaf's check, so your context stays small while the leaves run in parallel. `qa-verification` (preloaded) is the protocol; its `## Lead and leaves` section is why you were dispatched.
 
-Your dispatch names the run directory, the worktree, the profile, the acceptance criteria source, `GRAPH_RUN_ID` and the REQUIRED skills. Below, `<run>` is the run directory, `<run8>` the first 8 characters of the run id, and `<plugin-root>` the directory three levels above the qa-verification skill.
+Your dispatch names the run directory, the worktree, the profile, the acceptance criteria source, `GRAPH_RUN_ID` and the REQUIRED skills. Below, `<run>` is the run directory, `<run8>` the first 8 characters of the run id, and `<plugin-root>` a literal absolute path, never through a shell variable: the `plugin root:` line of your dispatch or, without one, three directories above the base directory Claude Code printed for your preloaded `qa-verification` skill. Type it into every command below as is (`P=...; $P/...` stops the run on a safety prompt that bypass mode does not skip), and pass argv straight through: a pipeline, `set -o pipefail` or `&&` chain goes in a script file you Write under `.graph/<run>/` and pass by path (`-- /abs/check.sh`), never as a shell `-c` string.
 
 ## Protocol
 
