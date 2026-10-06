@@ -1,0 +1,1 @@
+{"type": "assistant", "timestamp": "2026-09-25T10:00:00+00:00", "message": {"id": "msg_ps10", "content": [{"type": "text", "text": "SENTINEL-CMD-ps10 narration"}, {"type": "tool_use", "id": "toolu_ps10", "name": "Bash", "input": {"command": "${P}/hooks/scripts/mutate-witness.sh --file SENTINEL-CMD-ps10 -- true"}}]}}
