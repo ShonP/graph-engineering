@@ -73,8 +73,27 @@ def candidates(line: str) -> list[str]:
     return texts + BACKTICK_SPAN.findall(line)
 
 
+def logical(numbered) -> list[tuple[int, str]]:
+    """Join lines ending in `\\` into one command, numbered by its first physical line.
+
+    A continued comment (`# a \\` then `#   b`) drops the next line's `#`, so a usage
+    block split over comment lines reads as the one command a reader copies.
+    """
+    joined: list[tuple[int, str]] = []
+    for n, text in numbered:
+        if joined and joined[-1][1].rstrip().endswith("\\"):
+            first, head = joined[-1]
+            tail = text.lstrip()
+            if head.lstrip().startswith("#"):
+                tail = tail.lstrip("#").lstrip()
+            joined[-1] = (first, f"{head.rstrip()[:-1].rstrip()} {tail}")
+        else:
+            joined.append((n, text))
+    return joined
+
+
 def s1_hits(rel: str, lines: list[str]) -> list[str]:
-    return [f"{rel}:{n} S1" for n, line in enumerate(lines, 1)
+    return [f"{rel}:{n} S1" for n, line in logical(enumerate(lines, 1))
             if any(find_violation(text) for text in candidates(line))]
 
 
@@ -103,7 +122,7 @@ def shell_c_after_dashdash(text: str) -> bool:
 def s2_hits(rel: str, lines: list[str]) -> list[str]:
     if rel.rsplit("/", 1)[-1] not in PLUGIN_SCRIPTS:
         return []
-    return [f"{rel}:{n} S2" for n, text in header(lines) if shell_c_after_dashdash(text)]
+    return [f"{rel}:{n} S2" for n, text in logical(header(lines)) if shell_c_after_dashdash(text)]
 
 
 def s3_hits(rel: str, text: str) -> list[str]:
@@ -154,8 +173,29 @@ PLANTED = {
         f"`<plugin root>` is a {PHRASE}.\n"
     ),
 }
+# Backslash-continued twins (review F1): the `-c` wrapper sits on a later physical line.
+WAIT = "/abs/plugin/hooks/scripts/wait-run.sh --full --log /l.log \\\n"
+WITNESS = ("/abs/plugin/skills/process/review-protocol/scripts/mutate-witness.sh --file src/x.py \\\n"
+           "  --lines 3-4 --find '<' --replace '<=' --receipt /abs/r.json \\\n")
+CONTINUED = {
+    "agents/b.md": f"# B\n\n```bash\n{WAIT}  -- bash -c 'set -o pipefail; tools/check'\n```\n",
+    "agents/b-clean.md": f"# B\n\n```bash\n{WAIT}  -- bash /abs/check.sh\n```\n",
+    "skills/a/SKILL.md": f"# A\n\n```bash\n{WITNESS}  -- sh -c 'cd sub && make test'\n```\n",
+    "skills/a-clean/SKILL.md": f"# A\n\n```bash\n{WITNESS}  -- bash /abs/check.sh\n```\n",
+    "scripts/usage.sh": f"#!/usr/bin/env bash\n# Usage:\n#   {WAIT}#     -- bash -c 'tools/check'\nset -eu\n",
+    "scripts/usage-clean.sh": f"#!/usr/bin/env bash\n# Usage:\n#   {WAIT}#     -- bash /abs/check.sh\nset -eu\n",
+    "skills/v/scripts/lane-run.sh":
+        "#!/usr/bin/env bash\n# Usage: lane-run.sh --lane a -- \\\n#   sh -c 'make test'\nset -eu\n",
+    "skills/u/scripts/lane-run.sh":
+        "#!/usr/bin/env bash\n# Usage: lane-run.sh --lane a -- \\\n#   bash /abs/check.sh\nset -eu\n",
+}
+PLANTED.update(CONTINUED)
 PLANTED_HITS = [
+    "agents/b.md:4 S1",
     "agents/x.md:6 S1",
+    "scripts/usage.sh:3 S1",
+    "skills/a/SKILL.md:4 S1",
+    "skills/v/scripts/lane-run.sh:2 S2",
     "skills/y/scripts/mutate-witness.sh:3 S2",
     "agents/z.md S3",
 ]

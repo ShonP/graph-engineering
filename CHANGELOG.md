@@ -11,12 +11,14 @@ commits.
 ## [Unreleased]
 
 Unattended runs no longer stop on Claude Code's inline-shell `rm` safety
-prompt. From Claude Code 2.1.288, a Bash call whose command name starts with a
-variable, or that wraps a script in `bash -c`/`sh -c`, waits for an answer even
-in bypass mode. Our own guidance taught agents both shapes (`<plugin root>`
-expanded into `P=...; $P/hooks/scripts/wait-run.sh`, and `-- sh -c '...'` in
-the mutation witness header), so the fix is in what the plugin teaches, and the
-safety check stays on.
+prompt. From Claude Code 2.1.288, a Bash call holding a `-c` shell script that
+Claude Code cannot check waits for an answer even in bypass mode, when that
+call also has an `rm` word, brace expansion or a command named by a variable.
+Our own guidance taught agents both halves (`<plugin root>` expanded into
+`P=...; $P/hooks/scripts/wait-run.sh`, and `-- sh -c '...'` in the mutation
+witness header). It now teaches neither the `$VAR/` command name nor the `-c`
+wrapper, so the fix is in what the plugin teaches, and the safety check stays
+on.
 
 ### Added
 
