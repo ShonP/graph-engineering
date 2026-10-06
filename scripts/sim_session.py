@@ -128,33 +128,37 @@ def release(lease_id: str) -> int:
 
 
 def execute(command: list[str], udid: str, keep_gui: bool) -> int:
-    """Run argv on udid. A reboot the command makes stays the wrappers' (devices.rebind)."""
-    with sims.locked():
-        before = (sims.read_marker(udid) or {}).get("booted_at")
-    try:
-        return run_child(command, udid, keep_gui)
-    finally:
-        with sims.locked():
-            devices.rebind(udid, before)
-
-
-def run_child(command: list[str], udid: str, keep_gui: bool) -> int:
-    if keep_gui:
-        subprocess.run(["open", "-a", "Simulator", "--args", "-CurrentDeviceUDID", udid], check=False)
-    try:
-        child = subprocess.Popen(command, env=dict(os.environ, SIM_UDID=udid))
-    except OSError as error:
-        print(f"sim-session: cannot run {command[0]}: {error}", file=sys.stderr)
-        return 127
+    """Run argv on udid. A reboot the command makes stays the wrappers' (devices.rebind).
+    Signals are caught first: one that lands before argv starts ends the run without it."""
+    children: list[subprocess.Popen] = []
+    caught: list[int] = []
 
     def forward(signum, _frame):
-        if child.poll() is None:
-            child.send_signal(signum)
+        caught.append(signum)
+        if children and children[0].poll() is None:
+            children[0].send_signal(signum)
 
     for signum in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
         signal.signal(signum, forward)
-    code = child.wait()
-    return 128 - code if code < 0 else code
+    with sims.locked():
+        before = (sims.read_marker(udid) or {}).get("booted_at")
+    try:
+        if caught:
+            return 128 + caught[0]
+        if keep_gui:
+            subprocess.run(["open", "-a", "Simulator", "--args", "-CurrentDeviceUDID", udid], check=False)
+        try:
+            children.append(subprocess.Popen(command, env=dict(os.environ, SIM_UDID=udid)))
+        except OSError as error:
+            print(f"sim-session: cannot run {command[0]}: {error}", file=sys.stderr)
+            return 127
+        if caught and children[0].poll() is None:  # landed between the check above and the spawn
+            children[0].send_signal(caught[0])
+        code = children[0].wait()
+        return 128 - code if code < 0 else code
+    finally:
+        with sims.locked():
+            devices.rebind(udid, before)
 
 
 def acquire(args: argparse.Namespace, kind: str) -> dict | int:
