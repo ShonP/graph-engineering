@@ -32,7 +32,7 @@ def handler(name, **extra):
 class RegistrationContract(unittest.TestCase):
     def test_events_are_exactly_the_contract(self):
         self.assertEqual(
-            sorted(load()), ["PostToolUse", "PreToolUse", "SessionStart", "Stop"]
+            sorted(load()), ["PostToolUse", "PreToolUse", "SessionStart", "Stop", "SubagentStop"]
         )
 
     def test_posttooluse_lint_is_async(self):
@@ -70,7 +70,17 @@ class RegistrationContract(unittest.TestCase):
     def test_stop_rewakes_and_has_no_matcher(self):
         self.assertEqual(
             load()["Stop"],
-            [{"hooks": [handler("test-before-stop.sh", timeout=620, asyncRewake=True)]}],
+            [
+                {"hooks": [handler("test-before-stop.sh", timeout=620, asyncRewake=True)]},
+                {"hooks": [handler("reap-simulators.sh", timeout=5, **{"async": True})]},
+            ],
+        )
+
+    def test_subagent_stop_reaps_simulators_in_the_background(self):
+        # A subagent that booted a simulator and ended is the leak the owner saw.
+        self.assertEqual(
+            load()["SubagentStop"],
+            [{"hooks": [handler("reap-simulators.sh", timeout=5, **{"async": True})]}],
         )
 
     def test_sessionstart_matcher_is_an_exact_list(self):
@@ -92,7 +102,7 @@ class RegistrationContract(unittest.TestCase):
         for event, groups in load().items():
             for group in groups:
                 for h in group["hooks"]:
-                    if event in ("Stop", "SessionStart"):
+                    if event in ("Stop", "SubagentStop", "SessionStart"):
                         self.assertNotIn("if", h, event)
                     if "if" in h:
                         # one permission rule: no list, pipe or brace syntax

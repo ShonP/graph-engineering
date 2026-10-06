@@ -11,6 +11,7 @@ import datetime
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 STATE = Path(os.environ["FAKE_SIM_STATE"])
@@ -62,6 +63,7 @@ def simctl(args):
 def main():
     tool = Path(sys.argv[0]).name
     args = sys.argv[1:]
+    time.sleep(float(os.environ.get("FAKE_SIM_DELAY") or 0))  # a slow host, for budget tests
     with LOG.open("a") as log:
         log.write(" ".join([tool, *args]) + "\n")
     if tool == "xcrun":
