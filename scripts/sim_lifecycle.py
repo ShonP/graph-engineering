@@ -103,10 +103,6 @@ def read_marker(udid: str) -> dict | None:
     return marker if isinstance(marker, dict) else None
 
 
-def marker_name(udid: str) -> str | None:
-    return (read_marker(udid) or {}).get("name")
-
-
 def device(udid: str) -> dict | None:
     return next((d for d in devices() if d["udid"] == udid), None)
 

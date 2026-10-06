@@ -115,6 +115,30 @@ def live(lease: dict, idle: float) -> bool:
         return False
 
 
+def expired(lease: dict | None, idle: float) -> bool:
+    """No holder process runs and the lease sat unused past its window, whatever its kind. A
+    lease that cannot be read is never expired: nothing proves its holder gone."""
+    found = (lease or {}).get("holders")
+    if lease is None or (isinstance(found, list) and any(alive(h) for h in found)):
+        return False
+    try:
+        window = max(idle, float(lease.get("idle_min") or 0))
+        return sims.now() - float(lease["last_used_at"]) >= window * 60
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
+def free(udid: str, idle: float) -> bool:
+    """Release udid's expired leases; True when none is left, so acquire may hand the device out."""
+    left = False
+    for file, lease in on(udid):
+        if expired(lease, idle):
+            file.unlink(missing_ok=True)
+        else:
+            left = True
+    return not left
+
+
 def on(udid: str) -> list[tuple[Path, dict | None]]:
     return [(file, read(file)) for file in sims.state_dir().glob(f"{udid}.*.lease")]
 

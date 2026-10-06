@@ -2,9 +2,9 @@
 
 By default sim-session.sh reuses an idle graph-sim device on the newest iOS
 runtime, or creates one (newest iPhone type). A device with any other name is
-booted or shut down only when --device names it AND --allow-foreign is passed;
-the reaper never touches it. Idle graph-sim devices last booted over 7 days
-ago are deleted. SYNTHETIC fixture throughout.
+used only when --device names it AND --allow-foreign is passed, and nothing
+ever shuts it down (test_sim_invariants.py). Idle graph-sim devices last
+booted over 7 days ago are deleted. SYNTHETIC fixture throughout.
 """
 
 import json
@@ -63,12 +63,6 @@ class Dedicated(SimFixture):
         self.assertEqual(result.returncode, 2)
         self.assertIn("--allow-foreign", result.stderr)
         self.assertFalse(any(c.startswith("xcrun simctl boot") for c in self.calls()))
-
-    def test_allow_foreign_boots_and_closes_the_named_device(self):
-        result = self.session("--device", O, "--allow-foreign", "--", "true")
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(f"xcrun simctl boot {O}", self.calls())
-        self.assertEqual(self.device_state(O), "Shutdown")
 
     def test_reaper_never_touches_a_foreign_device_even_one_the_wrapper_booted(self):
         self.session("--device", O, "--allow-foreign", "--", "sh", "-c", "kill -9 $PPID")

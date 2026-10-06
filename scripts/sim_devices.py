@@ -4,14 +4,15 @@ Dedicated devices: the wrappers never use the owner's simulators. By default
 they reuse, or `simctl create`, a device named `graph-sim-<runtime>-<n>` (the
 newest iPhone type on the newest available iOS runtime), so the owner's Xcode
 or XcodeBuildMCP never lands on a device a wrapper will shut down. A device
-with any other name is booted or shut down only when `--device` names it and
-`--allow-foreign` is passed; the reaper never touches one.
+with any other name is used only when `--device` names it and
+`--allow-foreign` is passed, and nothing ever shuts it down.
 
-Boot binding: a marker claims one boot, the device's lastBootedAt when the
-wrapper booted it. A device booted again since (the owner's `simctl shutdown
-all` then Xcode, a Mac reboot) is not the wrappers' to close, whatever its
-marker says. A device listing without lastBootedAt binds to nothing, so the
-default on such a host is to leave devices running, never to close one.
+Boot binding: a marker claims one boot of a graph-sim device, its lastBootedAt
+right after the wrapper's own boot. Any other boot (the owner's `simctl
+shutdown all` then Xcode, a Mac reboot, a step's own reboot) is not the
+wrappers' to close, whatever its marker says, and is never adopted. A device
+listing without lastBootedAt binds to nothing, so the default on such a host
+is to leave devices running, never to close one.
 """
 
 import datetime
@@ -31,10 +32,11 @@ def dedicated(device: dict) -> bool:
 
 
 def bound(device: dict) -> bool:
-    """A wrapper booted this device and nothing booted it again since."""
+    """A graph-sim device a wrapper booted, and nothing booted it again since: the only kind
+    anything here shuts down."""
     marker = sims.read_marker(device["udid"])
     stamp = device.get("lastBootedAt")
-    return marker is not None and stamp is not None and marker.get("booted_at") == stamp
+    return dedicated(device) and marker is not None and stamp is not None and marker.get("booted_at") == stamp
 
 
 def booted_at(udid: str) -> str | None:
@@ -73,14 +75,14 @@ def create(runtime: dict) -> dict | None:
 
 
 def pick(idle: float) -> dict | None:
-    """The first graph-sim device on the newest iOS runtime no live lease holds, else a new one.
-    Call under the lock, so two acquires never both create."""
+    """The first graph-sim device on the newest iOS runtime with no unreleased lease, else a new
+    one. Call under the lock, so two acquires never both create."""
     runtime = newest_ios_runtime()
     if runtime is None:
         return None
     ours = sorted((d for d in sims.devices("available") if dedicated(d) and d["runtime"] == runtime["identifier"]),
                   key=lambda d: suffix(d["name"]))
-    return next((d for d in ours if not leases.live_on(d["udid"], idle)), None) or create(runtime)
+    return next((d for d in ours if leases.free(d["udid"], idle)), None) or create(runtime)
 
 
 def resolve(wanted: str | None, allow_foreign: bool, idle: float) -> tuple[dict | None, str]:
@@ -95,15 +97,6 @@ def resolve(wanted: str | None, allow_foreign: bool, idle: float) -> tuple[dict 
         return None, (f"{wanted} is not a dedicated {PREFIX}* device, and agents never touch other devices; "
                       "omit --device to get a dedicated one, or pass --allow-foreign when the owner named it")
     return device, ""
-
-
-def rebind(udid: str, before: str | None) -> None:
-    """After the wrapper's own step: when the step rebooted the device (the marker still names the
-    boot the step started on), the new boot is the wrappers' too. Call under the lock."""
-    marker = sims.read_marker(udid)
-    now = booted_at(udid)
-    if before is not None and marker and marker.get("booted_at") == before and now not in (None, before):
-        sims.marker_path(udid).write_text(json.dumps(dict(marker, booted_at=now)))
 
 
 def delete_days() -> float:

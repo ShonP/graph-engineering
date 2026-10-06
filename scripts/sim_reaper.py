@@ -22,8 +22,7 @@ Idle is measured from each lease's last_used_at, never from boot time.
 
 Then, unless --dry-run, leases that no longer hold anything are deleted,
 markers and leases of devices no longer booted, or booted again by someone
-else, are removed unless a live lease still holds them (a step may be
-rebooting the device), graph-sim devices shut down and unleased whose last
+else, are removed unless a live lease still holds them, graph-sim devices shut down and unleased whose last
 boot is older than $GRAPH_SIM_DELETE_DAYS (default 7) are deleted with
 `simctl delete` (`deleted <udid> (<name>)`), and Simulator.app is quit when it
 runs and no device is booted. --dry-run prints `would ...` and

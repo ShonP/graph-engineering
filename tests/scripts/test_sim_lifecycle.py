@@ -153,10 +153,11 @@ class Reaper(SimFixture):
         holder = self.start_holder(A, release)
         self.write_state({A: "Shutdown", B: "Shutdown"})  # mid `simctl shutdown; simctl boot`
         self.reap()
+        self.assertIn(f"{A}.json", self.files(), "a live lease keeps the claim while the device is down")
         self.write_state({A: "Booted", B: "Shutdown"})
         release.touch()
         holder.communicate(timeout=15)
-        self.assertEqual(self.device_state(A), "Shutdown", "the wrapper still closed what it booted")
+        self.assertEqual(self.device_state(A), "Booted", "the new boot is not the wrapper's, so it is left running")
 
     def test_dry_run_changes_nothing(self):
         # A leaked one-shot run (dead holder) and an idle lease: both reapable, both left on disk.

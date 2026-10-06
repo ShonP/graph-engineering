@@ -50,19 +50,6 @@ class BootBinding(SimFixture):
         self.assertNotIn(f"xcrun simctl shutdown {A}", self.calls())
         self.assertEqual([f for f in self.files() if f.startswith(A)], [], "stale marker removed")
 
-    def test_a_reboot_inside_the_wrappers_own_step_stays_the_wrappers(self):
-        # The step itself reboots the device (capture.sh does `simctl shutdown; simctl boot`).
-        reboot = f"xcrun simctl shutdown {A} && xcrun simctl boot {A}"
-        _, lease = self.acquire("--device", A)
-        self.set_device(A, lastBootedAt="2026-10-06T09:00:00Z")  # so the step's boot stamps a different time
-        before = json.loads((self.tmp / "sims" / f"{A}.json").read_text())
-        before["booted_at"] = "2026-10-06T09:00:00Z"
-        (self.tmp / "sims" / f"{A}.json").write_text(json.dumps(before))
-        step = self.session("run", "--lease", lease, "--", "sh", "-c", reboot)
-        self.assertEqual(step.returncode, 0, step.stderr)
-        self.session("release", "--lease", lease)
-        self.assertEqual(self.device_state(A), "Shutdown", "the wrapper still closed what it booted")
-
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
