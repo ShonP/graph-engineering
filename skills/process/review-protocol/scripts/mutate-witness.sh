@@ -18,8 +18,10 @@
 #   3. runs the test argv again. killed = it exited nonzero; 124 means it ran
 #      past --timeout (default 600 s per run) and its process group was killed.
 # The test runs in the subdirectory you invoked from. The copy holds tracked
-# files only, so fetch or link dependencies inside the argv, for example
-#   -- sh -c 'ln -s /abs/repo/node_modules . && npm test -- src/total.test.ts'
+# files only, so the test must fetch or link its dependencies itself. The argv
+# is spawned with no shell, so compound setup goes in a script file in the run
+# dir (link the dependency directory, then run the test) passed by its path:
+#   -- /abs/run/witness-test.sh
 # Python caches bytecode keyed on the source's mtime (one-second resolution) and
 # size, so a same-size edit within the same second would run stale bytecode and
 # the mutant would falsely survive. Both runs export PYTHONDONTWRITEBYTECODE=1,

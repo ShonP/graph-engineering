@@ -17,6 +17,9 @@
 # max_block=<S>s log=<path>`, plus the log's last 20 lines on a nonzero exit.
 # Exit: the job's code when complete, 75 when still running, 2 on an error.
 # Make the Bash call's own timeout longer than S. wait_run.py owns the logic.
+# The argv is spawned directly, with no shell: for a pipeline or `set -o
+# pipefail`, write a script file and pass its path. Call this script by its
+# literal absolute path.
 
 set -u
 
