@@ -50,13 +50,24 @@ in-flight runs first, or follow the 0.16.0 note below with `0.16.1`.
 - **Hook `reap-simulators.sh` on `Stop` and `SubagentStop`.** `async`, starts the
   reaper detached and returns; logs to `<sim dir>/reaper.log`. No `xcrun` on
   PATH starts nothing. Kill switch: `GRAPH_SIM_REAPER=off`.
+- **Dedicated devices and boot binding (`scripts/sim_devices.py`).** Agents
+  never use the owner's simulators: the wrapper reuses an idle
+  `graph-sim-<runtime>-<n>` device on the newest iOS runtime or `simctl
+  create`s one (the runtime's newest iPhone type). `--device` naming any other
+  device exits 2 unless `--allow-foreign` is passed too, and the reaper keeps
+  every non-graph-sim device (`reason=foreign`). Each marker records the
+  device's `lastBootedAt` at the wrapper's boot; release and the reaper leave a
+  device booted again outside the wrapper running (`reason=unmarked`) and
+  remove its stale marker and leases. Graph-sim devices unused for
+  `GRAPH_SIM_DELETE_DAYS` (default 7) are deleted to cap disk.
 
 ### Changed
 
 - **Simulator rule** in `implementer`, `qa-lead`, `qa-verification`,
   `ux-evidence` and `ux-journey`: every simulator use goes through
   `sim-session.sh` (headless). Never `open -a Simulator`. Close what you open.
-  Multi-step qa acquires once, runs each step with `run --lease`, and releases
+  Agents get dedicated `graph-sim-*` devices and never touch any other
+  simulator. Multi-step qa acquires once, runs each step with `run --lease`, and releases
   at the end; a single command uses the `--` form. `ux-evidence` captures
   `simctl io "$SIM_UDID"` instead of `booted`.
 
@@ -85,6 +96,18 @@ in-flight runs first, or follow the 0.16.0 note below with `0.16.1`.
   Reproduced on the owner's Mac 2026-10-06: `--dry-run` would have shut down a
   live qa lane's device driven by separate `xcodebuild` calls. Boot age says
   nothing about last use, so unmarked devices are now never reaped.
+- **Adopted after review, boot-bound claims:** a marker keyed only by udid
+  outlived its boot, so after `simctl shutdown all` and a fresh Xcode boot the
+  reaper shut the owner's new boot down (reproduced with the synthetic
+  fixture, 2026-10-06). The claim now carries the device's `lastBootedAt`
+  (present in real `simctl list devices -j`, checked on the owner's Mac), the
+  same fencing idea as a lease epoch: a claim on an older boot claims nothing.
+- **Adopted after review, dedicated devices:** CI device pools and fastlane
+  `scan` with a named device both run on devices the job owns. A headless
+  wrapper device the owner's Xcode could adopt was shut down under the owner,
+  so agents now create and use `graph-sim-*` devices only (owner decision
+  2026-10-06). Device type follows `simctl list runtimes -j`
+  `supportedDeviceTypes`, which lists the newest iPhone first.
 
 ## [0.16.0] - 2026-10-06
 

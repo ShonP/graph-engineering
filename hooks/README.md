@@ -169,7 +169,15 @@ live agent is using. Two scripts under `scripts/` carry it:
 
 - `sim-session.sh` boots the device with `xcrun simctl boot` (no
   Simulator.app window), writes a `<udid>.json` marker when it did the boot,
-  and hands out leases. One command: `sim-session.sh [--device <name|udid>]
+  and hands out leases. Devices are dedicated (`scripts/sim_devices.py`): by
+  default an idle `graph-sim-<runtime>-<n>` device on the newest iOS runtime,
+  `simctl create`d (newest iPhone type) when none is free, so the owner's own
+  simulators are never used. `--device` naming any device outside
+  `graph-sim-*` exits 2 unless `--allow-foreign` is passed too. The marker
+  records the device's `lastBootedAt` at that boot; a device booted again
+  since (the owner's `simctl shutdown all` then Xcode, a Mac reboot) is not the
+  wrappers' and is never shut down, unless the reboot happened inside the
+  wrapper's own step. One command: `sim-session.sh [--device <name|udid>]
   [--keep-gui] -- <argv>` acquires, runs argv with `SIM_UDID` exported, and
   releases on exit or a signal. Several tool calls: `sim-session.sh acquire`
   prints `SIM_UDID=` and `SIM_LEASE=`; each `sim-session.sh run --lease <id>
@@ -185,8 +193,12 @@ live agent is using. Two scripts under `scripts/` carry it:
   marker per wrapper-booted device and one `<udid>.<id>.lease` per holder
   (`scripts/sim_leases.py`).
 - `sim-reaper.sh [--dry-run] [--idle-minutes N]` never shuts down a device it
-  cannot prove is abandoned. A device with no marker (the owner's Xcode,
-  XcodeBuildMCP) is kept however long it has been up (`reason=unmarked`). A
+  cannot prove is abandoned. A device outside `graph-sim-*` is always kept
+  (`reason=foreign`). A graph-sim device with no marker for its current boot
+  (none, or a `booted_at` that differs from its `lastBootedAt`) is kept however
+  long it has been up (`reason=unmarked`), and the stale marker and leases are
+  removed. Graph-sim devices shut down, unleased and last booted over
+  `GRAPH_SIM_DELETE_DAYS` (default 7) ago are deleted (`simctl delete`). A
   marked device is kept while any lease holds it: a holder process runs (its
   start time is read under `LC_ALL=C TZ=UTC`, so a reaper in another locale or
   timezone agrees), or an acquired lease was used within its idle window of

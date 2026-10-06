@@ -54,7 +54,9 @@ the point; crop or highlight so the difference reads at thumbnail size.
      after). Captures spread over several tool calls: `sim-session.sh acquire`
      once, each capture as `sim-session.sh run --lease <id> -- <command>`, then
      `sim-session.sh release --lease <id>`. Never `open -a Simulator`.
-     Close what you open.
+     Close what you open. Agents get dedicated `graph-sim-*` devices (the
+     wrapper creates or reuses one) and never touch any other simulator: the
+     owner's devices are theirs.
    - Android: `adb exec-out screencap -p > <file>.png`, `adb shell screenrecord`.
    - If the repo already has a capture pipeline (profile `rules`), extend it;
      never build a parallel one.

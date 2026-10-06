@@ -37,6 +37,14 @@ class SimulatorRule(unittest.TestCase):
                 self.assertIn("release --lease", text)
                 self.assertNotIn("one script inside one wrapper call", text)
 
+    def test_every_simulator_guide_says_agents_get_dedicated_devices_only(self):
+        # F6: agents get graph-sim-* devices and never touch the owner's simulators.
+        for rel in GUIDES:
+            text = (ROOT / rel).read_text(encoding="utf-8")
+            with self.subTest(rel):
+                self.assertIn("`graph-sim-*`", text)
+                self.assertIn("never touch any other simulator", text)
+
     def test_capture_targets_the_wrapped_device_not_whatever_is_booted(self):
         text = (ROOT / "skills/process/ux-evidence/SKILL.md").read_text(encoding="utf-8")
         self.assertNotIn("simctl io booted", text)
