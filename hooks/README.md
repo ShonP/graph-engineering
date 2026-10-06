@@ -1,7 +1,7 @@
 # Plugin hooks
 
-Seven scripts ship with `graph-engineering`, registered in `hooks/hooks.json` as
-nine handlers. They are generic: nothing in them names a repo, a stack or a
+Eight scripts ship with `graph-engineering`, registered in `hooks/hooks.json` as
+eleven handlers. They are generic: nothing in them names a repo, a stack or a
 package manager. What to run is declared by the project in
 `.claude/graph-checks.json`; how agents are tiered is declared in the project's
 `.claude/graph-profile.yaml`. One more script, `scripts/wait-run.sh`, is not a
@@ -14,6 +14,7 @@ hook: agents call it by path to wait on a long suite (see wait-run below).
 | `PreToolUse`, `Bash` | `scripts/guard-poll-loop.sh` | sync, timeout 5, no `if` | Denies a shell loop that sleeps, only for an implementer subagent, and points it at `wait-run.sh`. Fails open. `GRAPH_POLL_GUARD=off` disables it |
 | `PreToolUse`, `Agent\|Task` | `scripts/guard-agent.sh` | sync, timeout 15 | Enforces the profile's `policy:` block on subagent calls |
 | `Stop`, no matcher | `scripts/test-before-stop.sh` | `asyncRewake`, timeout 620 | Runs the configured test after the turn ends and wakes Claude only when it fails. On an unchanged tree it replays the stored verdict instead (`<git common dir>/graph-engineering/checks-state.json`); any nonempty `GRAPH_CHECKS_NO_MEMO` turns that off |
+| `Stop` and `SubagentStop`, no matcher | `scripts/reap-simulators.sh` | `async`, timeout 5 | Starts `scripts/sim-reaper.sh` detached and returns: shuts down only simulators a wrapper booted that no live lease or running build holds, and quits an idle Simulator.app. `GRAPH_SIM_REAPER=off` disables it. Exit `0` always |
 | `SessionStart`, `startup\|clear\|compact` | `scripts/print-handoff.sh` | sync, timeout 15 | Prints the head of `docs/HANDOFF.md` into the new context, a warning when that file is over 150 lines, the reply contract when the repo has a profile, and one line when a run's success measures are due. Silent on resume, fork and `--agent` sessions. Exit `0` always |
 | `SessionStart`, `startup` | `scripts/doctor-on-start.sh` | sync, timeout 5 | Cached setup check: up to 3 lines of doctor findings, or a `/graph-init` hint. Silent when clean. Exit `0` always |
 
@@ -158,6 +159,67 @@ which is what wait-run gives.
   decision. Exit `0` always.
 - **Kill switch.** The owner sets `GRAPH_POLL_GUARD=off` under `env` in Claude
   Code settings; no deploy is needed. Unset or `on` means active.
+
+## Simulator reaper
+
+Agents boot iOS simulators for qa and evidence, and a simulator left booted
+holds gigabytes of RAM and a share of CPU until someone shuts it down. Many
+sessions share one Mac, so the fix must never shut down a simulator another
+live agent is using. Two scripts under `scripts/` carry it:
+
+- `sim-session.sh` boots the device with `xcrun simctl boot` (no
+  Simulator.app window), writes a `<udid>.json` marker when it did the boot,
+  and hands out leases. Devices are dedicated (`scripts/sim_devices.py`): by
+  default an idle `graph-sim-<runtime>-<n>` device on the newest iOS runtime,
+  `simctl create`d (newest iPhone type) when none is free, so the owner's own
+  simulators are never used. `--device` naming any device outside
+  `graph-sim-*` exits 2 unless `--allow-foreign` is passed too; that flag
+  runs steps on the device but never writes a marker for it, and nothing
+  (release, one-shot exit, reaper) ever shuts down a device outside
+  `graph-sim-*`. The marker records the graph-sim device's `lastBootedAt`
+  right after the wrapper's own boot; any other boot (the owner's `simctl
+  shutdown all` then Xcode, a Mac reboot, a step's own reboot) is not the
+  wrappers' and is logged and left running. One command: `sim-session.sh [--device <name|udid>]
+  [--keep-gui] -- <argv>` acquires, runs argv with `SIM_UDID` exported, and
+  releases on exit or a signal. Several tool calls: `sim-session.sh acquire`
+  prints `SIM_UDID=` and `SIM_LEASE=`; each `sim-session.sh run --lease <id>
+  -- <argv>` holds the lease while argv runs (concurrent steps each hold
+  their own slot) and sets
+  `last_used_at` to now before and after; `sim-session.sh release --lease
+  <id>` ends it. `run` on a lease past its idle window exits 2 (`lease
+  expired, acquire again`) without renewing it, and acquire never hands out a
+  device holding an unreleased lease; it releases an expired one only when no
+  holder process runs and the window has passed. Release shuts a wrapper-booted device down when no other live
+  lease holds it and no running `xcodebuild`, XCTest or `simctl` outside any
+  wrapper names it (then the reaper closes it later); the shell that launched
+  the wrapper, and its other ancestors, never count. A device someone else
+  booted is used and left running. Simulator.app is quit only when nothing is
+  booted. State: `${GRAPH_SIM_DIR:-~/.cache/graph-engineering/sims}`, one
+  marker per wrapper-booted device and one `<udid>.<id>.lease` per holder
+  (`scripts/sim_leases.py`).
+- `sim-reaper.sh [--dry-run] [--idle-minutes N]` never shuts down a device it
+  cannot prove is abandoned. A device outside `graph-sim-*` is always kept
+  (`reason=foreign`). A graph-sim device with no marker for its current boot
+  (none, or a `booted_at` that differs from its `lastBootedAt`) is kept however
+  long it has been up (`reason=unmarked`), and the stale marker and leases are
+  removed. Graph-sim devices shut down, unleased and last booted over
+  `GRAPH_SIM_DELETE_DAYS` (default 7) ago are deleted (`simctl delete`). A
+  marked device is kept while any lease holds it: a holder process runs (its
+  start time is read under `LC_ALL=C TZ=UTC`, so a reaper in another locale or
+  timezone agrees), or an acquired lease was used within its idle window of
+  `last_used_at`: `GRAPH_SIM_IDLE_MIN` at acquire (default 15), or N when
+  longer, never boot time (`reason=leased`); and
+  while a running `xcodebuild`, XCTest or `simctl` names it by udid or `name=`
+  (`reason=in-use`). Otherwise it is shut down (`reason=idle`, `dead-owner`
+  or `released`). A live lease keeps its claim while its device is down.
+  `--dry-run`
+  prints `would ...` and deletes nothing.
+
+`reap-simulators.sh` runs the reaper on `Stop` and `SubagentStop`. It is
+`async` and double-backgrounds the reaper with every descriptor redirected,
+so it costs one fork; it prints nothing. No `xcrun` on PATH means nothing
+starts. The log is `<sim dir>/reaper.log`, rolled to `reaper.log.1` past 1 MB.
+Kill switch: `GRAPH_SIM_REAPER=off` under `env` in Claude Code settings.
 
 ## Agent policy guard
 
@@ -359,6 +421,7 @@ python3 hooks/tests/test_doctor_on_start.py
 python3 hooks/tests/test_wait_run.py
 python3 hooks/tests/test_wait_count.py
 python3 hooks/tests/test_guard_poll_loop.py
+python3 hooks/tests/test_reap_simulators.py
 python3 -m unittest discover -s tests/measure
 ```
 

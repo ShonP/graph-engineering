@@ -10,6 +10,122 @@ commits.
 
 ## [Unreleased]
 
+## [0.16.1] - 2026-10-06
+
+Agents close the simulators they open. Subagents booted iOS simulators (and
+Simulator.app) for qa and evidence and left them running, holding CPU and RAM
+on a Mac many sessions share.
+
+**Upgrading.** As with every release, a run opened on 0.16.0 fails `preflight`
+after the upgrade (`run plugin version differs from executing helper`); finish
+in-flight runs first, or follow the 0.16.0 note below with `0.16.1`.
+
+### Added
+
+- **`scripts/sim-session.sh`, one-shot and lease forms.** Boots the device
+  headless (`xcrun simctl boot`, never Simulator.app unless `--keep-gui`) and
+  writes a `<udid>.json` marker when it did the boot.
+  `sim-session.sh [--device <name|udid>] -- <argv>` acquires, runs argv with
+  `SIM_UDID` exported, and releases on exit, SIGINT, SIGTERM or SIGHUP. For
+  work that spans tool calls, `sim-session.sh acquire` prints `SIM_UDID=` and
+  `SIM_LEASE=`; `sim-session.sh run --lease <id> -- <argv>` runs one step,
+  holding the lease while argv runs and renewing `last_used_at` before and
+  after; `sim-session.sh release --lease <id>` ends it. Release shuts a
+  wrapper-booted device down when no other live lease holds it and no running
+  `xcodebuild`/XCTest/`simctl` outside any wrapper names it; the shell that
+  launched the wrapper never counts. A device someone else booted is reused and
+  left running. Simulator.app is quit only when no device is booted. State
+  lives in `${GRAPH_SIM_DIR:-~/.cache/graph-engineering/sims}` under one fcntl
+  lock; leases are `<udid>.<id>.lease` (`scripts/sim_leases.py`).
+- **`scripts/sim-reaper.sh [--dry-run] [--idle-minutes N]`.** Never shuts down
+  a device it cannot prove is abandoned. A device without a marker (the
+  owner's Xcode, XcodeBuildMCP) is never touched, however old. A marked device
+  is shut down only when every lease on it is released, or its holder died, or
+  it sat unused since `last_used_at` past its idle window
+  (`GRAPH_SIM_IDLE_MIN` at acquire, default 15, recorded in the lease; N when
+  longer; never boot age), and no running
+  `xcodebuild`, XCTest or `simctl` names it by udid or `name=`. A live lease
+  keeps its claim while its device is down. `--dry-run` deletes nothing. Quits an idle
+  Simulator.app.
+- **Hook `reap-simulators.sh` on `Stop` and `SubagentStop`.** `async`, starts the
+  reaper detached and returns; logs to `<sim dir>/reaper.log`. No `xcrun` on
+  PATH starts nothing. Kill switch: `GRAPH_SIM_REAPER=off`.
+- **Dedicated devices and boot binding (`scripts/sim_devices.py`).** Agents
+  never use the owner's simulators: the wrapper reuses an idle
+  `graph-sim-<runtime>-<n>` device on the newest iOS runtime or `simctl
+  create`s one (the runtime's newest iPhone type). `--device` naming any other
+  device exits 2 unless `--allow-foreign` is passed too. Hard invariant:
+  nothing (release, one-shot exit, reaper) ever shuts down a device outside
+  `graph-sim-*`; `--allow-foreign` runs steps on one but writes no marker for
+  it (`reason=foreign`). Each marker records the graph-sim device's
+  `lastBootedAt` right after the wrapper's own boot, and only that boot is
+  ever shut down: any other one (the owner's, a Mac reboot, a step's own
+  reboot) is never adopted, but logged and left running (`reason=unmarked`),
+  its stale marker and leases removed. `run --lease` on an expired lease
+  exits 2 (`lease expired, acquire again`) without renewing it, and acquire
+  never hands out a device holding an unreleased lease: it releases an
+  expired one only when no holder process runs and the idle window passed. Graph-sim devices unused for
+  `GRAPH_SIM_DELETE_DAYS` (default 7) are deleted to cap disk.
+
+### Changed
+
+- **Simulator rule** in `implementer`, `qa-lead`, `qa-verification`,
+  `ux-evidence` and `ux-journey`: every simulator use goes through
+  `sim-session.sh` (headless). Never `open -a Simulator`. Close what you open.
+  Agents get dedicated `graph-sim-*` devices and never touch any other
+  simulator. Multi-step qa acquires once, runs each step with `run --lease`, and releases
+  at the end; a single command uses the `--` form. `ux-evidence` captures
+  `simctl io "$SIM_UDID"` instead of `booted`.
+
+### Prior art
+
+- **Adopted, one-shot form:** fastlane `scan` (2.240.1,
+  `scan/lib/scan/runner.rb`) records which devices were shut down before it
+  boots them and shuts only those down `at_exit`; the `--` form is that boot,
+  run, shut down what you booted cycle, trap-safe. Read in the source
+  2026-10-06.
+- **Rejected, shut down everything:** fastlane `snapshot`
+  (`simulator_launcher_base.rb`, `prepare_simulators_for_launch`) runs
+  `xcrun simctl shutdown booted` and kills Simulator.app before each run, and
+  `xcrun simctl shutdown all` is the common cleanup advice. Both kill a device
+  another agent, the owner's Xcode or XcodeBuildMCP is using on a shared Mac.
+- **Adopted, lease with heartbeat:** Kubernetes `coordination.k8s.io` Lease
+  (`holderIdentity`, `renewTime`, `leaseDurationSeconds`), etcd lease TTL with
+  keepalive, and CI device pools that check a device out and back in. Each
+  `run` renews `last_used_at`; a holder pid with its start time stands in for
+  the keepalive while a step runs; expiry is idle time since last use. The
+  start time is read under `LC_ALL=C TZ=UTC`: `ps -o lstart` prints in the
+  caller's locale and zone, so a reaper fired from another session read every
+  live holder as dead (reproduced in review, 2026-10-06).
+- **Rejected after review, boot age as a proxy for disuse:** an earlier cut
+  of this release shut down unmarked devices booted more than 30 minutes ago.
+  Reproduced on the owner's Mac 2026-10-06: `--dry-run` would have shut down a
+  live qa lane's device driven by separate `xcodebuild` calls. Boot age says
+  nothing about last use, so unmarked devices are now never reaped.
+- **Adopted after review, boot-bound claims:** a marker keyed only by udid
+  outlived its boot, so after `simctl shutdown all` and a fresh Xcode boot the
+  reaper shut the owner's new boot down (reproduced with the synthetic
+  fixture, 2026-10-06). The claim now carries the device's `lastBootedAt`
+  (present in real `simctl list devices -j`, checked on the owner's Mac), the
+  same fencing idea as a lease epoch: a claim on an older boot claims nothing.
+- **Adopted after review, dedicated devices:** CI device pools and fastlane
+  `scan` with a named device both run on devices the job owns. A headless
+  wrapper device the owner's Xcode could adopt was shut down under the owner,
+  so agents now create and use `graph-sim-*` devices only (owner decision
+  2026-10-06). Device type follows `simctl list runtimes -j`
+  `supportedDeviceTypes`, which lists the newest iPhone first.
+- **Rejected after review, carrying a claim across a step's reboot:** an
+  earlier cut rebound the marker to a new boot seen at the end of a step. A
+  stale marker plus an outside boot made it claim the owner's boot and shut it
+  down (reproduced with the synthetic fixture, 2026-10-06). Same fencing rule
+  as a lease epoch: a holder never extends its claim to a newer epoch it did
+  not create. A step that reboots its device now leaves that boot running
+  (owner direction: safety over cleverness).
+- **Adopted after review, an expired lease is not renewable:** Kubernetes
+  Lease and etcd keepalive both refuse to revive a lease past its TTL; the
+  holder must acquire again. `run` on an expired lease now exits 2, so two
+  agents never share one graph-sim device silently.
+
 ## [0.16.0] - 2026-10-06
 
 Throughput. Implementation runs as a ready queue instead of waves, every task

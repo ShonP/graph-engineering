@@ -191,7 +191,7 @@ class Registration(unittest.TestCase):  # AC-W2-DR-05
 
     def test_sessionstart_doctor_entry_is_startup_only(self):
         hooks = json.loads((HOOKS / "hooks.json").read_text(encoding="utf-8"))["hooks"]
-        self.assertEqual(sorted(hooks), ["PostToolUse", "PreToolUse", "SessionStart", "Stop"])
+        self.assertEqual(sorted(hooks), ["PostToolUse", "PreToolUse", "SessionStart", "Stop", "SubagentStop"])
         root = "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/"
         self.assertEqual(hooks["SessionStart"], [
             {"matcher": "startup|clear|compact",
