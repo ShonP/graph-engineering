@@ -10,6 +10,54 @@ commits.
 
 ## [Unreleased]
 
+Unattended runs no longer stop on Claude Code's inline-shell `rm` safety
+prompt. From Claude Code 2.1.288, a Bash call whose command name starts with a
+variable, or that wraps a script in `bash -c`/`sh -c`, waits for an answer even
+in bypass mode. Our own guidance taught agents both shapes (`<plugin root>`
+expanded into `P=...; $P/hooks/scripts/wait-run.sh`, and `-- sh -c '...'` in
+the mutation witness header), so the fix is in what the plugin teaches, and the
+safety check stays on.
+
+### Added
+
+- **PreToolUse guard `guard-plugin-shell.sh`.** Denies a Bash call that runs a
+  plugin script (`wait-run.sh`, `mutate-witness.sh`, `lane-run.sh`,
+  `worktree-gc.sh`) in either shape Claude Code cannot check: a `$`-led command
+  word naming the script, or argv that starts `bash`/`sh`/`zsh`/`dash`/`ksh`
+  with an option word holding `c`. It covers every caller, main thread
+  included, and bypass mode. The deny reason names the literal plugin root and
+  the right shape. A command naming no plugin script exits in bash before
+  python starts. Detector: `hooks/scripts/plugin_shell.py`. Kill switch:
+  `GRAPH_SHELL_GUARD=off`.
+- **`scripts/plugin_shell_calls.py`, the success-signal adapter.**
+  `python3 scripts/plugin_shell_calls.py --days 14` prints one number: the
+  trigger-shaped plugin-script Bash calls by `graph-engineering:` subagents in
+  the local transcripts, using the guard's own detector. Baseline: 253 in the
+  14 days before this release. It reads one machine, so it is a floor.
+- **Guidance scan `tests/checks/test_plugin_shell_guidance.py`.** Fails CI when
+  an agent prompt, skill, engine doc, command, template, README or plugin
+  script header shows a guard-denied call, a `-- <shell> -c` header example, or
+  a `<plugin root>/.../<script>` line with no literal-path rule beside it. A
+  planted violation per rule proves it can fail.
+
+### Changed
+
+- **Agents, the engine doc and script headers teach one call shape.**
+  `implementer`, `implementer-simple`, `qa` and `qa-lead`, `docs/engine/run.md`,
+  `review-protocol`, and the `wait-run.sh` and `mutate-witness.sh` headers say
+  `<plugin root>` is a literal absolute path, never through a shell variable;
+  argv passes straight through; a pipeline goes in a script file under
+  `.graph/<run>/` passed as `-- bash /abs/path/check.sh` (a file the Write tool
+  made is not executable, so it runs through its interpreter).
+- **Every dispatch carries a `plugin root: <absolute path>` line.** A
+  subagent's Bash has no `CLAUDE_PLUGIN_ROOT`, so this literal is where it
+  copies the path from.
+- **The owner-side opt-out is left alone.**
+  `CLAUDE_CODE_DISABLE_INLINE_SHELL_RM_PROMPT=1` switches the check off, and
+  Claude Code reads it only from the environment it is launched with
+  (settings files ignore it). That stays each user's own choice; the plugin
+  does not set it.
+
 ## [0.16.1] - 2026-10-06
 
 Agents close the simulators they open. Subagents booted iOS simulators (and
