@@ -208,8 +208,9 @@ PLANTED_HITS = [
 ]
 
 
-def unreleased(changelog: str) -> str:
-    return changelog.split("## [Unreleased]", 1)[1].split("\n## [", 1)[0]
+def guard_entry(changelog: str) -> str:
+    sections = changelog.split("\n## [")[1:]
+    return next(s for s in sections if "guard-plugin-shell.sh" in s)
 
 
 class GuidanceScan(unittest.TestCase):
@@ -236,8 +237,8 @@ class GuidanceScan(unittest.TestCase):
 
 
 class Changelog(unittest.TestCase):
-    def test_unreleased_entry_names_the_guard_dispatch_line_and_signal(self):
-        entry = unreleased((ROOT / "CHANGELOG.md").read_text(encoding="utf-8"))
+    def test_guard_entry_names_the_guard_dispatch_line_and_signal(self):
+        entry = guard_entry((ROOT / "CHANGELOG.md").read_text(encoding="utf-8"))
         for needle in ("GRAPH_SHELL_GUARD=off", "plugin root:", "plugin_shell_calls.py",
                        "CLAUDE_CODE_DISABLE_INLINE_SHELL_RM_PROMPT", "guard-plugin-shell.sh"):
             with self.subTest(needle=needle):

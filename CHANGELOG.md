@@ -10,6 +10,8 @@ commits.
 
 ## [Unreleased]
 
+## [0.16.2] - 2026-10-06
+
 Unattended runs no longer stop on Claude Code's inline-shell `rm` safety
 prompt. From Claude Code 2.1.288, a Bash call holding a `-c` shell script that
 Claude Code cannot check waits for an answer even in bypass mode, when that
