@@ -47,8 +47,11 @@ the point; crop or highlight so the difference reads at thumbnail size.
    later UI change means re-render, never re-record:
    - Web: Playwright - fixed viewport, seeded deterministic data, no dev-tools
      chrome, `page.screenshot` / `recordVideo`.
-   - iOS: `xcrun simctl io booted screenshot <file>.png`,
-     `xcrun simctl io booted recordVideo <file>.mp4`.
+   - iOS: `xcrun simctl io "$SIM_UDID" screenshot <file>.png`,
+     `xcrun simctl io "$SIM_UDID" recordVideo <file>.mp4`, with the whole
+     capture script run as `bash <plugin-root>/scripts/sim-session.sh -- <script>`
+     (headless; it boots the device, exports `SIM_UDID` and shuts it down
+     after). Never `open -a Simulator`. Close what you open.
    - Android: `adb exec-out screencap -p > <file>.png`, `adb shell screenrecord`.
    - If the repo already has a capture pipeline (profile `rules`), extend it;
      never build a parallel one.

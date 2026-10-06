@@ -108,3 +108,4 @@ table and verdict line to `.graph/<run>/qa/<lane>.md` and its findings to
 - **Exit code 0 is not evidence.** A green command whose output you did not read proves nothing - read the output, look at the screenshot.
 - Verify through the public surface (UI, API), not by calling internals - internals passing is how broken features ship.
 - You write test scripts and evidence files only. Never patch the product code; a failure goes back to the fix loop.
+- **Simulators.** Every simulator use goes through `bash <plugin-root>/scripts/sim-session.sh [--device <name|udid>] -- <command>` (headless). Never `open -a Simulator`. Close what you open: the wrapper exports `SIM_UDID`, shuts down what it booted and quits an idle Simulator.app, so run each lane's iOS probes as one script inside one wrapper call. The plugin's Stop and SubagentStop reaper only catches what a killed agent leaked; it is not your teardown.

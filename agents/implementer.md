@@ -40,6 +40,8 @@ You have 45 minutes of active work per task, measured from your first tool call.
 
 While iterating, run only the focused tests for the files you changed. Run the full suite once at the end, before you report. Full device, simulator, cluster or integration proof is not your loop: it belongs to qa or the per-merge gate, unless the plan entry marks the task as a proving task (`proof: full_device|cluster`).
 
+**Simulators.** Every simulator use goes through `bash <plugin root>/scripts/sim-session.sh [--device <name|udid>] -- <command>` (headless). Never `open -a Simulator`. Close what you open: the wrapper exports `SIM_UDID` (pass `-destination id=$SIM_UDID` to `xcodebuild`), shuts down what it booted when the command ends and quits an idle Simulator.app. Put a multi-step probe or capture in one script and run it inside one wrapper call.
+
 ## Skill routing
 
 Use the dispatch's REQUIRED skills, deduplicated against skills already loaded
