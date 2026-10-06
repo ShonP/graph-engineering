@@ -54,6 +54,10 @@ class Dedicated(SimFixture):
         self.assertIn(f"kept {O} ({NAMES[O]}) reason=foreign", result.stdout)
         self.assertFalse(any(O in c for c in self.calls() if "shutdown" in c or "boot" in c))
 
+    def test_naming_a_dedicated_device_needs_no_flag(self):
+        udid, _ = self.acquire("--device", NAMES[B])
+        self.assertEqual(udid, B)
+
     def test_a_foreign_device_is_refused_without_allow_foreign(self):
         result = self.session("--device", NAMES[O], "--", "true")
         self.assertEqual(result.returncode, 2)
