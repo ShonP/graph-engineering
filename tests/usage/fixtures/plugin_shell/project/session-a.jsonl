@@ -1,0 +1,1 @@
+{"type": "assistant", "timestamp": "2026-09-25T10:00:00Z", "message": {"id": "msg_ps13", "content": [{"type": "tool_use", "id": "toolu_ps13", "name": "Bash", "input": {"command": "$P/hooks/scripts/wait-run.sh SENTINEL-CMD-ps13"}}]}}
