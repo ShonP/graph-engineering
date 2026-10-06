@@ -188,11 +188,18 @@ CONTINUED = {
         "#!/usr/bin/env bash\n# Usage: lane-run.sh --lane a -- \\\n#   sh -c 'make test'\nset -eu\n",
     "skills/u/scripts/lane-run.sh":
         "#!/usr/bin/env bash\n# Usage: lane-run.sh --lane a -- \\\n#   bash /abs/check.sh\nset -eu\n",
+    # Review F3: without dropping the continued comment's `#`, the join reads
+    # `cd /work && #   $P/...` and the `#` hides the `$P/` command name.
+    "scripts/usage-var.sh": ("#!/usr/bin/env bash\n# Usage:\n#   cd /work && \\\n"
+                             "#   $P/hooks/scripts/wait-run.sh --log /x -- make\nset -eu\n"),
+    "scripts/usage-var-clean.sh": ("#!/usr/bin/env bash\n# Usage:\n#   cd /work && \\\n"
+                                   "#   /abs/plugin/hooks/scripts/wait-run.sh --log /x -- make\nset -eu\n"),
 }
 PLANTED.update(CONTINUED)
 PLANTED_HITS = [
     "agents/b.md:4 S1",
     "agents/x.md:6 S1",
+    "scripts/usage-var.sh:3 S1",
     "scripts/usage.sh:3 S1",
     "skills/a/SKILL.md:4 S1",
     "skills/v/scripts/lane-run.sh:2 S2",
