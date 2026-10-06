@@ -20,7 +20,7 @@ and reported, never re-planned. If you need those, use `/graph-ship`.
 
 Hand-written subagent-driven runs put 6 to 14 tasks in one lane on one shared worktree; each task
 ran implement, review, fix and re-review in sequence, so average concurrency was 1.0 and a
-561-minute run was 76 agents chained end to end (`docs/research/2026-10-05-run-throughput-analysis.md`,
+561-minute run was 76 agents chained end to end (`docs/superpowers/research/2026-10-05-run-throughput-analysis.md`,
 Finding 3). This workflow has no lanes and no barrier: a task starts the moment every dependency is
 merged and a writer slot is free. Ready tasks start longest remaining chain first, then in input
 order, the same rule as `graph-control ready`. The cap is 4 writers (`max_writers` defaults to 4 and
