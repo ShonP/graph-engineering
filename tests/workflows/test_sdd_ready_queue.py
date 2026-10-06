@@ -130,6 +130,13 @@ class SddReadyQueue(unittest.TestCase):
         self.assertRegex(body, r"round === FIX_ROUNDS \? FULL : type")
         self.assertIn("superpowers:systematic-debugging", functions(self.text)["fixPrompt"])
 
+    def test_fix_prompt_carries_a_per_round_run_id(self):
+        # docs/engine/run.md: each fix round gets its own stack id <run-id>-t<n>-r<N>.
+        self.assertIn(
+            "GRAPH_RUN_ID=${input.run_id}-${task.id.toLowerCase()}-r${round}",
+            functions(self.text)["fixPrompt"],
+        )
+
     def test_partial_review_is_scoped_to_the_built_cases(self):
         bodies = functions(self.text)
         review = "".join(bodies[name] for name in reachable(bodies, "reviewPrompt"))

@@ -150,7 +150,7 @@ function fixPrompt(input, task, findings, round, latest) {
   const last = round === FIX_ROUNDS
     ? '\nThis is the last round and a fresh diagnosis: superpowers:systematic-debugging is REQUIRED. Load it and state a new hypothesis for why earlier rounds did not clear these findings before any edit.'
     : ''
-  return `Fix round ${round} of ${FIX_ROUNDS} for task ${task.id} of run ${input.run_id}. Work in the existing worktree ${worktree}; do not create another. Brief: ${task.brief}.${scopeNote(task, latest)}${last}
+  return `Fix round ${round} of ${FIX_ROUNDS} for task ${task.id} of run ${input.run_id}. GRAPH_RUN_ID=${input.run_id}-${task.id.toLowerCase()}-r${round}. Work in the existing worktree ${worktree}; do not create another. Brief: ${task.brief}.${scopeNote(task, latest)}${last}
 Fix every finding below test-first and commit. Return DONE or DONE_WITH_CONCERNS only when the whole scope is built; if part of it is still not built, return PARTIAL with green_commit, done_cases, remaining_cases and remaining_scope as they stand now.\n${JSON.stringify(findings, null, 2)}`
 }
 
