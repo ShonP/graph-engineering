@@ -78,11 +78,18 @@ class ReapHook(unittest.TestCase):
         self.assertEqual(self.device_state(), "Booted")
 
     def test_no_xcrun_on_path_starts_nothing(self):
-        env = dict(self.env, PATH="/nonexistent")
+        # Every tool the hook uses except xcrun, so only its xcrun check can stop it.
+        tools = self.tmp / "no-xcrun"
+        tools.mkdir()
+        for name in ("bash", "cat", "dirname", "mkdir", "mv", "nohup", "wc"):
+            found = subprocess.run(["/usr/bin/which", name], capture_output=True, text=True).stdout.strip()
+            (tools / name).symlink_to(found)
+        env = dict(self.env, PATH=str(tools))
         result = subprocess.run(["/bin/bash", str(SCRIPT)], input=EVENT, env=env, capture_output=True, text=True, timeout=10)
         self.assertEqual(result.returncode, 0)
         time.sleep(1.5)
         self.assertEqual(self.log.read_text(), "")
+        self.assertFalse((self.tmp / "sims").exists(), "the hook stopped before preparing a reaper run")
 
 
 if __name__ == "__main__":
