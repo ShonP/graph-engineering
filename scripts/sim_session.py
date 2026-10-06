@@ -4,8 +4,9 @@
 
 Boots the device with `xcrun simctl boot` (no Simulator.app window), exports
 SIM_UDID to argv, runs it, and on exit, SIGINT, SIGTERM or SIGHUP: drops this
-wrapper's lease, shuts the device down when a wrapper booted it and no live
-wrapper still holds it, then quits Simulator.app when no device is booted. A
+wrapper's lease, shuts the device down when a wrapper booted it, no live
+wrapper still holds it and no running xcodebuild/XCTest/simctl names it (by
+udid or `name=`; then the marker stays and the reaper closes it later), then quits Simulator.app when no device is booted. A
 device someone else booted (no marker) is used and left running. Pass
 `id=$SIM_UDID` to `xcodebuild -destination` so it reuses the booted device
 instead of booting one of its own.
@@ -64,10 +65,12 @@ def acquire(device: dict, label: str) -> bool:
     return True
 
 
-def release(udid: str) -> None:
+def release(udid: str, name: str) -> None:
+    """Drop this lease; the last holder shuts a wrapper-booted device down unless a process
+    outside any wrapper still names it, in which case the marker stays for the reaper."""
     with sims.locked():
         (sims.state_dir() / f"{udid}.{os.getpid()}.lease").unlink(missing_ok=True)
-        if sims.marker_path(udid).exists() and not sims.live_leases(udid):
+        if sims.marker_path(udid).exists() and not sims.live_leases(udid) and not sims.referenced(udid, name):
             sims.simctl("shutdown", udid)
             sims.forget(udid)
         sims.quit_gui_if_idle()
@@ -108,7 +111,7 @@ def main(argv: list[str]) -> int:
             subprocess.run(["open", "-a", "Simulator", "--args", "-CurrentDeviceUDID", udid], check=False)
         return run(command, udid)
     finally:
-        release(udid)
+        release(udid, device["name"])
 
 
 if __name__ == "__main__":

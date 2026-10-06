@@ -7,8 +7,8 @@ Stdlib only. Run from any directory:
 
 Drives the hook the way Claude Code does (the event's JSON on stdin) with the
 SYNTHETIC xcrun/osascript/pgrep/open from tests/scripts/fixtures/fake_xcrun.py
-first on PATH, a throwaway GRAPH_SIM_DIR and a device booted long ago with no
-owner. FAKE_SIM_DELAY makes every fake call slow, so a hook that waited for the
+first on PATH, a throwaway GRAPH_SIM_DIR and a device whose wrapper died
+(a marker with no live lease). FAKE_SIM_DELAY makes every fake call slow, so a hook that waited for the
 reaper would blow the 1 s budget.
 """
 
@@ -58,6 +58,8 @@ class ReapHook(unittest.TestCase):
         return json.loads(self.state.read_text())["devices"]["com.apple.CoreSimulator.SimRuntime.iOS-26-5"][0]["state"]
 
     def test_returns_inside_budget_and_the_reaper_finishes_in_the_background(self):
+        (self.tmp / "sims").mkdir()
+        (self.tmp / "sims" / f"{UDID}.json").write_text(json.dumps({"udid": UDID, "pid": 999999}))
         result, elapsed = self.fire()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, "", "a background hook prints nothing into the session")

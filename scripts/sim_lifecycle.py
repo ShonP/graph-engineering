@@ -113,13 +113,15 @@ def forget(udid: str) -> None:
         path.unlink(missing_ok=True)
 
 
-def referenced(udid: str) -> bool:
-    """A running xcodebuild, XCTest or simctl process names this device on its command line."""
+def referenced(udid: str, name: str | None = None) -> bool:
+    """A running xcodebuild, XCTest or simctl process names this device on its command line:
+    by udid, or with `name`, by a `name=<name>` destination (a prefix match keeps more, never less)."""
     result = subprocess.run(["ps", "-axo", "pid=,command="], capture_output=True, text=True, check=False)
     own = str(os.getpid())
+    needles = [udid] + ([f"name={name}"] if name else [])
     for line in result.stdout.splitlines():
         pid, _, command = line.strip().partition(" ")
-        if pid != own and udid in command and any(tool in command for tool in TOOLS):
+        if pid != own and any(n in command for n in needles) and any(tool in command for tool in TOOLS):
             return True
     return False
 
