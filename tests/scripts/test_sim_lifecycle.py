@@ -74,10 +74,9 @@ class SimFixture(unittest.TestCase):
                                    env=self.env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         self.addCleanup(lambda: process.poll() is None and process.kill())
         deadline = time.monotonic() + 10
-        while self.device_state(A if device in (A, "iPhone 17") else B) != "Booted" or not list((self.tmp / "sims").glob("*")):
-            self.assertLess(time.monotonic(), deadline, "holder never booted the device")
+        while not list((self.tmp / "sims").glob("*.lease")):  # written after the boot, under the lock
+            self.assertLess(time.monotonic(), deadline, "holder never leased the device")
             time.sleep(0.05)
-        time.sleep(0.2)  # the lease is written under the same lock as the boot
         return process
 
     def reap(self, *args):

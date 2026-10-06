@@ -62,12 +62,13 @@ class ReapHook(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, "", "a background hook prints nothing into the session")
         self.assertLess(elapsed, 1.0)
+        log = self.tmp / "sims" / "reaper.log"
         deadline = time.monotonic() + 15
-        while self.device_state() != "Shutdown":
+        # The shutdown lands before its log line, so wait for the line.
+        while f"shut down {UDID}" not in (log.read_text() if log.exists() else ""):
             self.assertLess(time.monotonic(), deadline, "the detached reaper never ran")
             time.sleep(0.1)
-        log = (self.tmp / "sims" / "reaper.log").read_text()
-        self.assertIn(f"shut down {UDID}", log)
+        self.assertEqual(self.device_state(), "Shutdown")
 
     def test_kill_switch_starts_nothing(self):
         result, _ = self.fire(dict(self.env, GRAPH_SIM_REAPER="off"))
