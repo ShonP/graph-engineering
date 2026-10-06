@@ -45,7 +45,7 @@ in-flight runs first, or follow the 0.16.0 note below with `0.16.1`.
   (`GRAPH_SIM_IDLE_MIN` at acquire, default 15, recorded in the lease; N when
   longer; never boot age), and no running
   `xcodebuild`, XCTest or `simctl` names it by udid or `name=`. A live lease
-  survives its device rebooting. `--dry-run` deletes nothing. Quits an idle
+  keeps its claim while its device is down. `--dry-run` deletes nothing. Quits an idle
   Simulator.app.
 - **Hook `reap-simulators.sh` on `Stop` and `SubagentStop`.** `async`, starts the
   reaper detached and returns; logs to `<sim dir>/reaper.log`. No `xcrun` on
@@ -54,11 +54,17 @@ in-flight runs first, or follow the 0.16.0 note below with `0.16.1`.
   never use the owner's simulators: the wrapper reuses an idle
   `graph-sim-<runtime>-<n>` device on the newest iOS runtime or `simctl
   create`s one (the runtime's newest iPhone type). `--device` naming any other
-  device exits 2 unless `--allow-foreign` is passed too, and the reaper keeps
-  every non-graph-sim device (`reason=foreign`). Each marker records the
-  device's `lastBootedAt` at the wrapper's boot; release and the reaper leave a
-  device booted again outside the wrapper running (`reason=unmarked`) and
-  remove its stale marker and leases. Graph-sim devices unused for
+  device exits 2 unless `--allow-foreign` is passed too. Hard invariant:
+  nothing (release, one-shot exit, reaper) ever shuts down a device outside
+  `graph-sim-*`; `--allow-foreign` runs steps on one but writes no marker for
+  it (`reason=foreign`). Each marker records the graph-sim device's
+  `lastBootedAt` right after the wrapper's own boot, and only that boot is
+  ever shut down: any other one (the owner's, a Mac reboot, a step's own
+  reboot) is never adopted, but logged and left running (`reason=unmarked`),
+  its stale marker and leases removed. `run --lease` on an expired lease
+  exits 2 (`lease expired, acquire again`) without renewing it, and acquire
+  never hands out a device holding an unreleased lease: it releases an
+  expired one only when no holder process runs and the idle window passed. Graph-sim devices unused for
   `GRAPH_SIM_DELETE_DAYS` (default 7) are deleted to cap disk.
 
 ### Changed
@@ -108,6 +114,17 @@ in-flight runs first, or follow the 0.16.0 note below with `0.16.1`.
   so agents now create and use `graph-sim-*` devices only (owner decision
   2026-10-06). Device type follows `simctl list runtimes -j`
   `supportedDeviceTypes`, which lists the newest iPhone first.
+- **Rejected after review, carrying a claim across a step's reboot:** an
+  earlier cut rebound the marker to a new boot seen at the end of a step. A
+  stale marker plus an outside boot made it claim the owner's boot and shut it
+  down (reproduced with the synthetic fixture, 2026-10-06). Same fencing rule
+  as a lease epoch: a holder never extends its claim to a newer epoch it did
+  not create. A step that reboots its device now leaves that boot running
+  (owner direction: safety over cleverness).
+- **Adopted after review, an expired lease is not renewable:** Kubernetes
+  Lease and etcd keepalive both refuse to revive a lease past its TTL; the
+  holder must acquire again. `run` on an expired lease now exits 2, so two
+  agents never share one graph-sim device silently.
 
 ## [0.16.0] - 2026-10-06
 

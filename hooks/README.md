@@ -173,18 +173,23 @@ live agent is using. Two scripts under `scripts/` carry it:
   default an idle `graph-sim-<runtime>-<n>` device on the newest iOS runtime,
   `simctl create`d (newest iPhone type) when none is free, so the owner's own
   simulators are never used. `--device` naming any device outside
-  `graph-sim-*` exits 2 unless `--allow-foreign` is passed too. The marker
-  records the device's `lastBootedAt` at that boot; a device booted again
-  since (the owner's `simctl shutdown all` then Xcode, a Mac reboot) is not the
-  wrappers' and is never shut down, unless the reboot happened inside the
-  wrapper's own step. One command: `sim-session.sh [--device <name|udid>]
+  `graph-sim-*` exits 2 unless `--allow-foreign` is passed too; that flag
+  runs steps on the device but never writes a marker for it, and nothing
+  (release, one-shot exit, reaper) ever shuts down a device outside
+  `graph-sim-*`. The marker records the graph-sim device's `lastBootedAt`
+  right after the wrapper's own boot; any other boot (the owner's `simctl
+  shutdown all` then Xcode, a Mac reboot, a step's own reboot) is not the
+  wrappers' and is logged and left running. One command: `sim-session.sh [--device <name|udid>]
   [--keep-gui] -- <argv>` acquires, runs argv with `SIM_UDID` exported, and
   releases on exit or a signal. Several tool calls: `sim-session.sh acquire`
   prints `SIM_UDID=` and `SIM_LEASE=`; each `sim-session.sh run --lease <id>
   -- <argv>` holds the lease while argv runs (concurrent steps each hold
   their own slot) and sets
   `last_used_at` to now before and after; `sim-session.sh release --lease
-  <id>` ends it. Release shuts a wrapper-booted device down when no other live
+  <id>` ends it. `run` on a lease past its idle window exits 2 (`lease
+  expired, acquire again`) without renewing it, and acquire never hands out a
+  device holding an unreleased lease; it releases an expired one only when no
+  holder process runs and the window has passed. Release shuts a wrapper-booted device down when no other live
   lease holds it and no running `xcodebuild`, XCTest or `simctl` outside any
   wrapper names it (then the reaper closes it later); the shell that launched
   the wrapper, and its other ancestors, never count. A device someone else
@@ -206,7 +211,8 @@ live agent is using. Two scripts under `scripts/` carry it:
   longer, never boot time (`reason=leased`); and
   while a running `xcodebuild`, XCTest or `simctl` names it by udid or `name=`
   (`reason=in-use`). Otherwise it is shut down (`reason=idle`, `dead-owner`
-  or `released`). A live lease survives its device rebooting. `--dry-run`
+  or `released`). A live lease keeps its claim while its device is down.
+  `--dry-run`
   prints `would ...` and deletes nothing.
 
 `reap-simulators.sh` runs the reaper on `Stop` and `SubagentStop`. It is
