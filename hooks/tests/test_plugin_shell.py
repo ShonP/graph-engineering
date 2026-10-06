@@ -130,6 +130,28 @@ class Variants(unittest.TestCase):
         command = "/abs/hooks/scripts/wait-run.sh --log /x -- make; bash -c 'echo hi'"
         self.assertIsNone(plugin_shell.find_violation(command))
 
+    def test_separator_glued_to_a_substitution_still_splits(self):
+        """Review F1: shlex glues `)` to the next operator (`);`, `)&&`, `)|`), so the
+        command after an unquoted $(...) must still be read in command position."""
+        cases = [
+            ('P=$(cat /r/root); $P/hooks/scripts/wait-run.sh --log /x -- make',
+             'variable-command'),
+            ('P=$(ls -d /c/*/ | tail -1); $P/hooks/scripts/wait-run.sh --log /x -- make',
+             'variable-command'),
+            ('P=$(cat /r/root)&& $P/hooks/scripts/wait-run.sh --log /x -- make',
+             'variable-command'),
+            ('echo $(cat /r/root)| $P/hooks/scripts/wait-run.sh --log /x -- make',
+             'variable-command'),
+            ("echo $(date); /abs/hooks/scripts/wait-run.sh --log /x -- bash -c 'a|b'",
+             'shell-c'),
+            ("echo $(dirname $(pwd)); /abs/hooks/scripts/wait-run.sh -- sh -c 'a|b'",
+             'shell-c'),
+            ('echo $(date); make', None),
+        ]
+        for command, expected in cases:
+            with self.subTest(command):
+                self.assertEqual(plugin_shell.find_violation(command), expected)
+
     def test_known_gaps_return_none(self):
         """Known gap (followups F10), shared with the poll guard: the inside of $(...)
         and a heredoc body are not read as commands."""
@@ -167,6 +189,7 @@ class HookJson(unittest.TestCase):
         self.assertEqual(output['permissionDecision'], 'deny')
         self.assertIn(str(self.ROOT), output['permissionDecisionReason'])
         self.assertIn('script file', output['permissionDecisionReason'])
+        self.assertRegex(output['permissionDecisionReason'], r'-- bash /\S+\.sh')
         self.assertIn('GRAPH_SHELL_GUARD=off', output['permissionDecisionReason'])
 
     def test_trigger_from_a_subagent_is_denied(self):

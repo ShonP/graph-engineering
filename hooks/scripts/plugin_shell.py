@@ -31,7 +31,8 @@ REASON = (
     f"Call plugin scripts by their literal absolute path under {PLUGIN_ROOT}, never through "
     "a shell variable, and pass argv straight through instead of wrapping it in bash -c or "
     "sh -c; for a pipeline, set -o pipefail or an && chain, Write a script file under "
-    ".graph/<run>/ and pass its path. Claude Code cannot check a $VAR command or a shell -c "
+    ".graph/<run>/ and pass it through bash, as -- bash /abs/path/check.sh (a Write-created "
+    "file is not executable). Claude Code cannot check a $VAR command or a shell -c "
     "script, so it stops even bypass-mode runs on a safety prompt. "
     "To switch this guard off, set GRAPH_SHELL_GUARD=off."
 )
@@ -50,6 +51,21 @@ def is_assignment(word: str) -> bool:
     return bool(equals) and name.isidentifier()
 
 
+def close_substitution(raw: list[str], i: int) -> tuple[int, str]:
+    """Skip a `$(...)` body; return the next index and any operator glued after `)`."""
+    depth = 0
+    while i < len(raw):
+        word = raw[i]
+        i += 1
+        if not is_operator(word):
+            continue
+        for at, char in enumerate(word):
+            depth += (char == "(") - (char == ")")
+            if depth <= 0:
+                return i, word[at + 1:]
+    return i, ""
+
+
 def words(raw: list[str]):
     """Rejoin `$` expansions, collapse `$(...)` to one word, skip heredoc bodies."""
     i, heredoc, pending = 0, None, None
@@ -61,14 +77,10 @@ def words(raw: list[str]):
                 heredoc = None
             continue
         if word == "$" and nxt == "(":
-            depth = 0
-            while i < len(raw):
-                if is_operator(raw[i]):
-                    depth += raw[i].count("(") - raw[i].count(")")
-                i += 1
-                if depth <= 0:
-                    break
+            i, glued = close_substitution(raw, i)
             yield "$()"
+            if glued:
+                yield glued
         elif word == "$" and nxt == "{" and "}" in raw[i:i + 3]:
             close = raw.index("}", i)
             joined = "$" + "".join(raw[i:close + 1])
