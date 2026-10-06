@@ -89,21 +89,21 @@ class SimFixture(unittest.TestCase):
         process = subprocess.Popen(["bash", str(SESSION), *argv, "--", sys.executable, "-c", HOLD, str(release)],
                                    env=self.env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         self.addCleanup(lambda: process.poll() is None and process.kill())
-        deadline = time.monotonic() + 10
-        while not self.held():  # the holder is recorded after the boot, under the lock
+        before, deadline = self.held(), time.monotonic() + 10
+        while self.held() <= before:  # the holder is recorded after the boot, under the lock
             self.assertLess(time.monotonic(), deadline, "holder never leased the device")
             time.sleep(0.05)
         return process
 
     def held(self):
-        """Some lease names a running holder process."""
+        """How many running holder processes the leases name."""
+        count = 0
         for path in (self.tmp / "sims").glob("*.lease"):
             try:
-                if json.loads(path.read_text()).get("holder"):
-                    return True
-            except (OSError, ValueError):
+                count += len(json.loads(path.read_text()).get("holders") or [])
+            except (OSError, ValueError, TypeError):
                 pass
-        return False
+        return count
 
     def mark_dead_owner(self, udid):
         """A marker with no live lease: the wrapper that booted udid was killed."""

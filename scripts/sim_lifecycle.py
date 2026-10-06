@@ -74,8 +74,11 @@ def booted() -> list[dict]:
 
 
 def start_time(pid: int) -> str | None:
-    result = subprocess.run(["ps", "-o", "lstart=", "-p", str(pid)], capture_output=True, text=True, check=False)
-    return result.stdout.strip() or None
+    """When pid started, as text every session reads the same: `ps` formats lstart in the
+    caller's locale and timezone, and the reaper may run from a session whose differ."""
+    result = subprocess.run(["ps", "-o", "lstart=", "-p", str(pid)], capture_output=True, text=True, check=False,
+                            env=dict(os.environ, LC_ALL="C", TZ="UTC"))
+    return " ".join(result.stdout.split()) or None
 
 
 def marker_path(udid: str) -> Path:

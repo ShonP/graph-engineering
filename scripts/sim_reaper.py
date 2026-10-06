@@ -7,8 +7,10 @@ booted device, in order:
   - no sim-session marker (the owner's Xcode, XcodeBuildMCP, any script that
     booted it itself): keep, `reason=unmarked`, however long it has been up
   - a live lease holds it (a holder process runs a command on it, or an
-    acquired lease was used within N minutes, default $GRAPH_SIM_IDLE_MIN,
-    else 15): keep, `reason=leased`
+    acquired lease was used within its idle window: the one recorded at
+    acquire, or N when longer, N defaulting to $GRAPH_SIM_IDLE_MIN, else 15):
+    keep, `reason=leased`. Holder start times are read under LC_ALL=C TZ=UTC,
+    so a reaper in another session's locale or timezone agrees on who lives.
   - a running xcodebuild, XCTest or simctl names it, by udid or by a
     `name=<its name>` destination: keep, `reason=in-use`
   - otherwise shut it down: `reason=idle` (an acquired lease went unused past

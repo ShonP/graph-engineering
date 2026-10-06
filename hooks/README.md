@@ -173,7 +173,8 @@ live agent is using. Two scripts under `scripts/` carry it:
   [--keep-gui] -- <argv>` acquires, runs argv with `SIM_UDID` exported, and
   releases on exit or a signal. Several tool calls: `sim-session.sh acquire`
   prints `SIM_UDID=` and `SIM_LEASE=`; each `sim-session.sh run --lease <id>
-  -- <argv>` records itself as the lease's holder while argv runs and sets
+  -- <argv>` holds the lease while argv runs (concurrent steps each hold
+  their own slot) and sets
   `last_used_at` to now before and after; `sim-session.sh release --lease
   <id>` ends it. Release shuts a wrapper-booted device down when no other live
   lease holds it and no running `xcodebuild`, XCTest or `simctl` outside any
@@ -186,9 +187,11 @@ live agent is using. Two scripts under `scripts/` carry it:
 - `sim-reaper.sh [--dry-run] [--idle-minutes N]` never shuts down a device it
   cannot prove is abandoned. A device with no marker (the owner's Xcode,
   XcodeBuildMCP) is kept however long it has been up (`reason=unmarked`). A
-  marked device is kept while any lease holds it: its holder process runs, or
-  an acquired lease was used within N minutes of `last_used_at`
-  (`GRAPH_SIM_IDLE_MIN`, default 15), never boot time (`reason=leased`); and
+  marked device is kept while any lease holds it: a holder process runs (its
+  start time is read under `LC_ALL=C TZ=UTC`, so a reaper in another locale or
+  timezone agrees), or an acquired lease was used within its idle window of
+  `last_used_at`: `GRAPH_SIM_IDLE_MIN` at acquire (default 15), or N when
+  longer, never boot time (`reason=leased`); and
   while a running `xcodebuild`, XCTest or `simctl` names it by udid or `name=`
   (`reason=in-use`). Otherwise it is shut down (`reason=idle`, `dead-owner`
   or `released`). A live lease survives its device rebooting. `--dry-run`

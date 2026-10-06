@@ -41,8 +41,9 @@ in-flight runs first, or follow the 0.16.0 note below with `0.16.1`.
   a device it cannot prove is abandoned. A device without a marker (the
   owner's Xcode, XcodeBuildMCP) is never touched, however old. A marked device
   is shut down only when every lease on it is released, or its holder died, or
-  it sat unused longer than N minutes since `last_used_at`
-  (`GRAPH_SIM_IDLE_MIN`, default 15; never boot age), and no running
+  it sat unused since `last_used_at` past its idle window
+  (`GRAPH_SIM_IDLE_MIN` at acquire, default 15, recorded in the lease; N when
+  longer; never boot age), and no running
   `xcodebuild`, XCTest or `simctl` names it by udid or `name=`. A live lease
   survives its device rebooting. `--dry-run` deletes nothing. Quits an idle
   Simulator.app.
@@ -75,7 +76,10 @@ in-flight runs first, or follow the 0.16.0 note below with `0.16.1`.
   (`holderIdentity`, `renewTime`, `leaseDurationSeconds`), etcd lease TTL with
   keepalive, and CI device pools that check a device out and back in. Each
   `run` renews `last_used_at`; a holder pid with its start time stands in for
-  the keepalive while a step runs; expiry is idle time since last use.
+  the keepalive while a step runs; expiry is idle time since last use. The
+  start time is read under `LC_ALL=C TZ=UTC`: `ps -o lstart` prints in the
+  caller's locale and zone, so a reaper fired from another session read every
+  live holder as dead (reproduced in review, 2026-10-06).
 - **Rejected after review, boot age as a proxy for disuse:** an earlier cut
   of this release shut down unmarked devices booted more than 30 minutes ago.
   Reproduced on the owner's Mac 2026-10-06: `--dry-run` would have shut down a

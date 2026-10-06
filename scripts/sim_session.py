@@ -8,10 +8,11 @@
 One-shot: acquire, run argv, release, in one call; the release also runs on
 SIGINT, SIGTERM and SIGHUP. Multi-step work (capture, read the PNG, decide the
 next step) acquires once, runs each step with `run --lease`, and releases at
-the end. `run` exports SIM_UDID, records itself as the lease's holder while
-argv runs, and sets last_used_at to now before and after, so the reaper never
-takes a device a step is using or used within the idle window
-(GRAPH_SIM_IDLE_MIN, default 15 minutes).
+the end. `run` exports SIM_UDID, holds the lease while argv runs (concurrent
+steps each hold their own slot), and sets last_used_at to now before and
+after, so the reaper never takes a device a step is using or used within the
+idle window (GRAPH_SIM_IDLE_MIN as set for `acquire`, default 15 minutes; it
+is recorded in the lease).
 
 Boot is `xcrun simctl boot` (no Simulator.app window) and writes the marker
 that makes the device the wrappers' to close. Release drops the lease, then

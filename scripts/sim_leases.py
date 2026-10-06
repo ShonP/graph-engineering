@@ -5,16 +5,19 @@ One file per holder, `<udid>.<id>.lease` in sim_lifecycle.state_dir():
   id            16 hex chars, the handle `run --lease` and `release --lease` take
   udid, label   the device and who asked for it
   kind          "oneshot" (`sim-session.sh -- cmd`) or "lease" (`acquire`)
+  idle_min      the idle window, GRAPH_SIM_IDLE_MIN at acquire (default 15)
   acquired_at, last_used_at
                 epoch seconds from sim_lifecycle.now(); every `run` renews
                 last_used_at before and after its command
-  holder        {pid, started} while a sim-session process runs a command on
-                the device, else null; the process start time makes a
-                recycled pid read as dead
+  holders       [{pid, started}], one per sim-session process running a
+                command on the device (concurrent `run --lease` steps each
+                hold a slot); the start time, read under LC_ALL=C TZ=UTC so
+                every session reads it alike, makes a recycled pid read as dead
 
-A lease is live while its holder process runs. An acquired lease also stays
-live until it has sat unused for the idle window (GRAPH_SIM_IDLE_MIN, default
-15 minutes) since last_used_at; a oneshot lease dies with its process. Release
+A lease is live while any holder process runs. An acquired lease also stays
+live until it has sat unused since last_used_at for its idle window, or the
+reader's if longer (the reaper's --idle-minutes); a oneshot lease dies with
+its process. Release
 deletes the file. Writes go through a temp file and a rename, so a reader never
 sees half a lease. Reading never deletes anything; only prune() and forget() do.
 """
@@ -64,23 +67,7 @@ def holder() -> dict:
     return {"pid": os.getpid(), "started": sims.start_time(os.getpid())}
 
 
-def create(udid: str, label: str, kind: str, held: bool) -> dict:
-    stamp = sims.now()
-    lease = {"id": secrets.token_hex(8), "udid": udid, "label": label, "kind": kind,
-             "acquired_at": stamp, "last_used_at": stamp, "holder": holder() if held else None}
-    write(lease)
-    return lease
-
-
-def renew(lease: dict, held: bool) -> dict:
-    """last_used_at = now; held records this process as running a command on the device."""
-    lease = dict(lease, last_used_at=sims.now(), holder=holder() if held else None)
-    write(lease)
-    return lease
-
-
-def holder_alive(lease: dict) -> bool:
-    held = lease.get("holder")
+def alive(held: object) -> bool:
     if not isinstance(held, dict) or held.get("started") is None:
         return False
     try:
@@ -89,13 +76,41 @@ def holder_alive(lease: dict) -> bool:
         return False
 
 
+def holders(lease: dict) -> list[dict]:
+    """The holders still running, this process excluded."""
+    found = lease.get("holders")
+    mine = os.getpid()
+    return [h for h in found if alive(h) and h.get("pid") != mine] if isinstance(found, list) else []
+
+
+def create(udid: str, label: str, kind: str, held: bool) -> dict:
+    stamp = sims.now()
+    lease = {"id": secrets.token_hex(8), "udid": udid, "label": label, "kind": kind,
+             "idle_min": sims.idle_minutes(), "acquired_at": stamp, "last_used_at": stamp,
+             "holders": [holder()] if held else []}
+    write(lease)
+    return lease
+
+
+def renew(lease: dict, held: bool) -> dict:
+    """last_used_at = now; held adds this process to the holders running a command on the
+    device, otherwise it leaves them. Other steps on the same lease keep their slots."""
+    lease = dict(lease, last_used_at=sims.now(), holders=holders(lease) + ([holder()] if held else []))
+    write(lease)
+    return lease
+
+
 def live(lease: dict, idle: float) -> bool:
-    if holder_alive(lease):
+    """Held by a running step, or an acquired lease used within its window: the longer of the
+    one recorded at acquire and `idle`, so no session's setting cuts another's lease short."""
+    found = lease.get("holders")
+    if isinstance(found, list) and any(alive(h) for h in found):
         return True
     if lease.get("kind") != "lease":
         return False
     try:
-        return sims.now() - float(lease["last_used_at"]) < idle * 60
+        window = max(idle, float(lease.get("idle_min") or 0))
+        return sims.now() - float(lease["last_used_at"]) < window * 60
     except (KeyError, TypeError, ValueError):
         return False
 
