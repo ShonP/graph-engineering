@@ -31,6 +31,11 @@ class ForeignDevices(SimFixture):
         self.assertEqual(self.shutdowns(O), [])
         self.assertNotIn(f"{O}.json", self.files(), "no owned marker for a foreign device")
 
+    def test_acquire_with_allow_foreign_boots_without_an_owned_marker(self):
+        self.acquire("--device", O, "--allow-foreign")
+        self.assertEqual(self.device_state(O), "Booted")
+        self.assertNotIn(f"{O}.json", self.files())
+
     def test_leased_steps_with_allow_foreign_never_shut_down(self):
         self.write_state({A: "Shutdown", B: "Shutdown", O: "Booted"}, booted_at=OUTSIDE_BOOT)
         _, lease = self.acquire("--device", O, "--allow-foreign")
@@ -98,6 +103,17 @@ class ExpiredLeases(SimFixture):
         step = self.session("run", "--lease", lease, "--", "true")
         self.assertFalse(first == second and step.returncode == 0, "two agents share one graph-sim device")
         self.assertEqual(step.returncode, 2)
+
+    def test_acquire_never_releases_a_lease_whose_step_still_runs(self):
+        self.at(0)
+        _, lease = self.acquire("--device", A)
+        release = self.tmp / "release"
+        step = self.start_holder(A, release, "run", "--lease", lease)
+        self.at(600)
+        udid, _ = self.acquire()
+        self.assertNotEqual(udid, A, "a running step holds the device however old the lease")
+        release.touch()
+        step.communicate(timeout=15)
 
     def test_acquire_skips_a_dead_one_shots_device_inside_the_idle_window(self):
         self.at(0)
