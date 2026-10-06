@@ -27,20 +27,21 @@ in-flight runs first, or follow the 0.16.0 note below with `0.16.1`.
   `--keep-gui`), exports `SIM_UDID`, runs argv, and on exit, SIGINT, SIGTERM or
   SIGHUP drops its lease. A device a wrapper booted is shut down by its last
   live holder unless a running `xcodebuild`/XCTest/`simctl` outside any wrapper
-  still names it (then the reaper closes it later); a device someone else booted is reused and left running.
+  still names it (then the reaper closes it later); the shell that launched the
+  wrapper never counts, even when its command line names the device. A device
+  someone else booted is reused and left running.
   Simulator.app is quit only when no device is booted. Ownership lives in
   `${GRAPH_SIM_DIR:-~/.cache/graph-engineering/sims}`: a `<udid>.json` marker
   per wrapper-booted device and a lease per holder keyed by pid and process
   start time, all under one fcntl lock.
-- **`scripts/sim-reaper.sh [--dry-run] [--include-unowned] [--grace-minutes N]`.**
-  Shuts down a booted device a wrapper booted whose holders are all dead. A
-  device no wrapper booted is kept and logged `reason=unowned`, because an
-  agent driving it by name or by separate `simctl` calls is invisible between
-  calls; `--include-unowned` is the manual sweep for those (no `xcodebuild`
-  naming it by udid or `name=`, booted longer than N minutes,
-  `GRAPH_SIM_GRACE_MIN`, default 30). Never touches a device a live lease or a
-  referencing process holds, and keeps a live wrapper's claim while its device
-  reboots. Quits an idle Simulator.app.
+- **`scripts/sim-reaper.sh [--dry-run] [--keep-unowned] [--grace-minutes N]`.**
+  Never touches a device a live lease holds or a running `xcodebuild`, XCTest
+  or `simctl` names by udid or `name=`. Otherwise shuts down a device a wrapper
+  booted whose holders are all dead, and a device no wrapper booted once it
+  has been booted longer than N minutes (`GRAPH_SIM_GRACE_MIN`, default 30):
+  the evidence scripts and XcodeBuildMCP sessions that boot a device and walk
+  away. `--keep-unowned` or `GRAPH_SIM_REAP_UNOWNED=off` keeps those. Keeps a
+  live wrapper's claim while its device reboots. Quits an idle Simulator.app.
 - **Hook `reap-simulators.sh` on `Stop` and `SubagentStop`.** `async`, starts the
   reaper detached and returns; logs to `<sim dir>/reaper.log`. No `xcrun` on
   PATH starts nothing. Kill switch: `GRAPH_SIM_REAPER=off`.

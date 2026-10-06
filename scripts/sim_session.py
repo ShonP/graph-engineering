@@ -6,7 +6,9 @@ Boots the device with `xcrun simctl boot` (no Simulator.app window), exports
 SIM_UDID to argv, runs it, and on exit, SIGINT, SIGTERM or SIGHUP: drops this
 wrapper's lease, shuts the device down when a wrapper booted it, no live
 wrapper still holds it and no running xcodebuild/XCTest/simctl names it (by
-udid or `name=`; then the marker stays and the reaper closes it later), then quits Simulator.app when no device is booted. A
+udid or `name=`; then the marker stays and the reaper closes it later; the
+shell that launched this wrapper never counts), then quits Simulator.app when
+no device is booted. A
 device someone else booted (no marker) is used and left running. Pass
 `id=$SIM_UDID` to `xcodebuild -destination` so it reuses the booted device
 instead of booting one of its own.

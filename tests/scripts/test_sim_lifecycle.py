@@ -162,6 +162,15 @@ class Session(SimFixture):
         self.reap()
         self.assertEqual(self.device_state(A), "Shutdown")
 
+    def test_shuts_down_when_the_launching_shell_names_the_device(self):
+        # An agent's Bash-tool shell carries the udid and `simctl` on its own
+        # command line and waits on the wrapper; it is not a separate user.
+        script = f'bash {SESSION} --device {A} -- sh -c "true # xcrun simctl io {A} screenshot x.png"; true'
+        result = subprocess.run(["bash", "-c", script], env=self.env, capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.device_state(A), "Shutdown")
+        self.assertEqual(list((self.tmp / "sims").glob(f"{A}*")), [])
+
     def test_unknown_device_is_a_usage_error(self):
         result = self.session("--device", "No Such Phone", "--", "true")
         self.assertEqual(result.returncode, 2)
@@ -198,28 +207,40 @@ class Reaper(SimFixture):
         release.touch()
         build.wait(timeout=10)
 
-    def test_never_shuts_down_an_unmarked_device_by_default(self):
-        # No marker means no wrapper booted it: an agent may drive it by name or
-        # by separate simctl calls the reaper cannot see between calls.
+    def test_skips_a_dead_owners_device_an_xcodebuild_picks_by_name(self):
+        self.write_state({A: "Booted", B: "Shutdown"})
+        self.mark_dead_owner(A)
+        build, release = self.start_build("-destination", "platform=iOS Simulator,name=iPhone 17")
+        self.reap()
+        self.assertEqual(self.device_state(A), "Booted", "another agent's test run is still on it")
+        release.touch()
+        build.wait(timeout=10)
+
+    def test_reaps_an_unmarked_device_only_past_the_grace_period(self):
+        # Booted outside any wrapper (an evidence script, XcodeBuildMCP) and left running.
+        now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        self.write_state({A: "Booted", B: "Shutdown"}, booted_at=now)
+        self.reap("--grace-minutes", "30")
+        self.assertEqual(self.device_state(A), "Booted", "inside the grace period")
         self.write_state({A: "Booted", B: "Shutdown"}, booted_at=OLD)
-        result = self.reap("--grace-minutes", "0")
+        result = self.reap("--grace-minutes", "30")
+        self.assertEqual(self.device_state(A), "Shutdown")
+        self.assertIn(f"shut down {A} (iPhone 17) reason=unowned-past-grace", result.stdout)
+
+    def test_keep_unowned_never_shuts_down_an_unmarked_device(self):
+        self.write_state({A: "Booted", B: "Shutdown"}, booted_at=OLD)
+        result = self.reap("--keep-unowned", "--grace-minutes", "0")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.device_state(A), "Booted")
         self.assertIn(f"kept {A} (iPhone 17) reason=unowned", result.stdout)
+        self.env["GRAPH_SIM_REAP_UNOWNED"] = "off"
+        self.reap("--grace-minutes", "0")
+        self.assertEqual(self.device_state(A), "Booted", "the owner switch keeps them too")
 
-    def test_include_unowned_reaps_only_past_the_grace_period(self):
-        now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        self.write_state({A: "Booted", B: "Shutdown"}, booted_at=now)
-        self.reap("--include-unowned", "--grace-minutes", "30")
-        self.assertEqual(self.device_state(A), "Booted", "inside the grace period")
-        self.write_state({A: "Booted", B: "Shutdown"}, booted_at=OLD)
-        self.reap("--include-unowned", "--grace-minutes", "30")
-        self.assertEqual(self.device_state(A), "Shutdown")
-
-    def test_include_unowned_skips_a_device_an_xcodebuild_picks_by_name(self):
+    def test_skips_an_unmarked_device_an_xcodebuild_picks_by_name(self):
         self.write_state({A: "Booted", B: "Shutdown"}, booted_at=OLD)
         build, release = self.start_build("-destination", "platform=iOS Simulator,name=iPhone 17")
-        self.reap("--include-unowned", "--grace-minutes", "0")
+        self.reap("--grace-minutes", "0")
         self.assertEqual(self.device_state(A), "Booted")
         release.touch()
         build.wait(timeout=10)

@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Shut down simulators no live process owns, then quit an idle Simulator.app:
-#   sim-reaper.sh [--dry-run] [--include-unowned] [--grace-minutes N]
-# Shuts down only devices a sim-session.sh booted whose wrappers all died;
-# never one a live wrapper holds or a running xcodebuild, XCTest or simctl
-# names. Devices no wrapper booted are kept unless --include-unowned (manual). See scripts/sim_reaper.py for the rules. A host
+#   sim-reaper.sh [--dry-run] [--keep-unowned] [--grace-minutes N]
+# Never touches a device a live wrapper holds or a running xcodebuild, XCTest
+# or simctl names. Shuts down devices whose wrappers all died, and devices no
+# wrapper booted once past the grace period (unless --keep-unowned or
+# GRAPH_SIM_REAP_UNOWNED=off). See scripts/sim_reaper.py for the rules. A host
 # without xcrun (not a Mac, no Xcode) exits 0 before any interpreter starts.
 set -u
 command -v xcrun >/dev/null 2>&1 || exit 0

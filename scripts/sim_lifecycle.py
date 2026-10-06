@@ -113,17 +113,36 @@ def forget(udid: str) -> None:
         path.unlink(missing_ok=True)
 
 
-def referenced(udid: str, name: str | None = None) -> bool:
-    """A running xcodebuild, XCTest or simctl process names this device on its command line:
-    by udid, or with `name`, by a `name=<name>` destination (a prefix match keeps more, never less)."""
-    result = subprocess.run(["ps", "-axo", "pid=,command="], capture_output=True, text=True, check=False)
-    own = str(os.getpid())
-    needles = [udid] + ([f"name={name}"] if name else [])
+def processes() -> dict[str, tuple[str, str]]:
+    """pid -> (ppid, command) for every running process."""
+    result = subprocess.run(["ps", "-axo", "pid=,ppid=,command="], capture_output=True, text=True, check=False)
+    table = {}
     for line in result.stdout.splitlines():
-        pid, _, command = line.strip().partition(" ")
-        if pid != own and any(n in command for n in needles) and any(tool in command for tool in TOOLS):
-            return True
-    return False
+        parts = line.split(None, 2)
+        if len(parts) >= 2:
+            table[parts[0]] = (parts[1], parts[2] if len(parts) == 3 else "")
+    return table
+
+
+def lineage(table: dict[str, tuple[str, str]]) -> set[str]:
+    """This process and its ancestors: the shell that launched a wrapper waits on it and
+    may name the device on its own command line, but it is not another user of the device."""
+    chain, pid = set(), str(os.getpid())
+    while pid in table and pid not in chain:
+        chain.add(pid)
+        pid = table[pid][0]
+    return chain | {str(os.getpid())}
+
+
+def referenced(udid: str, name: str | None = None) -> bool:
+    """A running xcodebuild, XCTest or simctl process outside this process's lineage names this
+    device on its command line: by udid, or with `name`, by a `name=<name>` destination (a prefix
+    match keeps more, never less)."""
+    table = processes()
+    mine = lineage(table)
+    needles = [udid] + ([f"name={name}"] if name else [])
+    return any(pid not in mine and any(n in command for n in needles) and any(tool in command for tool in TOOLS)
+               for pid, (_, command) in table.items())
 
 
 def gui_running() -> bool:

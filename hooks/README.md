@@ -172,20 +172,23 @@ live agent is using. Two scripts under `scripts/` carry it:
   `SIM_UDID`, runs argv, and on exit or a signal drops its lease. A device a
   wrapper booted is shut down by the last live holder, unless a running
   `xcodebuild`, XCTest or `simctl` outside any wrapper still names it (the
-  reaper closes it later); a device someone else booted is used and left
-  running. Simulator.app is quit only when nothing is
+  reaper closes it later). The shell that launched the wrapper, and its other
+  ancestors, never count as such a process, even when their command line
+  names the device. A device someone else booted is used and left running.
+  Simulator.app is quit only when nothing is
   booted. State: `${GRAPH_SIM_DIR:-~/.cache/graph-engineering/sims}`, one
   `<udid>.json` marker per wrapper-booted device and one lease per holder
   (pid plus process start time, so a recycled pid reads as dead).
-- `sim-reaper.sh [--dry-run] [--include-unowned] [--grace-minutes N]` shuts
-  down a booted device a wrapper booted once its holders are all dead. A device
-  with no marker is kept and logged `reason=unowned`: an agent can drive it by
-  name or by separate `simctl` calls the reaper cannot see between calls.
-  `--include-unowned` is a manual sweep that also closes those, once no
-  `xcodebuild` names them by udid or `name=` and they booted more than N
-  minutes ago (`GRAPH_SIM_GRACE_MIN`, default 30). A live lease or a
-  referencing process always wins, and a live wrapper's claim survives its
-  device rebooting.
+- `sim-reaper.sh [--dry-run] [--keep-unowned] [--grace-minutes N]` skips any
+  device a live lease holds or a running `xcodebuild`, XCTest or `simctl`
+  names by udid or `name=`. Otherwise it shuts down a device a wrapper booted
+  once its holders are all dead, and a device with no marker (booted outside
+  any wrapper: an evidence script, XcodeBuildMCP) once it booted more than N
+  minutes ago (`GRAPH_SIM_GRACE_MIN`, default 30). The grace is what keeps a
+  device an agent drives by separate `simctl` calls, invisible between calls,
+  alive through the work that booted it. `--keep-unowned`, or
+  `GRAPH_SIM_REAP_UNOWNED=off` in settings `env`, keeps unmarked devices and
+  logs `reason=unowned`. A live wrapper's claim survives its device rebooting.
 
 `reap-simulators.sh` runs the reaper on `Stop` and `SubagentStop`. It is
 `async` and double-backgrounds the reaper with every descriptor redirected,

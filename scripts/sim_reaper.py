@@ -1,17 +1,17 @@
 """Shut down simulators nobody alive is using, then quit an idle Simulator.app.
 
-    sim_reaper.py [--dry-run] [--include-unowned] [--grace-minutes N]
+    sim_reaper.py [--dry-run] [--keep-unowned] [--grace-minutes N]
 
 For each booted device, in order:
   - a live sim-session lease holds it: skip (owned)
-  - a running xcodebuild, XCTest or simctl names its udid: skip (in use)
+  - a running xcodebuild, XCTest or simctl names it, by udid or by a
+    `name=<its name>` destination: skip (in use)
   - a sim-session marker but no live lease (its wrapper was killed): shut down
-  - no marker: skip and log `kept ... reason=unowned`. No wrapper booted it, and
-    an agent driving it by name or by separate simctl calls is invisible
-    between calls, so the hook never stops it.
-  - --include-unowned (a manual sweep, never the hook): an unmarked device no
-    xcodebuild names by `name=<its name>` either, booted longer than N minutes
-    ago (default $GRAPH_SIM_GRACE_MIN, else 30), is shut down.
+  - no marker (booted outside any wrapper: an evidence script, XcodeBuildMCP):
+    shut down once it booted more than N minutes ago (default
+    $GRAPH_SIM_GRACE_MIN, else 30), so a device an agent drives by separate
+    simctl calls survives the session that booted it. --keep-unowned or
+    GRAPH_SIM_REAP_UNOWNED=off keeps these and logs `kept ... reason=unowned`.
 Then markers of devices no longer booted are removed unless a live wrapper
 still holds them (a wrapped command may be rebooting the device), dead leases
 are dropped, and Simulator.app is quit when it runs and no device is booted.
@@ -41,17 +41,15 @@ def age_minutes(device: dict) -> float | None:
     return (datetime.datetime.now(datetime.UTC) - booted_at).total_seconds() / 60
 
 
-def verdict(device: dict, grace: float, include_unowned: bool) -> str | None:
+def verdict(device: dict, grace: float, keep_unowned: bool) -> str | None:
     """The reason to shut this device down, "unowned" to keep and log it, or None to keep it."""
     udid = device["udid"]
-    if sims.live_leases(udid) or sims.referenced(udid):
+    if sims.live_leases(udid) or sims.referenced(udid, device.get("name")):
         return None
     if sims.marker_path(udid).exists():
         return "dead-owner"
-    if not include_unowned:
+    if keep_unowned:
         return "unowned"
-    if sims.referenced(udid, device.get("name")):
-        return None
     age = age_minutes(device)
     if age is not None and age > grace:
         return "unowned-past-grace"
@@ -63,7 +61,7 @@ def say(text: str) -> None:
     print(f"{stamp} sim-reaper: {text}", flush=True)
 
 
-def reap(dry_run: bool, grace: float, include_unowned: bool = False) -> int:
+def reap(dry_run: bool, grace: float, keep_unowned: bool = False) -> int:
     with sims.locked():
         try:
             booted = sims.booted()
@@ -72,7 +70,7 @@ def reap(dry_run: bool, grace: float, include_unowned: bool = False) -> int:
             return 1
         kept = []
         for device in booted:
-            reason = verdict(device, grace, include_unowned)
+            reason = verdict(device, grace, keep_unowned)
             label = f"{device['udid']} ({device.get('name', '?')}) reason={reason}"
             if reason in (None, "unowned"):
                 kept.append(device["udid"])
@@ -102,11 +100,12 @@ def reap(dry_run: bool, grace: float, include_unowned: bool = False) -> int:
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="sim-reaper.sh")
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--include-unowned", action="store_true")
+    parser.add_argument("--keep-unowned", action="store_true",
+                        default=os.environ.get("GRAPH_SIM_REAP_UNOWNED", "on") == "off")
     parser.add_argument("--grace-minutes", type=float,
                         default=float(os.environ.get("GRAPH_SIM_GRACE_MIN") or 30))
     args = parser.parse_args(argv)
-    return reap(args.dry_run, args.grace_minutes, args.include_unowned)
+    return reap(args.dry_run, args.grace_minutes, args.keep_unowned)
 
 
 if __name__ == "__main__":
