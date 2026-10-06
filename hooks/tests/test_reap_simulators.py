@@ -25,6 +25,7 @@ HOOKS = Path(__file__).resolve().parent.parent
 SCRIPT = HOOKS / "scripts" / "reap-simulators.sh"
 FAKE = HOOKS.parent / "tests" / "scripts" / "fixtures" / "fake_xcrun.py"
 UDID = "AAAAAAAA-0000-4000-8000-000000000001"
+NAME = "graph-sim-iOS-26-5-1"  # a dedicated device: the only kind the reaper ever closes
 EVENT = json.dumps({"hook_event_name": "SubagentStop", "session_id": "s", "stop_hook_active": False})
 
 
@@ -39,7 +40,7 @@ class ReapHook(unittest.TestCase):
             (bin_dir / tool).symlink_to(FAKE)
         self.state = self.tmp / "state.json"
         self.state.write_text(json.dumps({"gui": True, "devices": {"com.apple.CoreSimulator.SimRuntime.iOS-26-5": [
-            {"udid": UDID, "name": "iPhone 17", "state": "Booted", "isAvailable": True,
+            {"udid": UDID, "name": NAME, "state": "Booted", "isAvailable": True,
              "lastBootedAt": "2026-01-01T00:00:00Z"}]}}))
         self.log = self.tmp / "calls.log"
         self.log.write_text("")
@@ -59,7 +60,8 @@ class ReapHook(unittest.TestCase):
 
     def test_returns_inside_budget_and_the_reaper_finishes_in_the_background(self):
         (self.tmp / "sims").mkdir()
-        (self.tmp / "sims" / f"{UDID}.json").write_text(json.dumps({"udid": UDID, "pid": 999999}))
+        (self.tmp / "sims" / f"{UDID}.json").write_text(json.dumps({"udid": UDID, "pid": 999999,
+                                                                   "booted_at": "2026-01-01T00:00:00Z"}))
         result, elapsed = self.fire()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, "", "a background hook prints nothing into the session")
@@ -73,12 +75,12 @@ class ReapHook(unittest.TestCase):
         self.assertEqual(self.device_state(), "Shutdown")
 
     def test_never_closes_a_device_booted_outside_any_wrapper(self):
-        # No marker: the owner's Xcode or XcodeBuildMCP booted it, months ago by lastBootedAt.
+        # No marker: something outside the wrappers booted it, months ago by lastBootedAt.
         result, _ = self.fire()
         self.assertEqual(result.returncode, 0, result.stderr)
         log = self.tmp / "sims" / "reaper.log"
         deadline = time.monotonic() + 15
-        while f"kept {UDID} (iPhone 17) reason=unmarked" not in (log.read_text() if log.exists() else ""):
+        while f"kept {UDID} ({NAME}) reason=unmarked" not in (log.read_text() if log.exists() else ""):
             self.assertLess(time.monotonic(), deadline, "the detached reaper never judged the device")
             time.sleep(0.1)
         self.assertEqual(self.device_state(), "Booted")

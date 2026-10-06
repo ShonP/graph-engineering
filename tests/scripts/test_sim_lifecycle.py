@@ -15,13 +15,13 @@ import subprocess
 import sys
 import unittest
 
-from sim_fixture import A, B, OLD, SESSION, SimFixture
+from sim_fixture import A, B, NAMES, OLD, SESSION, SimFixture
 
 
 class Session(SimFixture):
     def test_boots_headless_exports_udid_and_shuts_down_what_it_booted(self):
         out = self.tmp / "udid.txt"
-        result = self.session("--device", "iPhone 17", "--", "sh", "-c", f'printf %s "$SIM_UDID" > {out}')
+        result = self.session("--device", NAMES[A], "--", "sh", "-c", f'printf %s "$SIM_UDID" > {out}')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(out.read_text(), A)
         self.assertIn(f"xcrun simctl boot {A}", self.calls())
@@ -131,7 +131,7 @@ class Reaper(SimFixture):
     def test_skips_a_dead_owners_device_an_xcodebuild_picks_by_name(self):
         self.write_state({A: "Booted", B: "Shutdown"})
         self.mark_dead_owner(A)
-        build, release = self.start_build("-destination", "platform=iOS Simulator,name=iPhone 17")
+        build, release = self.start_build("-destination", f"platform=iOS Simulator,name={NAMES[A]}")
         self.reap()
         self.assertEqual(self.device_state(A), "Booted", "another agent's test run is still on it")
         release.touch()
@@ -144,7 +144,7 @@ class Reaper(SimFixture):
         result = self.reap("--idle-minutes", "0")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.device_state(A), "Booted")
-        self.assertIn(f"kept {A} (iPhone 17) reason=unmarked", result.stdout)
+        self.assertIn(f"kept {A} ({NAMES[A]}) reason=unmarked", result.stdout)
         self.assertNotIn(f"xcrun simctl shutdown {A}", self.calls())
         self.assertTrue(self.gui(), "a device is booted, so Simulator.app stays")
 

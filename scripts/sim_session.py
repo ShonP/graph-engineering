@@ -1,7 +1,7 @@
 """Run commands on an iOS simulator booted headless, and close it when done.
 
-    sim-session.sh [--device D] [--keep-gui] [--label L] -- <argv...>     one-shot
-    sim-session.sh acquire [--device D] [--label L]                       prints SIM_UDID=, SIM_LEASE=
+    sim-session.sh [--device D [--allow-foreign]] [--keep-gui] [--label L] -- <argv...>   one-shot
+    sim-session.sh acquire [--device D [--allow-foreign]] [--label L]     prints SIM_UDID=, SIM_LEASE=
     sim-session.sh run --lease <id> [--keep-gui] -- <argv...>             one step, renews the lease
     sim-session.sh release --lease <id>                                   closes what acquire opened
 
@@ -22,8 +22,13 @@ shell that launched this wrapper never counts), then quits Simulator.app when
 no device is booted. A device someone else booted is used and left running.
 Pass `id=$SIM_UDID` to `xcodebuild -destination`.
 
---device: a udid or an exact device name; default $SIM_DEVICE, else the first
-iPhone on the newest runtime. --keep-gui: also show Simulator.app (a recording
+Devices are dedicated (sim_devices.py): by default an idle `graph-sim-<runtime>-<n>`
+device on the newest iOS runtime, created (newest iPhone type) when none is
+free; the owner's devices are never used. A marker binds to the boot the
+wrapper made (lastBootedAt), so a device booted again outside the wrapper is
+never shut down. --device: a udid or an exact device name, default $SIM_DEVICE;
+naming a device outside graph-sim-* is refused (exit 2) unless --allow-foreign
+is passed too, for a device the owner named. --keep-gui: also show Simulator.app (a recording
 that needs the window); cleanup is unchanged. --label: the owner written to the
 marker and lease (default $GRAPH_RUN_ID or sim-session).
 
@@ -38,6 +43,7 @@ import signal
 import subprocess
 import sys
 
+import sim_devices as devices
 import sim_leases as leases
 import sim_lifecycle as sims
 
@@ -48,6 +54,7 @@ def parser_for(name: str, usage: str, *options: str) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog=f"sim-session.sh {name}".strip(), usage=usage)
     if "device" in options:
         parser.add_argument("--device", default=os.environ.get("SIM_DEVICE"))
+        parser.add_argument("--allow-foreign", action="store_true")
         parser.add_argument("--label", default=os.environ.get("GRAPH_RUN_ID") or "sim-session")
     if "lease" in options:
         parser.add_argument("--lease", required=True)
@@ -60,8 +67,9 @@ def parse(argv: list[str]) -> tuple[str, argparse.Namespace, list[str]]:
     name = argv[0] if argv[:1] and argv[0] in COMMANDS else ""
     rest = argv[1:] if name else argv
     usage, options = {
-        "": ("sim-session.sh [--device <name|udid>] [--keep-gui] [--label L] -- <argv...>", ("device", "gui")),
-        "acquire": ("sim-session.sh acquire [--device <name|udid>] [--label L]", ("device",)),
+        "": ("sim-session.sh [--device <name|udid> [--allow-foreign]] [--keep-gui] [--label L] -- <argv...>",
+             ("device", "gui")),
+        "acquire": ("sim-session.sh acquire [--device <name|udid> [--allow-foreign]] [--label L]", ("device",)),
         "run": ("sim-session.sh run --lease <id> [--keep-gui] -- <argv...>", ("lease", "gui")),
         "release": ("sim-session.sh release --lease <id>", ("lease",)),
     }[name]
@@ -78,13 +86,6 @@ def parse(argv: list[str]) -> tuple[str, argparse.Namespace, list[str]]:
     return name, args, command
 
 
-def resolve(wanted: str | None) -> dict | None:
-    available = sims.devices("available")
-    if wanted:
-        return next((d for d in available if wanted in (d["udid"], d["name"])), None)
-    return next((d for d in available if d["name"].startswith("iPhone") and ".iOS-" in d["runtime"]), None)
-
-
 def ensure_booted(udid: str, name: str, label: str) -> bool:
     """Boot udid unless it is up, marking it as the wrappers' to close. Call under the lock."""
     current = next((d for d in sims.devices() if d["udid"] == udid), None)
@@ -94,15 +95,22 @@ def ensure_booted(udid: str, name: str, label: str) -> bool:
     if boot.returncode:
         print(f"sim-session: boot {udid} failed: {boot.stderr.strip()}", file=sys.stderr)
         return False
-    sims.write_marker(udid, name, label)
+    sims.write_marker(udid, name, label, devices.booted_at(udid))
     return True
 
 
 def settle(udid: str) -> None:
     """Shut a wrapper-booted device down once nothing holds it, then quit an idle Simulator.app.
-    A device still named by a running process keeps its marker, so the reaper closes it later."""
-    if (sims.marker_path(udid).exists() and not leases.live_on(udid, sims.idle_minutes())
-            and not sims.referenced(udid, sims.marker_name(udid))):
+    A device still named by a running process keeps its marker, so the reaper closes it later.
+    A device booted again outside the wrapper since its marker was written is left running, and
+    the stale marker and leases are dropped."""
+    if not sims.marker_path(udid).exists() or leases.live_on(udid, sims.idle_minutes()):
+        sims.quit_gui_if_idle()
+        return
+    current = sims.device(udid)
+    if current and current.get("state") == "Booted" and not devices.bound(current):
+        leases.forget(udid)
+    elif not sims.referenced(udid, sims.marker_name(udid)):
         sims.simctl("shutdown", udid)
         leases.forget(udid)
     sims.quit_gui_if_idle()
@@ -120,6 +128,17 @@ def release(lease_id: str) -> int:
 
 
 def execute(command: list[str], udid: str, keep_gui: bool) -> int:
+    """Run argv on udid. A reboot the command makes stays the wrappers' (devices.rebind)."""
+    with sims.locked():
+        before = (sims.read_marker(udid) or {}).get("booted_at")
+    try:
+        return run_child(command, udid, keep_gui)
+    finally:
+        with sims.locked():
+            devices.rebind(udid, before)
+
+
+def run_child(command: list[str], udid: str, keep_gui: bool) -> int:
     if keep_gui:
         subprocess.run(["open", "-a", "Simulator", "--args", "-CurrentDeviceUDID", udid], check=False)
     try:
@@ -139,15 +158,15 @@ def execute(command: list[str], udid: str, keep_gui: bool) -> int:
 
 
 def acquire(args: argparse.Namespace, kind: str) -> dict | int:
-    try:
-        device = resolve(args.device)
-    except RuntimeError as error:
-        print(f"sim-session: {error}", file=sys.stderr)
-        return 1
-    if device is None:
-        print(f"sim-session: no available simulator matches {args.device or 'an iPhone'}", file=sys.stderr)
-        return 2
     with sims.locked():
+        try:
+            device, why = devices.resolve(args.device, args.allow_foreign, sims.idle_minutes())
+        except RuntimeError as error:
+            print(f"sim-session: {error}", file=sys.stderr)
+            return 1
+        if device is None:
+            print(f"sim-session: {why}", file=sys.stderr)
+            return 2
         if not ensure_booted(device["udid"], device["name"], args.label):
             return 1
         return leases.create(device["udid"], args.label, kind, held=kind == "oneshot")

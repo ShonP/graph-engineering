@@ -4,8 +4,11 @@
 
 The rule: never shut down a device it cannot prove is abandoned. For each
 booted device, in order:
-  - no sim-session marker (the owner's Xcode, XcodeBuildMCP, any script that
-    booted it itself): keep, `reason=unmarked`, however long it has been up
+  - not a dedicated `graph-sim-*` device (the owner's own, or one a wrapper
+    used with --allow-foreign): keep, `reason=foreign`, always
+  - no sim-session marker for its current boot (none at all, or one whose
+    booted_at differs from the device's lastBootedAt because something
+    outside the wrappers booted it again): keep, `reason=unmarked`
   - a live lease holds it (a holder process runs a command on it, or an
     acquired lease was used within its idle window: the one recorded at
     acquire, or N when longer, N defaulting to $GRAPH_SIM_IDLE_MIN, else 15):
@@ -18,9 +21,12 @@ booted device, in order:
 Idle is measured from each lease's last_used_at, never from boot time.
 
 Then, unless --dry-run, leases that no longer hold anything are deleted,
-markers and leases of devices no longer booted are removed unless a live lease
-still holds them (a step may be rebooting the device), and Simulator.app is
-quit when it runs and no device is booted. --dry-run prints `would ...` and
+markers and leases of devices no longer booted, or booted again by someone
+else, are removed unless a live lease still holds them (a step may be
+rebooting the device), graph-sim devices shut down and unleased whose last
+boot is older than $GRAPH_SIM_DELETE_DAYS (default 7) are deleted with
+`simctl delete` (`deleted <udid> (<name>)`), and Simulator.app is quit when it
+runs and no device is booted. --dry-run prints `would ...` and
 changes nothing, files included.
 
 Idempotent and safe to run from many sessions at once (one lock). Prints one
@@ -32,6 +38,7 @@ import argparse
 import datetime
 import sys
 
+import sim_devices as devices
 import sim_leases as leases
 import sim_lifecycle as sims
 
@@ -39,7 +46,9 @@ import sim_lifecycle as sims
 def verdict(device: dict, idle: float) -> tuple[bool, str]:
     """(shut it down, why)."""
     udid = device["udid"]
-    if not sims.marker_path(udid).exists():
+    if not devices.dedicated(device):
+        return False, "foreign"
+    if not devices.bound(device):
         return False, "unmarked"
     held = [lease for _, lease in leases.on(udid) if lease]
     if any(leases.live(lease, idle) for lease in held):
@@ -55,15 +64,29 @@ def say(text: str) -> None:
     print(f"{stamp} sim-reaper: {text}", flush=True)
 
 
-def tidy(booted: set[str], idle: float) -> None:
-    """Drop leases that hold nothing, and the state of devices no longer booted."""
+def tidy(claimed: set[str], idle: float) -> None:
+    """Drop leases that hold nothing, and the state of devices not booted by a wrapper's boot
+    (shut down, or booted again since by someone else) that no live lease still holds."""
     state = sims.state_dir()
     known = {f.name.split(".", 1)[0] for f in state.glob("*.lease")} | {m.stem for m in state.glob("*.json")}
     for udid in known:
-        if udid not in booted and not leases.live_on(udid, idle):
+        if udid not in claimed and not leases.live_on(udid, idle):
             leases.forget(udid)
         else:
             leases.prune(udid, idle)
+
+
+def delete_stale(dry_run: bool, idle: float) -> None:
+    """Delete graph-sim devices idle (shut down, unleased) past GRAPH_SIM_DELETE_DAYS, default 7."""
+    for device in sims.devices():
+        if devices.stale(device, idle):
+            label = f"{device['udid']} ({device.get('name', '?')}) reason=unused-{devices.delete_days():g}d"
+            if dry_run:
+                say(f"would delete {label}")
+            else:
+                sims.simctl("delete", device["udid"])
+                leases.forget(device["udid"])
+                say(f"deleted {label}")
 
 
 def reap(dry_run: bool, idle: float) -> int:
@@ -87,10 +110,12 @@ def reap(dry_run: bool, idle: float) -> int:
                 leases.forget(device["udid"])
                 say(f"shut down {label}")
         if dry_run:
+            delete_stale(True, idle)
             if not kept and sims.gui_running():
                 say("would quit Simulator.app")
             return 0
-        tidy({d["udid"] for d in booted}, idle)
+        tidy({d["udid"] for d in booted if d["udid"] in kept and devices.bound(d)}, idle)
+        delete_stale(False, idle)
         if sims.quit_gui_if_idle():
             say("quit Simulator.app")
     return 0

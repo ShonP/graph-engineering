@@ -3,7 +3,8 @@
 Every case runs the public scripts with a SYNTHETIC xcrun/osascript/pgrep/open
 (tests/scripts/fixtures/fake_xcrun.py) first on PATH and a throwaway
 GRAPH_SIM_DIR, so no Xcode is needed and no real simulator is touched. The
-devices are synthetic too: two iPhones on one fake iOS runtime. Time is
+devices are synthetic too: two dedicated graph-sim iPhones (A, B) and one owner
+device (O) on a fake iOS runtime, plus an older runtime with none. Time is
 simulated through GRAPH_SIM_CLOCK (epoch seconds the scripts read as now).
 """
 
@@ -21,9 +22,24 @@ SESSION = ROOT / "scripts" / "sim-session.sh"
 REAPER = ROOT / "scripts" / "sim-reaper.sh"
 FAKE = Path(__file__).resolve().parent / "fixtures" / "fake_xcrun.py"
 RUNTIME = "com.apple.CoreSimulator.SimRuntime.iOS-26-5"
+OLDER_RUNTIME = "com.apple.CoreSimulator.SimRuntime.iOS-18-6"
+PRO = "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro"
+# A and B are the wrappers' dedicated devices; O is the owner's own (Xcode's), never the wrappers'.
 A = "AAAAAAAA-0000-4000-8000-000000000001"
 B = "BBBBBBBB-0000-4000-8000-000000000002"
+O = "CCCCCCCC-0000-4000-8000-000000000003"
+NAMES = {A: "graph-sim-iOS-26-5-1", B: "graph-sim-iOS-26-5-2", O: "iPhone 17"}
 OLD = "2026-01-01T00:00:00Z"
+# Newest first, as `simctl list runtimes -j` orders supportedDeviceTypes.
+IPHONES = [{"identifier": PRO, "name": "iPhone 17 Pro", "productFamily": "iPhone"},
+           {"identifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-17", "name": "iPhone 17", "productFamily": "iPhone"},
+           {"identifier": "com.apple.CoreSimulator.SimDeviceType.iPad-Pro-13", "name": "iPad Pro 13", "productFamily": "iPad"}]
+RUNTIMES = [{"identifier": OLDER_RUNTIME, "platform": "iOS", "version": "18.6", "isAvailable": True,
+             "supportedDeviceTypes": IPHONES[1:]},
+            {"identifier": RUNTIME, "platform": "iOS", "version": "26.5", "isAvailable": True,
+             "supportedDeviceTypes": IPHONES},
+            {"identifier": "com.apple.CoreSimulator.SimRuntime.watchOS-26-5", "platform": "watchOS",
+             "version": "26.5", "isAvailable": True, "supportedDeviceTypes": []}]
 T0 = 1_790_000_000  # a fixed simulated "now", in epoch seconds
 # Holds the device until <file> appears; a plain wait, no network.
 HOLD = "import os, sys, time\nwhile not os.path.exists(sys.argv[1]): time.sleep(0.05)\n"
@@ -54,14 +70,32 @@ class SimFixture(unittest.TestCase):
         self.env["GRAPH_SIM_CLOCK"] = str(T0 + minutes * 60)
 
     def write_state(self, states, gui=False, booted_at=None):
-        names = {A: "iPhone 17", B: "iPhone 17 Pro"}
-        devices = [{"udid": u, "name": names[u], "state": s, "isAvailable": True,
+        """A, B and O in the given states (O Shutdown unless named); devices the scripts created
+        through `simctl create` stay as they are."""
+        created = [d for d in self.all_devices() if d["udid"] not in NAMES] if self.state.exists() else []
+        states = {O: "Shutdown", **states}
+        devices = [{"udid": u, "name": NAMES[u], "state": s, "isAvailable": True, "deviceTypeIdentifier": PRO,
                     **({"lastBootedAt": booted_at or OLD} if s == "Booted" else {})} for u, s in states.items()]
-        self.state.write_text(json.dumps({"devices": {RUNTIME: devices}, "gui": gui}))
+        self.state.write_text(json.dumps({"devices": {RUNTIME: devices + created, OLDER_RUNTIME: []},
+                                          "runtimes": RUNTIMES, "gui": gui}))
+
+    def all_devices(self):
+        return [d for group in json.loads(self.state.read_text())["devices"].values() for d in group]
+
+    def device(self, udid):
+        return next((d for d in self.all_devices() if d["udid"] == udid), None)
+
+    def set_device(self, udid, **fields):
+        """Change fields of one synthetic device in place (lastBootedAt, state)."""
+        state = json.loads(self.state.read_text())
+        for group in state["devices"].values():
+            for d in group:
+                if d["udid"] == udid:
+                    d.update(fields)
+        self.state.write_text(json.dumps(state))
 
     def device_state(self, udid):
-        devices = json.loads(self.state.read_text())["devices"][RUNTIME]
-        return next(d["state"] for d in devices if d["udid"] == udid)
+        return self.device(udid)["state"]
 
     def gui(self):
         return json.loads(self.state.read_text())["gui"]
@@ -106,10 +140,11 @@ class SimFixture(unittest.TestCase):
         return count
 
     def mark_dead_owner(self, udid):
-        """A marker with no live lease: the wrapper that booted udid was killed."""
+        """A marker for the device's current boot with no live lease: the wrapper that booted udid was killed."""
         sims = self.tmp / "sims"
         sims.mkdir(exist_ok=True)
-        (sims / f"{udid}.json").write_text(json.dumps({"udid": udid, "pid": 999999, "owner": "test"}))
+        (sims / f"{udid}.json").write_text(json.dumps({"udid": udid, "pid": 999999, "owner": "test",
+                                                       "booted_at": self.device(udid).get("lastBootedAt")}))
 
     def start_build(self, *destination):
         """A SYNTHETIC `xcodebuild` process with the given destination on its command line."""

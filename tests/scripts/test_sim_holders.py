@@ -8,7 +8,7 @@ ends. SYNTHETIC devices and simulated time (GRAPH_SIM_CLOCK), see sim_fixture.
 
 import unittest
 
-from sim_fixture import A, B, SimFixture
+from sim_fixture import A, B, NAMES, SimFixture
 
 ELSEWHERE = ("LANG", "LC_ALL", "LC_TIME")
 
@@ -32,8 +32,8 @@ class Holders(SimFixture):
         result = self.reap()
         self.assertEqual(self.device_state(B), "Booted", result.stdout)
         self.assertEqual(self.device_state(A), "Booted", result.stdout)
-        self.assertIn(f"kept {B} (iPhone 17 Pro) reason=leased", result.stdout)
-        self.assertIn(f"kept {A} (iPhone 17) reason=leased", result.stdout)
+        self.assertIn(f"kept {B} ({NAMES[B]}) reason=leased", result.stdout)
+        self.assertIn(f"kept {A} ({NAMES[A]}) reason=leased", result.stdout)
         release.touch()
         oneshot.communicate(timeout=15)
         step.communicate(timeout=15)
@@ -50,7 +50,7 @@ class Holders(SimFixture):
         self.at(61)
         result = self.reap()
         self.assertEqual(self.device_state(A), "Shutdown")
-        self.assertIn(f"shut down {A} (iPhone 17) reason=idle", result.stdout)
+        self.assertIn(f"shut down {A} ({NAMES[A]}) reason=idle", result.stdout)
 
     def test_a_shorter_reaper_window_never_cuts_a_lease_short(self):
         self.at(0)

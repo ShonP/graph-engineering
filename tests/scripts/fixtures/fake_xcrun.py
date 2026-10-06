@@ -3,7 +3,9 @@
 
 Installed under those names in a test's bin directory (first on PATH), so the
 simulator lifecycle scripts run without Xcode. State lives in $FAKE_SIM_STATE
-(the `simctl list -j` shape plus a `gui` flag for Simulator.app); every call is
+(the `simctl list -j` shape, `runtimes` as `simctl list runtimes -j` prints
+them, and a `gui` flag for Simulator.app); `simctl boot` stamps lastBootedAt,
+`create` and `delete` add and drop devices; every call is
 appended to $FAKE_SIM_LOG as one line, `<tool> <args...>`.
 """
 
@@ -12,6 +14,7 @@ import json
 import os
 import sys
 import time
+import uuid
 from pathlib import Path
 
 STATE = Path(os.environ["FAKE_SIM_STATE"])
@@ -40,6 +43,25 @@ def simctl(args):
                     and not ("available" in rest and not d.get("isAvailable", True))]
             out[runtime] = keep
         print(json.dumps({"devices": out}))
+        return 0
+    if args[:2] == ["list", "runtimes"]:
+        print(json.dumps({"runtimes": state.get("runtimes", [])}))
+        return 0
+    if args[:1] == ["create"] and len(args) == 4:
+        name, device_type, runtime = args[1:]
+        if runtime not in {r["identifier"] for r in state.get("runtimes", [])}:
+            print(f"Invalid runtime: {runtime}", file=sys.stderr)
+            return 148
+        udid = str(uuid.uuid4()).upper()
+        state["devices"].setdefault(runtime, []).append({"udid": udid, "name": name, "state": "Shutdown",
+                                                         "isAvailable": True, "deviceTypeIdentifier": device_type})
+        save(state)
+        print(udid)
+        return 0
+    if args[:1] == ["delete"] and len(args) == 2:
+        for group in state["devices"].values():
+            group[:] = [d for d in group if d["udid"] != args[1]]
+        save(state)
         return 0
     if args and args[0] in ("boot", "shutdown") and len(args) == 2:
         for d in devices(state):

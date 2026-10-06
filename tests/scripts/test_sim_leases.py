@@ -9,12 +9,12 @@ running xcodebuild/XCTest/simctl names it. Time is simulated (GRAPH_SIM_CLOCK).
 
 import unittest
 
-from sim_fixture import A, B, SimFixture
+from sim_fixture import A, B, NAMES, SimFixture
 
 
 class Lease(SimFixture):
     def test_acquire_boots_headless_and_prints_the_udid_and_a_lease(self):
-        udid, lease = self.acquire("--device", "iPhone 17", "--label", "qa-notice")
+        udid, lease = self.acquire("--device", NAMES[A], "--label", "qa-notice")
         self.assertEqual(udid, A)
         self.assertRegex(lease, r"^[0-9a-f]{16}$")
         self.assertEqual(self.device_state(A), "Booted", "the device outlives the acquire call")
@@ -56,7 +56,7 @@ class Lease(SimFixture):
         self.at(16)
         result = self.reap()
         self.assertEqual(self.device_state(A), "Shutdown")
-        self.assertIn(f"shut down {A} (iPhone 17) reason=idle", result.stdout)
+        self.assertIn(f"shut down {A} ({NAMES[A]}) reason=idle", result.stdout)
         self.assertEqual(self.files(), [], "marker and lease removed")
         self.assertFalse(self.gui(), "nothing booted, so Simulator.app is quit")
         late = self.session("run", "--lease", lease, "--", "true")

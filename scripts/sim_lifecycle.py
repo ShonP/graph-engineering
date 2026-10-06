@@ -7,9 +7,11 @@ names it. State lives in
 ${GRAPH_SIM_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/graph-engineering/sims}:
 
   <udid>.json         marker: a wrapper booted this device (pid, name,
-                      started_at, owner label). No marker means someone else
-                      booted it (the owner's Xcode, XcodeBuildMCP), and
-                      nothing here ever shuts it down.
+                      started_at, owner label, booted_at = the device's
+                      lastBootedAt from `simctl list -j` at that boot). No
+                      marker, or one whose booted_at differs from the device's
+                      current lastBootedAt, means someone else booted it (the
+                      owner's Xcode, a reboot), and nothing here shuts it down.
   <udid>.<id>.lease   one per holder, see sim_leases.py.
   .lock               fcntl lock around every boot, lease and shutdown step.
 
@@ -85,17 +87,28 @@ def marker_path(udid: str) -> Path:
     return state_dir() / f"{udid}.json"
 
 
-def write_marker(udid: str, name: str, owner: str) -> None:
+def write_marker(udid: str, name: str, owner: str, booted_at: str | None) -> None:
+    """booted_at is the device's lastBootedAt right after the wrapper booted it: the marker
+    claims that one boot, never a later one someone else made."""
     now = datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds")
     marker_path(udid).write_text(json.dumps({"udid": udid, "name": name, "pid": os.getpid(),
-                                             "started_at": now, "owner": owner}))
+                                             "started_at": now, "owner": owner, "booted_at": booted_at}))
+
+
+def read_marker(udid: str) -> dict | None:
+    try:
+        marker = json.loads(marker_path(udid).read_text())
+    except (OSError, ValueError):
+        return None
+    return marker if isinstance(marker, dict) else None
 
 
 def marker_name(udid: str) -> str | None:
-    try:
-        return json.loads(marker_path(udid).read_text()).get("name")
-    except (OSError, ValueError, AttributeError):
-        return None
+    return (read_marker(udid) or {}).get("name")
+
+
+def device(udid: str) -> dict | None:
+    return next((d for d in devices() if d["udid"] == udid), None)
 
 
 def now() -> float:
