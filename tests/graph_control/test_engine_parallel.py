@@ -85,6 +85,14 @@ class EngineParallelTests(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertNotIn(token, self.text)
 
+    def test_plugin_scripts_take_a_pipeline_through_its_interpreter(self):
+        # wait-run and lane-run exec argv with no shell; a Write-tool script file is 0644,
+        # so a bare path exits 127 and the shape taught is `bash <absolute path>`.
+        self.assert_tokens(self.text, (
+            "literal absolute path, never through a shell variable",
+            "put a pipeline in a script file passed as `bash <absolute path>`",
+        ))
+
     def test_ac_w3_ep_01_host_isolation_is_never_offered(self):
         self.assertIsNone(re.search(r"isolation\W{0,3}worktree", self.text))
 

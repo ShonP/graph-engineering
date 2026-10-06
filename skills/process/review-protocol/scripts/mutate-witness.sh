@@ -20,8 +20,9 @@
 # The test runs in the subdirectory you invoked from. The copy holds tracked
 # files only, so the test must fetch or link its dependencies itself. The argv
 # is spawned with no shell, so compound setup goes in a script file in the run
-# dir (link the dependency directory, then run the test) passed by its path:
-#   -- /abs/run/witness-test.sh
+# dir (link the dependency directory, then run the test), passed through its
+# interpreter because a file the Write tool made is not executable:
+#   -- bash /abs/run/witness-test.sh
 # Python caches bytecode keyed on the source's mtime (one-second resolution) and
 # size, so a same-size edit within the same second would run stale bytecode and
 # the mutant would falsely survive. Both runs export PYTHONDONTWRITEBYTECODE=1,

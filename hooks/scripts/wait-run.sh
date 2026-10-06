@@ -18,8 +18,9 @@
 # Exit: the job's code when complete, 75 when still running, 2 on an error.
 # Make the Bash call's own timeout longer than S. wait_run.py owns the logic.
 # The argv is spawned directly, with no shell: for a pipeline or `set -o
-# pipefail`, write a script file and pass its path. Call this script by its
-# literal absolute path.
+# pipefail`, write a script file and pass it as `bash <absolute path>`: a file
+# the Write tool made is not executable, so a bare path exits 127. Call this
+# script by its literal absolute path.
 
 set -u
 

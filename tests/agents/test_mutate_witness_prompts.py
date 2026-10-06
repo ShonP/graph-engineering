@@ -57,6 +57,12 @@ class MutationWitness(unittest.TestCase):
             with self.subTest(needle=needle):
                 self.assertTrue(needle in header, f"script header lacks {needle!r}")
 
+    def test_script_file_example_runs_through_its_interpreter(self):
+        # A Write-tool file is 0644, so a bare path exits 127 and the baseline is refused.
+        header = SCRIPT.read_text(encoding="utf-8").split("\nset ", 1)[0]
+        self.assertIn("-- bash /abs/run/witness-test.sh", header)
+        self.assertNotRegex(header, r"-- /abs/run/")
+
     def test_new_text_is_generic_and_plain(self):
         for path in (SCRIPT, PROTOCOL, *IMPLEMENTERS):
             text = path.read_text(encoding="utf-8")
