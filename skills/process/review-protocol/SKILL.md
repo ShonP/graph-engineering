@@ -87,7 +87,8 @@ Write `findings.json` with the Write tool at the path your dispatch names; qa
 writes `qa-findings.json` in the same shape. The engine counts and routes from
 the file, never from prose. Check it from the repo with
 `uv run <plugin root>/scripts/graph-control.py findings <path>` (the plugin root
-is three directories above this skill) and rewrite the file until the command
+is three directories above this skill; type it as a literal absolute path, never
+through a shell variable) and rewrite the file until the command
 exits 0; that means the file is valid, whatever its verdict.
 
 ```json
