@@ -10,6 +10,43 @@ commits.
 
 ## [Unreleased]
 
+## [0.16.1] - 2026-10-06
+
+Agents close the simulators they open. Subagents booted iOS simulators (and
+Simulator.app) for qa and evidence and left them running, holding CPU and RAM
+on a Mac many sessions share.
+
+**Upgrading.** As with every release, a run opened on 0.16.0 fails `preflight`
+after the upgrade (`run plugin version differs from executing helper`); finish
+in-flight runs first, or follow the 0.16.0 note below with `0.16.1`.
+
+### Added
+
+- **`scripts/sim-session.sh [--device <name|udid>] [--keep-gui] -- <argv>`.**
+  Boots the device headless (`xcrun simctl boot`, never Simulator.app unless
+  `--keep-gui`), exports `SIM_UDID`, runs argv, and on exit, SIGINT, SIGTERM or
+  SIGHUP drops its lease. A device a wrapper booted is shut down by its last
+  live holder; a device someone else booted is reused and left running.
+  Simulator.app is quit only when no device is booted. Ownership lives in
+  `${GRAPH_SIM_DIR:-~/.cache/graph-engineering/sims}`: a `<udid>.json` marker
+  per wrapper-booted device and a lease per holder keyed by pid and process
+  start time, all under one fcntl lock.
+- **`scripts/sim-reaper.sh [--dry-run] [--grace-minutes N]`.** Shuts down a
+  booted device whose wrapper holders are all dead, or one with no marker, no
+  running `xcodebuild`/XCTest/`simctl` naming it, booted longer than N minutes
+  ago (`GRAPH_SIM_GRACE_MIN`, default 30). Never touches a device a live lease
+  or a referencing process holds. Quits an idle Simulator.app.
+- **Hook `reap-simulators.sh` on `Stop` and `SubagentStop`.** `async`, starts the
+  reaper detached and returns; logs to `<sim dir>/reaper.log`. No `xcrun` on
+  PATH starts nothing. Kill switch: `GRAPH_SIM_REAPER=off`.
+
+### Changed
+
+- **Simulator rule** in `implementer`, `qa-lead`, `qa-verification`,
+  `ux-evidence` and `ux-journey`: every simulator use goes through
+  `sim-session.sh` (headless). Never `open -a Simulator`. Close what you open.
+  `ux-evidence` captures `simctl io "$SIM_UDID"` instead of `booted`.
+
 ## [0.16.0] - 2026-10-06
 
 Throughput. Implementation runs as a ready queue instead of waves, every task
