@@ -154,11 +154,56 @@ which is what wait-run gives.
   passes. Loop keywords and `sleep` count only in command position. Known gaps:
   a heredoc body is read as commands, so writing a looping script through
   `cat <<EOF` is denied (use the Write tool); `bash -c '...'`, `eval` and
-  script files hide the loop in one word and are allowed.
+  script files hide the loop in one word and are allowed by this guard. A
+  plugin script whose argv holds a shell with a `-c` script is denied by the
+  plugin-script shell guard below.
 - **Fails open.** No Python 3.11+, unparsable input or an error means no
   decision. Exit `0` always.
 - **Kill switch.** The owner sets `GRAPH_POLL_GUARD=off` under `env` in Claude
   Code settings; no deploy is needed. Unset or `on` means active.
+
+## Plugin-script shell guard
+
+`guard-plugin-shell.sh` denies a Bash call that runs one of the plugin's own
+scripts (`wait-run.sh`, `mutate-witness.sh`, `lane-run.sh`, `worktree-gc.sh`)
+in either of two shapes Claude Code cannot check: a `$`-led command word that
+names a plugin script (the plugin root read from a shell variable), or a plugin
+script whose argv starts a shell (`bash`, `sh`, `zsh`, `dash`, `ksh`) with an
+option word holding `c`, so the shell runs an inline script. Claude Code stops
+either shape on its inline-shell safety prompt, and a run in bypass mode stalls
+until someone answers. The deny reason names the literal plugin root, says to
+pass argv straight through, and for a pipeline says to Write a script file under
+`.graph/<run>/` and pass it as `-- bash /abs/path/check.sh`.
+
+- **Gate.** Every caller, main thread included: the safety prompt stops the
+  main thread and every subagent alike, so there is no agent type to spare. A
+  deny also applies in `bypassPermissions` mode, on purpose.
+- **Ordering.** A PreToolUse deny runs before the safety prompt on Claude Code
+  2.1.291, so the caller reads the reason instead of stalling. That comes from a
+  static read of the CLI; live confirmation is open as followup F6.
+- **Not a replacement.** It does not replace or switch off Claude Code's own
+  check, which still prompts on every shape this guard does not cover.
+  `CLAUDE_CODE_DISABLE_INLINE_SHELL_RM_PROMPT` is a launch-environment opt-out
+  the owner may choose for himself; the plugin never sets it.
+- **Fast path.** It runs on every Bash call with no `if`. Python starts only
+  when the raw payload names one of the four scripts and also holds a dollar
+  sign or a shell word followed by an option sign; anything else exits in bash.
+  Both shapes need the script's name, the first needs a dollar sign and the
+  second needs a shell word right before an option, so neither can skip it.
+- **Parsing.** `scripts/plugin_shell.py` (stdlib) shares `poll_loop.py`'s
+  `shlex` tokenizer, so a commit message or a search pattern that mentions a
+  plugin script is one word and passes. Known gaps, shared with the sleep-loop
+  guard: the inside of a command substitution, backticks and a heredoc body are
+  not read as commands.
+- **Fail-open.** The hook fails open: no Python 3.11+, unparsable input or an
+  error means no decision. Exit `0` always.
+- **Seeing it.** A deny shows in the transcript as a blocked Bash call with the
+  reason above. A guard that is off, or that found nothing, prints nothing.
+- **Kill switch.** The owner sets `GRAPH_SHELL_GUARD=off` under `env` in Claude
+  Code settings; no deploy is needed. Unset or `on` means active.
+- **Flag registry.** Owner: Shon. Default: on. No removal date: the guard lives
+  as long as Claude Code's inline-shell check does. Rollback is the kill switch,
+  or a revert of the commit that registered the hook.
 
 ## Simulator reaper
 
@@ -297,7 +342,10 @@ graph-engineering: <n> success measure(s) due (<run ids>). Run: python3 <plugin>
 Spike f (2.1.285): a foreground subagent's background jobs are killed when it
 ends its turn, and a background subagent is re-woken only when its lead goes
 idle. The harness also blocks a bare `sleep N`. So a suite longer than one tool
-call runs through
+call runs through the line below, where `<plugin root>` is a
+literal absolute path, never through a shell variable. Argv goes straight through; a pipeline
+goes in a script file written under `.graph/<run>/` and passed as argv, as
+`-- bash /abs/path/check.sh`.
 
 ```
 <plugin root>/hooks/scripts/wait-run.sh --log <absolute path> [--max-block S] [--full [--reason TEXT]] [-- <argv...>]
@@ -400,6 +448,8 @@ remove hooks"). The ways out, in order of least collateral damage:
 - `policy-override: <reason>` in one agent prompt skips the agent guard for that call.
 - `GRAPH_POLL_GUARD=off` under `env` in Claude Code settings turns off the
   sleep-loop guard.
+- `GRAPH_SHELL_GUARD=off` under `env` in Claude Code settings turns off the
+  plugin-script shell guard.
 - `claude plugin disable graph-engineering` turns off the plugin, hooks included.
 - `"disableAllHooks": true` in a settings file turns off every hook from every
   source for that scope; `--settings '{"disableAllHooks": true}'` does it for one
@@ -421,6 +471,7 @@ python3 hooks/tests/test_doctor_on_start.py
 python3 hooks/tests/test_wait_run.py
 python3 hooks/tests/test_wait_count.py
 python3 hooks/tests/test_guard_poll_loop.py
+python3 hooks/tests/test_guard_plugin_shell.py
 python3 hooks/tests/test_reap_simulators.py
 python3 -m unittest discover -s tests/measure
 ```

@@ -57,7 +57,8 @@ class RegistrationContract(unittest.TestCase):
         self.assertEqual(
             groups[0]["hooks"],
             [handler("guard-destructive.sh", timeout=10, **{"if": i}) for i in ifs]
-            + [handler("guard-poll-loop.sh", timeout=5)],
+            + [handler("guard-poll-loop.sh", timeout=5)]
+            + [handler("guard-plugin-shell.sh", timeout=5)],
         )
         self.assertEqual(
             groups[1]["hooks"], [handler("guard-agent.sh", timeout=15)]
@@ -66,6 +67,7 @@ class RegistrationContract(unittest.TestCase):
     def test_description_names_the_sleep_loop_guard(self):
         description = json.loads((HOOKS_DIR / "hooks.json").read_text(encoding="utf-8"))["description"]
         self.assertIn("sleep-loop", description)
+        self.assertIn("plugin-script shell", description)
 
     def test_stop_rewakes_and_has_no_matcher(self):
         self.assertEqual(

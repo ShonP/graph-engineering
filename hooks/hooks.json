@@ -1,5 +1,5 @@
 {
-  "description": "graph-engineering: async lint on edit, destructive-command, sleep-loop and agent-policy guards, test on stop, simulator reaper on stop, handoff on session start",
+  "description": "graph-engineering: async lint on edit, destructive-command, sleep-loop, plugin-script shell and agent-policy guards, test on stop, simulator reaper on stop, handoff on session start",
   "hooks": {
     "PostToolUse": [
       {
@@ -43,6 +43,12 @@
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/guard-poll-loop.sh",
+            "args": [],
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/guard-plugin-shell.sh",
             "args": [],
             "timeout": 5
           }
