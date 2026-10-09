@@ -226,7 +226,7 @@ The model column is the default tier in the agent's frontmatter. The profile's
 rewrites any roster call to its role's tier. Never haiku, never fable, never
 `general-purpose`. Review never drops to a cheaper tier; the only move is up:
 fix round 3 escalates a small task from `implementer-simple` to `implementer`.
-`implementer` (200), `implementer-simple` (60), `qa` (250), `qa-lead` (150),
+`implementer` (200), `implementer-simple` (60), `qa` (400), `qa-lead` (150),
 `reviewer-lead` (120), `researcher-spike` (25) and `retro` (40) carry a
 frontmatter `maxTurns` cap. Children return at most 1,500 tokens plus artifact
 paths; the reviewer writes `findings.json` (schema v1 in `review-protocol`, a

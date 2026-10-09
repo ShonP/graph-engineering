@@ -26,7 +26,7 @@ TIERS = {
     "retro": "sonnet",
 }
 MAX_TURNS = {
-    "implementer": 200, "implementer-simple": 60, "qa": 250, "qa-lead": 150, "retro": 40,
+    "implementer": 200, "implementer-simple": 60, "qa": 400, "qa-lead": 150, "retro": 40,
     "researcher-spike": 25, "reviewer-lead": 120,
 }
 # Fields a plugin agent honors, minus isolation (it branches from the default
