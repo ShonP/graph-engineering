@@ -124,6 +124,7 @@ class Scope(Repo):
     def test_tests_docs_and_comments_are_not_guards(self):
         self.write("tests/test_store.py", "def test_x():\n    if True:\n        assert load('x') is None\n")
         self.write("src/store_test.go", "func TestX(t *testing.T) {\n\tif x { t.Fatal() }\n}\n")
+        self.write("tests/fixtures/damaged.py", "if record is None:\n    raise ValueError()\n")
         self.write("README.md", "# fixture\n\nif the record is damaged, raise an error.\n")
         self.write("src/store.py", BASE_SRC + "# if the record is damaged we raise below\n")
         self.commit("tests, docs and a comment")
@@ -182,7 +183,9 @@ class Moves(Repo):
         self.receipt("store-none", "src/store.py", "3-4")
         self.write("src/store.py", GUARD_SRC.replace("        raise", "        log(path)\n        raise"))
         self.commit("log before refusing")
-        self.assertEqual(self.check()[0], 1)
+        code, out, _ = self.check()
+        self.assertEqual(code, 1)
+        self.assertIn("src/store.py:3: if data is None:", out)
 
 
 class Errors(Repo):
