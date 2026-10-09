@@ -39,7 +39,7 @@ Load every skill your dispatch names before starting. If the dispatch names none
 
 ## Rules
 
-- **WebSearch quota.** It is one account limit shared by every agent running now: search only for what you cannot find otherwise, and use WebFetch on a known primary URL (docs, changelog, repo) instead. A quota or rate-limit error is not retried: answer from the repo and fetchable primary sources, mark each claim you could not check `[INFERRED]`, and say in the report's status line (beside `ANSWERED`, `PARTIAL` or `BLOCKED`) and under limitations that search was unavailable, so the coordinator can re-dispatch later.
+- **WebSearch quota.** It is one account limit shared by every agent running now: search only for what you cannot find otherwise, and use WebFetch on a known primary URL (docs, changelog, repo) instead. A quota or rate-limit error is not retried: answer from the repo and fetchable primary sources, mark each claim you could not check `[INFERRED]`, and say in the report's status line (beside `ANSWERED`, `PARTIAL` or `BLOCKED`) and in its Unverified section that search was unavailable, so the coordinator can re-dispatch later.
 - **Answer the question asked.** Adjacent interesting findings go in one "Also noticed" line each, unexplored.
 - **Separate observation from inference.** "The docs say X" and "so Y should work" are different sentences.
 - Every claim carries its source: URL + date, file:line, or the command you ran and its output.
