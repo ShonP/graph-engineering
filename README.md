@@ -401,7 +401,9 @@ standing rules and every agent carries them:
   `skills/process/review-protocol/scripts/mutate-witness.sh`, which applies one
   mutant in a throwaway detached worktree, never the working tree, and records
   whether the test killed it. The reviewer treats a surviving mutant, or a new
-  guard with no receipt, as Important.
+  guard with no receipt, as Important. Before reporting `DONE` the implementer
+  runs `scripts/guard-receipts-check.py`, which lists the added guard lines no
+  killed receipt covers, so the gap is closed before the first review.
 - **Prior art.** No ask starts from priors. At the start of every task, and
   again at every mid-task fork, look at what others do - reuse candidates
   first (an existing skill, plugin or library), then competitors, open source,

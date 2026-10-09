@@ -50,6 +50,12 @@ that guard's own test and `head` is on the reviewed branch. A surviving mutant
 receipt. Re-run a doubtful one from its fields: the script mutates only a
 disposable worktree, never the shared one.
 
+**Receipt coverage.** Before `DONE` the implementer runs
+`scripts/guard-receipts-check.py` from the plugin root (base SHA, receipts
+directory, `--repo`): it lists added guard lines that no killed receipt covers.
+Re-run it on the reviewed branch. A listed line the report neither covers nor
+names with a reason is Important.
+
 ## Always-on lenses
 
 Security and privacy load as their own skills. Two more lenses apply with no
