@@ -40,6 +40,18 @@ class MutationWitness(unittest.TestCase):
                 with self.subTest(agent=path.stem, needle=needle):
                     self.assertTrue(needle in body, f"{path.stem} lacks {needle!r}")
 
+    def test_implementers_run_the_receipt_coverage_gate_before_done(self):
+        for path in IMPLEMENTERS:
+            body = flat(path.read_text(encoding="utf-8"))
+            for needle in ("python3 <plugin root>/scripts/guard-receipts-check.py", "before reporting `DONE`",
+                           ".graph/<run>/mutants", "--repo", "give `--lines` the branch and its refusal"):
+                with self.subTest(agent=path.stem, needle=needle):
+                    self.assertTrue(needle in body, f"{path.stem} lacks {needle!r}")
+        protocol = flat(PROTOCOL.read_text(encoding="utf-8"))
+        self.assertIn("receipt coverage check (advisory)", protocol.lower())
+        self.assertNotIn("neither covers nor names", protocol)
+        self.assertIn("never a blocker", flat(IMPLEMENTERS[0].read_text(encoding="utf-8")))
+
     def test_no_in_place_sed_mutation_guidance(self):
         hits = []
         for base in (ROOT / "agents", ROOT / "skills/process"):

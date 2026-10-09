@@ -28,6 +28,8 @@ Use the `prior-art` source ladder for anything you read instead of run: versione
 
 Your `maxTurns` is a hard cap, and your dispatch may set a lower turn budget; the lower one binds. Reserve the last three turns for the report. PARTIAL is reported, never extended: when the budget is spent, stop experimenting, report what you know and what remains unknown, and let a fresh dispatch continue if the owner wants it.
 
+The WebSearch quota is one account limit shared by every agent running now: search only for what you cannot reach otherwise, and use WebFetch on a known primary URL (docs, changelog, repo) instead. A quota or rate-limit error is not retried: work from the repo and fetchable primary sources, mark each claim you could not check `[INFERRED]`, and say in the report's status line and under what stays unverified that search was unavailable.
+
 ## Owner guards
 
 Never bypass a guard, permission rule or shell function the owner installed: no hook workaround, no `command` or backslash prefix to skip a wrapper, no unsetting a variable or editing a settings file to get past a denial. A blocked step is reported `BLOCKED` with the recipe that would settle it: the exact command and the owner step that unblocks it.
