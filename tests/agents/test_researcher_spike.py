@@ -158,5 +158,17 @@ class DispatchersRouteToTheSpikeAgent(unittest.TestCase):  # AC-W3-SP-03
             self.assertIn(part, text)
 
 
+class SearchQuota(unittest.TestCase):
+    """WebSearch draws on one account quota shared by every agent; an empty quota is said, not hidden."""
+
+    def test_both_web_agents_budget_the_shared_search_quota(self):
+        for path in (RESEARCHER, SPIKE):
+            text = " ".join(path.read_text(encoding="utf-8").split())
+            for needle in ("WebSearch quota", "shared", "WebFetch on a known primary URL", "not retried",
+                           "`[INFERRED]`", "first line of the report"):
+                with self.subTest(agent=path.stem, needle=needle):
+                    self.assertIn(needle, text)
+
+
 if __name__ == "__main__":
     unittest.main()
