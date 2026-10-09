@@ -81,6 +81,8 @@ Produces `.claude/graph-profile.yaml` from the plugin's `templates/graph-profile
 
    **Host floor.** Propose `host.min_free_gb`, the free-disk floor `graph-control host-check` holds before each implementer dispatch. 20 when the stack fills disks: the runtime uses docker or compose, a device build exists (a `*.xcodeproj`, a Gradle Android module), or any `lanes` entry was proposed. Otherwise 5, which covers a `runtime.none` library or CLI and a plain interpreted service. Say which evidence picked the value; shown with the profile and written only on approval.
 
+   **Quick gate.** Propose `gates.quick`, the fast check every implementer runs before reporting DONE, from what the repo already runs at commit or push time: a `pre-commit` or `pre-push` hook (`.githooks/`, `.husky/`, `lefthook.yml`, `.pre-commit-config.yaml`) or a package script named like `check:quick` or `precommit`. Propose the script the hook calls, not the hook, and only a command that finishes in about a minute; a full test suite is not a quick gate. No such check, `""`. Shown with the profile and written only on approval.
+
 5. **Detect existing agents.** List `.claude/agents/*.md`. Where a local agent plainly covers a plugin role for a stack, propose it as a `localAgents` override (it runs instead of the plugin agent); where it adds a view beside the plugin agent (a visual reviewer beside the code reviewer), propose it under `localLanes`. This is the additive contract: the engine defers to what the repo already has and supplies only the legs it lacks.
 
 6. **Detect rule packs.** Glob `.claude/rules/*.md` and any nested `CLAUDE.md`. Record them under `rules`.

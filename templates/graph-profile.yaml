@@ -615,11 +615,19 @@ risk:
 #                  touch no risk row. Empty keeps every merge with the owner.
 # `agent-control` (built in, see `risk:`) always waits for the owner, even
 # under `--auto-merge`; listing it anywhere changes nothing.
+#   quick          the one entry that is a command, not an approver: the repo's
+#                  fast pre-push check (secrets scan, banned characters,
+#                  generated-file drift, ordering lints), run by every
+#                  implementer in its worktree before reporting DONE, so a
+#                  failure the push hook would catch is caught where it is
+#                  cheap to fix. One command string, run from the repo root;
+#                  a pipeline goes in a script it names. "" means none.
 gates:
   plan: owner   # also the design gate: the plan embeds the `design` node's spec
   merge: owner
   owner_classes: [destructive, credentials-and-access, spend, outbound-messaging]
   auto_classes: []
+  quick: ""     # e.g. "bash scripts/ci/quick-gate.sh"
 
 # How a merged run lands: `pr` opens a pull request; `push-main` pushes to the
 # default branch after the merge gate, for repos that trunk-deploy.
