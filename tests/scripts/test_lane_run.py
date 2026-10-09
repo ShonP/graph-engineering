@@ -236,6 +236,8 @@ class LoadAdmission(Lanes):
         host, message = self.admit([30, 90] * 50, wait_seconds=60)
         self.assertEqual(message, "lane t: load5 90.0 > 40 after 60 s")
         self.assertLessEqual(host.now, 60)
+        # One acquire-and-release round per 15 s poll: 5 rounds of two reads in 60 s, not a spin.
+        self.assertLessEqual(len(host.free_at_read), 10)
 
     def test_without_the_option_load_is_never_read(self):
         host, (fd, slot, _) = self.admit([999], max_load5=None)
