@@ -10,6 +10,49 @@ commits.
 
 ## [Unreleased]
 
+Wall-clock cuts from a two-day session retro (146 subagents), every gate kept:
+only ordering, repeats and idle time change.
+
+### Added
+
+- **Profile key `gates.quick`.** One command string, the repo's fast pre-push
+  check (secrets scan, banned characters, generated-file drift, ordering
+  lints). `definition-of-done` and the implementer run it in the task worktree
+  before reporting `DONE`, so the class of failure that blocked 12 pushes in the
+  retro window is caught where it is cheap to fix. The template ships `""`
+  (none); `/graph-init` proposes it from an existing pre-commit or pre-push
+  hook, and `--upgrade` adds the empty key. `graph-control doctor` warns
+  (`gates-quick`) when it is not a string.
+- **Task timing rows in the ledger.** `dispatch`, `merged` and `gated` per task,
+  plus each task's ready lag and merge gap in `merge.md`, so dispatch latency is
+  a measured number per run instead of a transcript parse.
+- **Fallback wakeup (engine heartbeat).** A coordinator turn that would end with
+  only background work in flight schedules its own wakeup about 10 minutes out
+  and processes what finished when it wakes; three quiet wakeups mark the leaf
+  `stalled` and open a decision card. It never kills or messages a child. The
+  retro saw a 62-minute idle run that only the owner's "continue" ended.
+- **Implementer progress checkpoint.** At 85% of its turns the implementer
+  writes `.graph-checkpoint.md` (base, commits, cases done and left, last test
+  command and result, next step) in its worktree, never committed.
+
+### Changed
+
+- **Ready-set dispatch is explicit.** A task dispatches the moment its last
+  dependency is `gated`; the engine never waits for a sibling, a plan level or a
+  batch. The per-merge gate still releases dependents.
+- **Resume carries state, not prose.** A writer stopped by its turn cap is
+  resumed with a block the engine builds from the worktree (`git log` since
+  base, `git status --short`, last test command and result, cases done and
+  left, the checkpoint), never "continue where you stopped". The same block opens
+  a `PARTIAL` remainder brief.
+- **Fix rounds test narrowly, then once in full.** The fix-round brief and the
+  implementer's new Fix rounds section: targeted tests on the files and classes
+  the findings name while fixing, then exactly one full suite at the end of the
+  round. The retro measured full-suite repeats per finding at 100-140 agent
+  minutes in two days.
+- **Retro agent turn cap 40 to 100,** and it writes `retro.md` as a draft within
+  its first 15 turns and refines it, so a capped retro still leaves a report.
+
 ## [0.16.2] - 2026-10-06
 
 Unattended runs no longer stop on Claude Code's inline-shell `rm` safety
