@@ -258,7 +258,12 @@ work inside a 45-minute time-box and return `PARTIAL` with their green work; the
 rest becomes a remainder task `<id>b`. A command on a resource the profile
 declares under `lanes:` (a device build, a shared database, a cluster) runs
 through `scripts/lane-run.sh <lane> --slots <n> -- <cmd>`, whose lock dies with
-the command; slots count independent instances, and a task that can have its
+the command. Compiles and test runs take separate lanes: an Xcode compile
+(`build-for-testing`) holds the `xcodebuild` lane, and a `test-without-building`
+run against the already built product holds the `xctest` lane (the `xcodebuild`
+slot count when a profile leaves it out), so a short run never queues behind a
+compile. `--elastic <e>` adds slots taken only while load per core and free
+memory leave headroom (`docs/engine/lanes.md`). Slots count independent instances, and a task that can have its
 own namespace (from `GRAPH_RUN_ID`) uses one instead of a lane. A suite longer
 than one tool call runs through `hooks/scripts/wait-run.sh`, which blocks at
 most 270 s per call and never polls; `--full` counts full-suite runs per task.

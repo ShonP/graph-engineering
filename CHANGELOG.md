@@ -10,6 +10,35 @@ commits.
 
 ## [Unreleased]
 
+Host lanes stop making short test runs wait behind long compiles. A
+session retro found 36% of simulator qa time was lane queueing: a 20 s
+`test-without-building` run waited 100 to 250 s for the same lane a 17 minute
+compile held. Same builds, same tests, same gates; only the locks move.
+
+### Added
+
+- **Test-run lane.** A build lane now pairs with a test-run lane: compiles
+  (`build-for-testing`, `build`) hold `xcodebuild`, runs against an already
+  built product (`test-without-building`) hold `xctest`, each its own command.
+  `xctest` is profile-declarable in `lanes:` like any lane; a profile that
+  leaves it out gets the `xcodebuild` slot count on its own lock files, so old
+  profiles need no edit. Taught in `docs/engine/lanes.md`, `docs/engine/run.md`,
+  `agents/qa.md`, `agents/qa-lead.md`, `agents/implementer.md`, the
+  `qa-verification` and `ux-evidence` skills, `/graph-init`'s Lanes step and
+  the profile template.
+- **Elastic lane slots.** `lane-run.sh <lane> --slots N --elastic E
+  [--max-load L] [--min-free-gb G]` may grant up to E slots above N, only while
+  the 1-minute load average per core is below L (default 0.7) and available
+  memory is at least G GB (default 2), read at admission by the new
+  `scripts/lane_host.py` (Linux `MemAvailable`, macOS
+  `kern.memorystatus_level` times `hw.memsize`). An unreadable probe refuses the
+  extra slot, so the lane falls back to N. Off by default: without `--elastic`
+  nothing changes. A `lanes:` entry may be a mapping
+  `{slots, elastic, max_load, min_free_gb}` that maps onto those flags. The
+  acquire line gains ` (elastic: <load and memory read>)` for an extra slot.
+  The ceiling follows GNU make's `--max-load` and GNU parallel's `--load`
+  (per core here), the floor GNU parallel's `--memfree`.
+
 ## [0.16.2] - 2026-10-06
 
 Unattended runs no longer stop on Claude Code's inline-shell `rm` safety
