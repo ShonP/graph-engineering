@@ -11,8 +11,9 @@ because the witness builds its mutant from HEAD.
 
 A guard line is an added line, comments skipped, that either opens a branch
 (`if`, `elif`, `else if`, `guard`, `unless`) or refuses (`raise`, `throw`,
-`assert`, `die`, `exit`/`sys.exit` with a nonzero literal). It is a line
-heuristic, not a parser: it over-reports a plain `if` that refuses nothing,
+`assert`, `die`, `exit`/`sys.exit` with a nonzero literal). Quoted and
+backticked spans are dropped before matching, and Python's
+`if __name__ == "__main__":` is not a guard. It is a line heuristic, not a parser: it over-reports a plain `if` that refuses nothing,
 which the implementer names in the report with the reason. Test files,
 fixtures, docs and data files (see SKIPPED) are never scanned; `--exclude` adds
 more fnmatch globs, matched against the repo-relative path.
@@ -43,6 +44,8 @@ GUARD = re.compile(
     r"|\bexit\s+[1-9]|\bsys\.exit\(\s*[1-9]"
 )
 COMMENT = ("#", "//", "/*", "*")
+LITERAL = re.compile(r'"[^"]*"|\'[^\']*\'|`[^`]*`')
+MAIN_BLOCK = re.compile(r"""if __name__ == ["']__main__["']:""")
 SKIPPED = (
     "test_*", "*_test.*", "*.test.*", "*.spec.*", "*Tests.*", "conftest.py",
     "*.md", "*.txt", "*.rst", "*.json", "*.yaml", "*.yml", "*.toml", "*.lock", "*.csv", "*.svg",
@@ -82,7 +85,9 @@ def scanned(path: str, excludes: list[str]) -> bool:
 
 def is_guard(text: str) -> bool:
     line = text.strip()
-    return bool(line) and not line.startswith(COMMENT) and bool(GUARD.search(line))
+    if not line or line.startswith(COMMENT) or MAIN_BLOCK.match(line):
+        return False
+    return bool(GUARD.search(LITERAL.sub("", line)))
 
 
 def added_lines(repo: Path, base: str):

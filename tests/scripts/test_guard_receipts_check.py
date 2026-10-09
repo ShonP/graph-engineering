@@ -130,6 +130,15 @@ class Scope(Repo):
         code, out, _ = self.check()
         self.assertEqual(code, 0, out)
 
+    def test_words_in_strings_and_the_main_block_are_not_guards(self):
+        self.write("src/cli.py", '"""Exits nonzero: `raise`, `assert` and `if` are the guard words."""\n'
+                                 'PATTERN = r"\\b(?:raise|throw)\\b"\n'
+                                 "HELP = 'die if the record is unreadable'\n"
+                                 'if __name__ == "__main__":\n    main()\n')
+        self.commit("strings and a main block")
+        code, out, _ = self.check()
+        self.assertEqual(code, 0, out)
+
     def test_shell_and_branch_shapes_count_as_guards(self):
         self.write("bin/run.sh", '#!/usr/bin/env bash\n[ -n "$1" ] || die "no target"\nelif true; then :\n'
                                  'echo ok\nexit 2\n')
