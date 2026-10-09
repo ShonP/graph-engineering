@@ -151,5 +151,108 @@ class Contract(Lanes):
         self.assertTrue((self.tmp / "xdg" / "graph-engineering" / "lanes" / "t.1.lock").is_file())
 
 
+def load_module():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("lane_run_under_test", LANE_RUN.with_name("lane_run.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class FakeHost:
+    """A clock that only moves when the code under test sleeps, and a scripted load5 series.
+
+    Each load5 read pops the next value (the last one repeats) and records whether
+    slot 1 of the lane was free at that moment, read through a second flock.
+    """
+
+    def __init__(self, module, lane_dir, loads):
+        self.module, self.lane_dir, self.loads = module, lane_dir, list(loads)
+        self.now, self.slept, self.free_at_read = 0.0, [], []
+
+    def clock(self):
+        return self.now
+
+    def sleep(self, seconds):
+        self.slept.append(seconds)
+        self.now += seconds
+
+    def load5(self):
+        self.lane_dir.mkdir(parents=True, exist_ok=True)
+        probe = self.module.try_slot(self.lane_dir / "t.1.lock")
+        self.free_at_read.append(probe is not None)
+        if probe is not None:
+            os.close(probe)
+        return self.loads.pop(0) if len(self.loads) > 1 else self.loads[0]
+
+
+class LoadAdmission(Lanes):
+    def setUp(self):
+        super().setUp()
+        self.module = load_module()
+        os.environ["GRAPH_LANES_DIR"] = str(self.tmp / "lanes")
+        self.addCleanup(os.environ.pop, "GRAPH_LANES_DIR", None)
+
+    def admit(self, loads, wait_seconds=600, max_load5=40):
+        host = FakeHost(self.module, self.tmp / "lanes", loads)
+        try:
+            result = self.module.admit("t", 1, wait_seconds, max_load5,
+                                       load5=host.load5, clock=host.clock, sleep=host.sleep)
+        except self.module.Busy as busy:
+            return host, str(busy)
+        self.addCleanup(os.close, result[0])
+        return host, result
+
+    def test_waits_for_load_before_taking_a_slot(self):
+        host, (fd, slot, waited) = self.admit([90, 70, 30, 30])
+        self.assertEqual(slot, 1)
+        self.assertEqual(host.free_at_read[:3], [True, True, True], "a load wait must never hold the slot")
+        self.assertEqual(waited, sum(host.slept))
+        self.assertGreater(waited, 0)
+        self.assertIsNone(self.module.try_slot(self.tmp / "lanes" / "t.1.lock"), "the admitted caller holds slot 1")
+
+    def test_releases_and_rewaits_when_load_rises_after_acquiring(self):
+        host, (fd, slot, _) = self.admit([30, 90, 90, 30, 30])
+        self.assertEqual(slot, 1)
+        self.assertEqual(host.free_at_read[1], False, "the post-acquire read happens while the slot is held")
+        self.assertEqual(host.free_at_read[2:4], [True, True], "the slot is released while load is over the cap")
+
+    def test_gives_up_after_wait_seconds_without_holding_a_slot(self):
+        host, message = self.admit([90], wait_seconds=60)
+        self.assertEqual(message, "lane t: load5 90.0 > 40 after 60 s")
+        self.assertTrue(all(host.free_at_read))
+        self.assertLessEqual(host.now, 60)
+        self.assertIsNotNone(self.module.try_slot(self.tmp / "lanes" / "t.1.lock"), "no slot may be left held")
+
+    def test_load_and_slot_waits_share_one_deadline(self):
+        (self.tmp / "lanes").mkdir(parents=True)
+        holder = self.module.try_slot(self.tmp / "lanes" / "t.1.lock")
+        self.addCleanup(os.close, holder)
+        host, message = self.admit([90, 90, 30], wait_seconds=60)
+        self.assertEqual(message, "lane t busy after 60 s")
+        self.assertLessEqual(host.now, 60)
+
+    def test_flapping_load_cannot_spin_past_the_deadline(self):
+        host, message = self.admit([30, 90] * 50, wait_seconds=60)
+        self.assertEqual(message, "lane t: load5 90.0 > 40 after 60 s")
+        self.assertLessEqual(host.now, 60)
+
+    def test_without_the_option_load_is_never_read(self):
+        host, (fd, slot, _) = self.admit([999], max_load5=None)
+        self.assertEqual((slot, host.free_at_read), (1, []))
+
+
+class LoadOption(Lanes):
+    def test_max_load5_must_be_positive(self):
+        for value in ("0", "-1", "x"):
+            with self.subTest(value=value):
+                self.assertEqual(self.run_lane("t", "--max-load5", value, "--", "true")[0], 2)
+
+    def test_max_load5_under_the_host_load_runs_the_command(self):
+        code, out, err = self.run_lane("t", "--max-load5", "100000", "--", "sh", "-c", "echo ran")
+        self.assertEqual((code, out), (0, "ran\n"))
+        self.assertIn("lane t slot 1 acquired after 0 s", err)
+
+
 if __name__ == "__main__":
     unittest.main()
