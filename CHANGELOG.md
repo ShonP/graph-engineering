@@ -10,6 +10,46 @@ commits.
 
 ## [Unreleased]
 
+qa takes less wall-clock time without dropping a row or an evidence rule. A
+two-day retro found simulator qa cost more active minutes than all
+implementation: leaves hit the 250-turn cap with no report written, a lead
+returned `FAIL INCOMPLETE` while its background leaves still ran, rows a
+simulator can never observe were driven for 30-45 minutes before ending
+`BLOCKED`, and two leaves wrote findings files the validator rejected.
+
+### Added
+
+- **`graph-control.py qa-lanes <qa dir> --lanes <ids> [--wait <s>]`.** The
+  qa-lead's wait gate. Each leaf writes `<lane>.done` (verdict counts, report
+  and findings paths) as its last act, or `<lane>.checkpoint.json` (rows done,
+  next row, remaining rows, driver and fixture paths) when it stops at its turn
+  budget. Exit 0 when every marker is present and valid (counts add up, the
+  findings file passes `findings`), 75 while a lane is pending, 1 on a
+  malformed marker. `--wait` blocks at most 270 s, so the lead never writes a
+  sleep loop.
+- **Leaf templates** under `skills/process/qa-verification/templates/`:
+  `qa-findings.json`, `lane.done.json`, `lane.checkpoint.json`. Tests parse
+  each with the same validators the engine runs, so a leaf copying a template
+  writes a file the validator accepts.
+- **Profile key `qa.runtimes`** (default empty: the newest runtime only, full
+  matrix). An entry adds an older runtime at `full` or `smoke` depth.
+
+### Changed
+
+- **qa-lead waits on markers, never on its own turn ending**, and re-dispatches
+  a checkpointed lane from its `remaining_rows` instead of re-onboarding.
+- **Shards:** at most 20 rows per leaf; a bigger lane splits into
+  `<lane>-<k>` shards.
+- **Pre-classification:** before dispatch the lead moves rows a simulator or
+  headless browser cannot observe (screen-reader output, OS settings panes,
+  real push delivery, events with no local sink, runtimes not running) into
+  `.graph/<run>/qa/device-checklist.md`; they stay in `qa.md` as `BLOCKED`
+  with a `DEVICE-ONLY` note and still count in the verdict.
+- **qa leaves:** `maxTurns` 250 to 400; report rows appended as each is
+  decided; a checkpoint at about 85% of the turn budget; a new driver smoked on
+  one locale and one color scheme before the matrix; at most 2 fix-reruns per
+  script; background processes stopped by recorded pid, never `pkill -f`.
+
 ## [0.16.2] - 2026-10-06
 
 Unattended runs no longer stop on Claude Code's inline-shell `rm` safety

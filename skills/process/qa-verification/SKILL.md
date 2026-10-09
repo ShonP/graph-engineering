@@ -15,6 +15,29 @@ rows of one report, never once per task. With the ready queue the merge unit is
 the whole run unless the plan splits it.
 
 1. **Read the acceptance criteria** from the task/plan. Each becomes one checklist row. No criteria = `NEEDS_SETUP` (ask the planner, do not invent criteria).
+
+   **Classify observability** before driving anything. A row whose oracle the
+   running system cannot show is not driven: it is `BLOCKED` with the note
+   `DEVICE-ONLY: <reason>` and goes, with its case ID, criterion and reason,
+   into `.graph/<run>/qa/device-checklist.md` for a person on a real device. It
+   still counts in the verdict; it is never silently dropped. A lead classifies
+   before dispatch and sends no leaf the row. The classes:
+
+   | Class | Why a simulator or headless browser cannot observe it |
+   | --- | --- |
+   | screen-reader announcement text, focus order and hints | the spoken output is not exposed to automation |
+   | OS settings panes (per-app notification or permission pages) | outside the app under test |
+   | real push delivery | needs the vendor's push service and a real device token |
+   | analytics or telemetry events with no local sink | nothing local records them |
+   | a state needing an edge runtime or account that is not running | stand it up in step 2, or the row is `BLOCKED` naming it |
+
+   Only the oracle moves: the rest of the row (the screen renders, the
+   control is labelled, the request fires) is still verified here.
+
+   **Coverage.** Simulator and device rows run the full matrix (every locale
+   and color scheme the criteria name) on the newest runtime. An older runtime
+   runs only when the brief or the profile's `qa.runtimes` names it, at the
+   depth named there; an older runtime nobody asked for is not a `BLOCKED` row.
 2. **Stand the system up from the profile's `runtime` block.** A nonempty
    `runtime.command` selects a bounded acceptance harness: run that command
    from the candidate worktree root with `GRAPH_RUN_ID` set. What it must do
@@ -55,7 +78,7 @@ the whole run unless the plan splits it.
 
 3. **Verify each criterion end-to-end**, choosing the cheapest sufficient probe:
    - **UI flow**: drive the real browser (Playwright script, or chrome automation tools). Walk the journey a user would, not the shortcut a developer would.
-   - **API contract**: run the PR's Bruno folders with the exact command in `api-contract` "How it runs" - `--env <api.env>`, one `--env-var NAME="$NAME"` per token name in `runtime.env` (an unbound `{{TOKEN}}` is sent literally and fails as a false bug), `--reporter-skip-all-headers`, and the report at an absolute `"$REPO_ROOT/.graph/<run>/qa/..."` path (bru runs from the collection directory) - or run the complete collection once for the final gate; reuse its touched-case results. A failed request is a `FAILED` row with the report path. Then Schemathesis against `api.schema` per `schemathesis`: the gate checks are pass/fail rows (report path + seed), the full default set runs report-only and each unique drift failure is written as an Important finding to `.graph/<run>/qa-findings.json`, in the findings schema from `review-protocol` (`{"schema_version": 1, "verdict": ..., "reviewed": ..., "findings": [...]}`; qa always writes this file, with an empty `findings` list when there is nothing, so an absent file never reads as zero findings), which the fix node reads beside the reviewer's `findings.json`. Exit 2 (schema did not load) is `BLOCKED`. An API criterion with no Bruno request behind it is `FAILED` - the house rule is part of the acceptance criteria. curl is for your one hostile probe, not a substitute for the suite.
+   - **API contract**: run the PR's Bruno folders with the exact command in `api-contract` "How it runs" - `--env <api.env>`, one `--env-var NAME="$NAME"` per token name in `runtime.env` (an unbound `{{TOKEN}}` is sent literally and fails as a false bug), `--reporter-skip-all-headers`, and the report at an absolute `"$REPO_ROOT/.graph/<run>/qa/..."` path (bru runs from the collection directory) - or run the complete collection once for the final gate; reuse its touched-case results. A failed request is a `FAILED` row with the report path. Then Schemathesis against `api.schema` per `schemathesis`: the gate checks are pass/fail rows (report path + seed), the full default set runs report-only and each unique drift failure is written as an Important finding to `.graph/<run>/qa-findings.json`, in the findings schema from `review-protocol` (`{"schema_version": 1, "verdict": ..., "reviewed": ..., "findings": [...]}`, shaped exactly as `templates/qa-findings.json`: verdict `PASS` or `FAIL`, never `INCOMPLETE`, which belongs to the report's verdict line; full shas in `reviewed`; qa always writes this file, with an empty `findings` list when there is nothing, so an absent file never reads as zero findings), which the fix node reads beside the reviewer's `findings.json`. Exit 2 (schema did not load) is `BLOCKED`. An API criterion with no Bruno request behind it is `FAILED` - the house rule is part of the acceptance criteria. curl is for your one hostile probe, not a substitute for the suite.
    - **Data effects**: query the store after the action; verify the write, and verify what must NOT have changed.
 4. **Capture evidence per criterion**: a screenshot for UI, the response body for API, the query result for data. Save into the run directory.
    - For UI criteria, start from the implementer's before/after pair under the profile's `uxEvidence.path` (see `ux-evidence`). Verify the after capture matches what is running now; re-capture with the committed script if it is stale. Before and after indistinguishable where the criteria say they differ is a `FAILED` row, not a note. A UI criterion with no before/after pair at all is `FAILED` - the house rule is part of the acceptance criteria.
@@ -102,10 +125,19 @@ last. Each lane writes evidence to `.graph/<run>/qa/<lane>/`, its criterion
 table and verdict line to `.graph/<run>/qa/<lane>.md` and its findings to
 `.graph/<run>/qa/<lane>-findings.json`; only the lead writes `qa.md` and
 `qa-findings.json`, so parallel lanes never overwrite each other.
+A leaf gets at most 20 rows; a bigger lane is split into shards
+`<lane>-<k>`, each with its own report, findings and marker. A leaf appends
+each row as it is decided, writes `<lane>.checkpoint.json`
+(`templates/lane.checkpoint.json`) when it stops at its turn budget, and
+writes `<lane>.done` (`templates/lane.done.json`) as its last act. The lead
+waits on the markers with `graph-control.py qa-lanes`, never on its own turn
+ending, and re-dispatches a checkpointed lane from its `remaining_rows`.
 
 ## Rules
 
 - **Exit code 0 is not evidence.** A green command whose output you did not read proves nothing - read the output, look at the screenshot.
 - Verify through the public surface (UI, API), not by calling internals - internals passing is how broken features ship.
 - You write test scripts and evidence files only. Never patch the product code; a failure goes back to the fix loop.
+- **Smoke, then the matrix.** A new driver script runs once on one locale and one color scheme before the full matrix, and gets at most 2 fix-reruns; a third failure stops it, and its rows are `BLOCKED` with the output (or `FAILED` when the product is at fault).
+- **Kill by recorded pid only.** Record the pid of every background process you start and stop it by that pid; never `pkill -f` or another pattern match, which kills processes other qa agents own.
 - **Simulators.** Every simulator use goes through `bash <plugin-root>/scripts/sim-session.sh` (headless). Never `open -a Simulator`. Close what you open. Agents get dedicated `graph-sim-*` devices (the wrapper creates or reuses one on the newest iOS runtime) and never touch any other simulator; the owner's devices are refused unless the owner names one (`--device <it> --allow-foreign`, which runs on it and never shuts it down). Multi-step qa (capture, read the PNG, decide the next step): `sim-session.sh acquire` once, which prints `SIM_UDID=` and `SIM_LEASE=`; run every step as `sim-session.sh run --lease <id> -- <command>`, which exports `SIM_UDID` and renews the lease; `sim-session.sh release --lease <id>` when the lane ends, failure included. A single command: `sim-session.sh -- <command>` (acquire, run and release in one call). A lease unused for 15 minutes (set `GRAPH_SIM_IDLE_MIN` on `acquire` for longer) expires: its next `run` exits 2, acquire again. The plugin's Stop and SubagentStop reaper only shuts down `graph-sim-*` devices a wrapper booted (that same boot) and nothing holds; it catches what a killed agent leaked and is not your teardown.
