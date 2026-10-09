@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Every guard line a task adds has a killed mutation receipt.
+"""Receipt coverage check (advisory): guard lines a task adds with no killed mutation receipt.
 
     python3 guard-receipts-check.py <base> <receipts-dir> [--repo <path>] [--exclude <glob>]...
 
@@ -13,8 +13,13 @@ A guard line is an added line, comments skipped, that either opens a branch
 (`if`, `elif`, `else if`, `guard`, `unless`) or refuses (`raise`, `throw`,
 `assert`, `die`, `exit`/`sys.exit` with a nonzero literal). Quoted and
 backticked spans are dropped before matching, and Python's
-`if __name__ == "__main__":` is not a guard. It is a line heuristic, not a parser: it over-reports a plain `if` that refuses nothing,
-which the implementer names in the report with the reason. Test files,
+`if __name__ == "__main__":` is not a guard. Also skipped, as noise: the lines of a
+Python docstring, an `if` that opens a line inside an open `[`/`(` or a literal
+`{` (a comprehension filter, a Dart collection-`if`), and a lone Dart-style
+`if (...) Element(),` line ending in a comma. It is an advisory line
+heuristic, not a parser: it still over-reports a plain `if` that refuses
+nothing, which the implementer notes in the report; a listed line is a
+checklist item, never a blocker by itself. Test files,
 fixtures, docs and data files (see SKIPPED) are never scanned; `--exclude` adds
 more fnmatch globs, matched against the repo-relative path.
 
@@ -90,6 +95,44 @@ def is_guard(text: str) -> bool:
     return bool(GUARD.search(LITERAL.sub("", line)))
 
 
+LITERAL_OPEN = re.compile(r"[=:,(\[]\s*\{$")
+BRANCH_START = re.compile(r"^(?:if|elif)\b")
+ELEMENT_IF = re.compile(r"^if\s*\(.*\)[^{;]*,$")
+
+
+class Scan:
+    """Per-file state over a run of consecutive added lines: docstring and open brackets."""
+
+    def __init__(self, path: str):
+        self.python = path.endswith((".py", ".pyi"))
+        self.in_doc = False
+        self.stack: list[str] = []
+
+    def noise(self, text: str) -> bool:
+        """True when the line is docstring prose or a branch word inside a list/call/map literal."""
+        line = text.strip()
+        if line.startswith(COMMENT) and not self.in_doc:
+            return False
+        if self.python:
+            marks = line.count('"""') + line.count("'''")
+            was_doc = self.in_doc
+            if marks % 2:
+                self.in_doc = not self.in_doc
+            if was_doc or self.in_doc:
+                return True
+        code = LITERAL.sub("", line).split("//")[0]
+        inside = bool(self.stack) and self.stack[-1] != "block"
+        skip = bool(BRANCH_START.match(line)) and (inside or bool(ELEMENT_IF.match(line)))
+        for char in code:
+            if char in "[(":
+                self.stack.append(char)
+            elif char == "{":
+                self.stack.append("literal" if LITERAL_OPEN.search(code.rstrip()) else "block")
+            elif char in "])}" and self.stack:
+                self.stack.pop()
+        return skip
+
+
 def added_lines(repo: Path, base: str):
     path, number = None, 0
     for row in git(repo, "diff", "-U0", "--no-color", "--no-ext-diff", f"{base}...HEAD").splitlines():
@@ -101,6 +144,19 @@ def added_lines(repo: Path, base: str):
         elif row.startswith("+") and path:
             yield path, number, row[1:]
             number += 1
+
+
+def guard_lines(repo: Path, base: str, excludes: list[str]):
+    found, scan, last = [], None, (None, 0)
+    for path, number, text in added_lines(repo, base):
+        if not scanned(path, excludes):
+            continue
+        if scan is None or last != (path, number - 1):
+            scan = Scan(path)
+        last = (path, number)
+        if not scan.noise(text) and is_guard(text):
+            found.append((path, number, text))
+    return found
 
 
 def carry(repo: Path, head: str, file: str, low: int, high: int) -> tuple[int, int] | None:
@@ -152,8 +208,7 @@ def main(argv: list[str]) -> int:
     try:
         current = git(args.repo, "rev-parse", "--verify", "HEAD").strip()
         git(args.repo, "rev-parse", "--verify", "--quiet", f"{args.base}^{{commit}}")
-        guards = [(p, n, t) for p, n, t in added_lines(args.repo, args.base)
-                  if scanned(p, args.exclude) and is_guard(t)]
+        guards = guard_lines(args.repo, args.base, args.exclude)
         count, ranges = receipts(args.repo, args.receipts, current)
     except GitError as error:
         print(f"guard-receipts: {args.base}: {error}", file=sys.stderr)

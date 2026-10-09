@@ -156,6 +156,63 @@ class Scope(Repo):
         self.assertEqual(self.check("--exclude", "generated/*")[0], 0)
 
 
+class Noise(Repo):
+    """Lines that read like a guard but refuse nothing are skipped; real guards beside them still count."""
+
+    def flagged(self, out, path):
+        return sorted(int(line.split(":")[1]) for line in out.splitlines() if line.startswith(f"{path}:"))
+
+    def test_python_docstring_prose_is_not_a_guard(self):
+        self.write("src/doc.py", 'def load(path):\n    """Load a record.\n\n'
+                                 "    if the record is damaged we raise ValueError\n"
+                                 "    and exit 2 when an assert fails.\n"
+                                 '    """\n    return read(path)\n')
+        self.commit("docstring")
+        code, out, _ = self.check()
+        self.assertEqual(code, 0, out)
+
+    def test_a_guard_after_a_docstring_still_counts(self):
+        self.write("src/doc.py", 'def load(path):\n    """Load a record."""\n    if path is None:\n'
+                                 "        raise ValueError(path)\n")
+        self.commit("docstring then guard")
+        code, out, _ = self.check()
+        self.assertEqual(code, 1)
+        self.assertEqual(self.flagged(out, "src/doc.py"), [3, 4])
+
+    def test_comprehension_filter_continuation_is_not_a_guard(self):
+        self.write("src/names.py", "names = [\n    n\n    for n in items\n    if n.ok\n]\n"
+                                   "pairs = dict(\n    (k, v)\n    for k, v in rows\n    if v\n)\n"
+                                   "seen = {\n    k\n    for k in keys\n    if k\n}\n")
+        self.commit("comprehensions")
+        code, out, _ = self.check()
+        self.assertEqual(code, 0, out)
+
+    def test_dart_collection_if_elements_are_not_guards(self):
+        self.write("lib/view.dart", "Widget build() {\n  return Column(children: [\n    Title(),\n"
+                                    "    if (showHint) Hint(),\n    if (compact)\n      Small(),\n"
+                                    "    for (final x in xs) Row(x),\n  ]);\n}\n")
+        self.commit("collection if")
+        code, out, _ = self.check()
+        self.assertEqual(code, 0, out)
+
+    def test_dart_collection_if_added_inside_an_existing_list(self):
+        self.write("lib/view.dart", "final items = [\n  Title(),\n];\n")
+        base = self.commit("list")
+        self.write("lib/view.dart", "final items = [\n  Title(),\n  if (showHint) Hint(),\n];\n")
+        self.commit("add an element")
+        code, out, _ = self.check(base=base)
+        self.assertEqual(code, 0, out)
+
+    def test_real_branches_beside_literals_still_count(self):
+        self.write("lib/frame.dart", "void update(double dt) {\n  if (dt > 0.05) return;\n"
+                                     "  final hooks = [\n    () {\n      if (bad) return;\n    },\n  ];\n"
+                                     "  if (done) {\n    stop();\n  }\n}\n")
+        self.commit("frame guards")
+        code, out, _ = self.check()
+        self.assertEqual(code, 1)
+        self.assertEqual(self.flagged(out, "lib/frame.dart"), [2, 5, 8])
+
+
 class Moves(Repo):
     def test_receipt_follows_lines_shifted_by_a_later_commit(self):
         self.write("src/store.py", GUARD_SRC)

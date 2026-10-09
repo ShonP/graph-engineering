@@ -48,8 +48,9 @@ class MutationWitness(unittest.TestCase):
                 with self.subTest(agent=path.stem, needle=needle):
                     self.assertTrue(needle in body, f"{path.stem} lacks {needle!r}")
         protocol = flat(PROTOCOL.read_text(encoding="utf-8"))
-        self.assertTrue(re.search(r"guard-receipts-check\.py.{0,400}neither covers nor names.{0,80}Important", protocol),
-                        "review-protocol does not make an unnamed uncovered guard line Important")
+        self.assertIn("receipt coverage check (advisory)", protocol.lower())
+        self.assertNotIn("neither covers nor names", protocol)
+        self.assertIn("never a blocker", flat(IMPLEMENTERS[0].read_text(encoding="utf-8")))
 
     def test_no_in_place_sed_mutation_guidance(self):
         hits = []

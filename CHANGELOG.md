@@ -19,7 +19,7 @@ of another session's host load.
 
 ### Added
 
-- **`scripts/guard-receipts-check.py`, the receipt coverage gate.**
+- **`scripts/guard-receipts-check.py`, the receipt coverage check (advisory).**
   `python3 <plugin root>/scripts/guard-receipts-check.py <base> <mutants dir>
   --repo <worktree>` lists every added guard line (`if`/`elif`/`guard`/
   `unless`, `raise`/`throw`/`assert`/`die`, a nonzero exit; comments, quoted
@@ -35,14 +35,19 @@ of another session's host load.
 
 ### Changed
 
-- **Implementers run the receipt coverage gate before `DONE`.** `implementer`
-  and `implementer-simple` run the check with their work committed; each
-  listed line gets a witness or a named reason. `review-protocol` re-runs it
-  and makes an unnamed uncovered line Important.
-- **Research agents budget the shared WebSearch quota.** `researcher` and
+- **Implementers run the receipt coverage check (advisory) before `DONE`.**
+  `implementer` and `implementer-simple` run the check with their work
+  committed and list its output in the report as a checklist: a real guard gets
+  a witness, a listed line that refuses nothing is noted, never a blocker.
+  `review-protocol` keeps Important only for a real new guard or validation
+  with no receipt (the standing rule); a listed line is a hint, not a finding.
+  The check skips Python docstring lines, comprehension-filter `if` lines and
+  Dart collection-`if` elements inside a `[`/`(`/literal `{`.
+- **Research agents budget the shared WebSearch quota.** `researcher` (in its
+  Rules, so every dispatch sees it, not only the fan-out leaf block) and
   `researcher-spike` prefer WebFetch on a known primary URL, do not retry a
   quota error, mark unchecked claims `[INFERRED]` and say in the report's
-  first line that search was unavailable.
+  status line, and under limitations, that search was unavailable.
 
 ## [0.16.2] - 2026-10-06
 
