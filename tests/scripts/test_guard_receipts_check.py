@@ -176,6 +176,15 @@ class Moves(Repo):
         self.assertIn("src/store.py:3: if not data:", out)
 
 
+    def test_receipt_is_stale_once_a_line_lands_inside_its_range(self):
+        self.write("src/store.py", GUARD_SRC)
+        self.commit("fail closed on an unreadable record")
+        self.receipt("store-none", "src/store.py", "3-4")
+        self.write("src/store.py", GUARD_SRC.replace("        raise", "        log(path)\n        raise"))
+        self.commit("log before refusing")
+        self.assertEqual(self.check()[0], 1)
+
+
 class Errors(Repo):
     def test_unknown_base_exits_2(self):
         code, _, err = self.check(base="no-such-ref")
