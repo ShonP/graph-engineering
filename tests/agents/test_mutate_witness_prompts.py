@@ -44,7 +44,7 @@ class MutationWitness(unittest.TestCase):
         for path in IMPLEMENTERS:
             body = flat(path.read_text(encoding="utf-8"))
             for needle in ("python3 <plugin root>/scripts/guard-receipts-check.py", "before reporting `DONE`",
-                           ".graph/<run>/mutants", "--repo"):
+                           ".graph/<run>/mutants", "--repo", "give `--lines` the branch and its refusal"):
                 with self.subTest(agent=path.stem, needle=needle):
                     self.assertTrue(needle in body, f"{path.stem} lacks {needle!r}")
         protocol = flat(PROTOCOL.read_text(encoding="utf-8"))
