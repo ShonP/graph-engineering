@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "lane": "<lane>",
+  "rows": 3,
+  "verified": 1,
+  "failed": 1,
+  "blocked": 1,
+  "report": ".graph/<run>/qa/<lane>.md",
+  "findings": ".graph/<run>/qa/<lane>-findings.json"
+}
