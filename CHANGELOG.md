@@ -10,6 +10,40 @@ commits.
 
 ## [Unreleased]
 
+## [0.16.3] - 2026-10-09
+
+Less wall-clock per landing at the same quality bar, from a consumer retro:
+63% of reviewed tasks took a CHANGES round, 46% of the important findings were
+guards with no mutation receipt, and agent gate slots sat held through 1.5 h
+of another session's host load.
+
+### Added
+
+- **`scripts/guard-receipts-check.py`, the receipt coverage gate.**
+  `python3 <plugin root>/scripts/guard-receipts-check.py <base> <mutants dir>
+  --repo <worktree>` lists every added guard line (`if`/`elif`/`guard`/
+  `unless`, `raise`/`throw`/`assert`/`die`, a nonzero exit; comments, quoted
+  spans, tests, fixtures and docs skipped) that no `killed: true` receipt
+  covers, and exits 1 naming them. A receipt from an earlier commit carries
+  forward when edits elsewhere shift its lines, and goes stale when a later
+  commit touches its range. Stdlib only.
+- **`lane-run.sh --max-load5 L`.** Waits for the 5-minute load average to be
+  at most L before taking a slot, so a load wait never holds one; reads load
+  again once the slot is held and gives it back when load rose. Load and slot
+  waits share `--wait-seconds`; past it the exit is 75 with
+  `lane <lane>: load5 <x> > <L> after S s`.
+
+### Changed
+
+- **Implementers run the receipt coverage gate before `DONE`.** `implementer`
+  and `implementer-simple` run the check with their work committed; each
+  listed line gets a witness or a named reason. `review-protocol` re-runs it
+  and makes an unnamed uncovered line Important.
+- **Research agents budget the shared WebSearch quota.** `researcher` and
+  `researcher-spike` prefer WebFetch on a known primary URL, do not retry a
+  quota error, mark unchecked claims `[INFERRED]` and say in the report's
+  first line that search was unavailable.
+
 ## [0.16.2] - 2026-10-06
 
 Unattended runs no longer stop on Claude Code's inline-shell `rm` safety
