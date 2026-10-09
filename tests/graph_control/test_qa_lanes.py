@@ -116,6 +116,12 @@ class Lanes(unittest.TestCase):
         code, out = self.run_lanes("ios-2")
         self.assertEqual(code, 1, out)
 
+    def test_checkpoint_next_row_is_the_first_remaining(self):
+        # A continuation starts at next_row; one outside remaining_rows would skip or repeat rows.
+        self.checkpoint("ios-2", next_row="AC-9")
+        code, out = self.run_lanes("ios-2")
+        self.assertEqual(code, 1, out)
+
     def test_wait_is_bounded(self):
         code, out = invoke(["qa-lanes", str(self.qa), "--lanes", "web", "--wait", "271"])
         self.assertEqual(code, 1, out)
