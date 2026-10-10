@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Decide whether an implementer subagent's Bash call is a shell loop that sleeps.
+"""Decide whether a roster subagent's Bash call is a shell loop that sleeps.
 
 Reads one PreToolUse payload on stdin and prints a deny decision or nothing.
 Stdlib only; any parse problem means no decision (fail open).
@@ -20,18 +20,17 @@ import shlex
 import sys
 from pathlib import Path
 
-IMPLEMENTER_TYPES = frozenset({
-    "graph-engineering:implementer",
-    "graph-engineering:implementer-simple",
-    "implementer",
-    "implementer-simple",
-})
+ROSTER = (
+    "implementer", "implementer-simple", "planner", "qa", "qa-lead", "researcher",
+    "researcher-spike", "retro", "reviewer", "reviewer-lead", "ux-designer",
+)
+GUARDED_TYPES = frozenset(ROSTER) | frozenset(f"graph-engineering:{role}" for role in ROSTER)
 LOOP_KEYWORDS = frozenset({"until", "while", "for"})
 COMMAND_PREFIXES = frozenset({"do", "then", "else", "elif", "if", "while", "until", "!", "{", "}", "time"})
 OPERATOR_CHARS = frozenset("();<>|&\n")
 WAIT_RUN = Path(__file__).resolve().parent / "wait-run.sh"
 REASON = (
-    "Shell loops that sleep are blocked for implementer subagents. To wait for a long "
+    "Shell loops that sleep are blocked for subagents. To wait for a long "
     f"command, run it through {WAIT_RUN} --log <absolute path> -- <argv> "
     "and call it again without argv to attach while it reports exit 75. To create a "
     "script file that contains a loop, use the Write tool instead of a heredoc."
@@ -76,7 +75,7 @@ def has_sleep_loop(command: str) -> bool:
 def decide(payload: dict) -> dict | None:
     if payload.get("tool_name") != "Bash" or not payload.get("agent_id"):
         return None
-    if payload.get("agent_type") not in IMPLEMENTER_TYPES:
+    if payload.get("agent_type") not in GUARDED_TYPES:
         return None
     tool_input = payload.get("tool_input")
     command = tool_input.get("command") if isinstance(tool_input, dict) else None

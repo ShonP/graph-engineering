@@ -11,7 +11,7 @@ hook: agents call it by path to wait on a long suite (see wait-run below).
 | --- | --- | --- | --- |
 | `PostToolUse`, `Edit\|Write` | `scripts/lint-touched-file.sh` | `async`, timeout 130 | Runs the configured lint on the file Claude just wrote and hands findings back on the next turn. Exit `0` always: it informs, it never blocks |
 | `PreToolUse`, `Bash` | `scripts/guard-destructive.sh` | sync, timeout 10, three handlers gated by `if` | Asks before a destructive command, with evidence. Never denies. Silent in `bypassPermissions` mode |
-| `PreToolUse`, `Bash` | `scripts/guard-poll-loop.sh` | sync, timeout 5, no `if` | Denies a shell loop that sleeps, only for an implementer subagent, and points it at `wait-run.sh`. Fails open. `GRAPH_POLL_GUARD=off` disables it |
+| `PreToolUse`, `Bash` | `scripts/guard-poll-loop.sh` | sync, timeout 5, no `if` | Denies a shell loop that sleeps, for every roster subagent, and points it at `wait-run.sh`. Fails open. `GRAPH_POLL_GUARD=off` disables it |
 | `PreToolUse`, `Agent\|Task` | `scripts/guard-agent.sh` | sync, timeout 15 | Enforces the profile's `policy:` block on subagent calls |
 | `Stop`, no matcher | `scripts/test-before-stop.sh` | `asyncRewake`, timeout 620 | Runs the configured test after the turn ends and wakes Claude only when it fails. On an unchanged tree it replays the stored verdict instead (`<git common dir>/graph-engineering/checks-state.json`); any nonempty `GRAPH_CHECKS_NO_MEMO` turns that off |
 | `Stop` and `SubagentStop`, no matcher | `scripts/reap-simulators.sh` | `async`, timeout 5 | Starts `scripts/sim-reaper.sh` detached and returns: shuts down only simulators a wrapper booted that no live lease or running build holds, and quits an idle Simulator.app. `GRAPH_SIM_REAPER=off` disables it. Exit `0` always |
@@ -141,10 +141,9 @@ whose condition or body runs `sleep`, and the deny reason points at
 loop around one is the same wait with no bound and no way to attach again,
 which is what wait-run gives.
 
-- **Gate.** It acts only when the call comes from an implementer subagent: the
-  payload must carry `agent_id`, and `agent_type` must be
-  `graph-engineering:implementer`, `graph-engineering:implementer-simple`,
-  `implementer` or `implementer-simple`. The main thread, including a
+- **Gate.** It acts on calls from every roster subagent, and only those: the
+  payload must carry `agent_id`, and `agent_type` must name a roster agent,
+  bare or `graph-engineering:`-prefixed. The main thread, including a
   `claude --agent` session, is never blocked. A deny also applies in
   `bypassPermissions` mode, on purpose: the agents it targets run there.
 - **Fast path.** It runs on every Bash call with no `if`, so input without the
