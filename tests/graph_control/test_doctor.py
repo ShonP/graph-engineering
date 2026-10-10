@@ -273,6 +273,13 @@ class EvidenceStore(unittest.TestCase):
         self.assertIn("no-such-evidence-cli", finding.message)
         self.assertEqual(set(calls), {"git"})  # doctor never runs a configured command
 
+    def test_outside_git_the_ignore_check_stays_silent(self):
+        fixture = Fixture(self)
+        fixture.profile(CLEAN + STORE)
+        shutil.rmtree(fixture.root / ".git")
+        found = {finding.id for finding in diagnose(fixture.root, PLUGIN, quick=False)}
+        self.assertNotIn("ux-store-unignored", found)
+
     def test_quick_mode_skips_the_store_checks(self):
         fixture = Fixture(self)
         fixture.profile(CLEAN + STORE.replace("git evidence pull", "no-such-evidence-cli pull"))
