@@ -98,10 +98,13 @@ class Leaf(Case):
 
 
 class Hygiene(unittest.TestCase):
-    def test_changelog_unreleased_names_it(self):
-        unreleased = CHANGELOG.split("## [Unreleased]", 1)[1].split("\n## [", 1)[0]
-        self.assertIn("qa-lanes", unreleased)
-        self.assertIn("device-checklist.md", unreleased)
+    def test_changelog_newest_section_names_it(self):
+        # Unreleased plus the newest release: a release moves the entry from one to the other.
+        sections = CHANGELOG.split("\n## [")[1:3]
+        self.assertTrue(sections[0].startswith("Unreleased]"), "Unreleased must be the first section")
+        newest = "".join(sections)
+        self.assertIn("qa-lanes", newest)
+        self.assertIn("device-checklist.md", newest)
 
     def test_no_em_dash_or_consumer_names(self):
         for path in (ROOT / "agents" / "qa-lead.md", ROOT / "agents" / "qa.md", SKILL_DIR / "SKILL.md",
