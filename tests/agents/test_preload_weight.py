@@ -14,7 +14,13 @@ DOD_CEILING = 6200
 class PreloadWeight(unittest.TestCase):
     def test_definition_of_done_stays_under_its_ceiling(self):
         size = len(DOD.read_bytes())
-        self.assertLessEqual(size, DOD_CEILING, f"definition-of-done is {size} bytes")
+        self.assertLessEqual(
+            size,
+            DOD_CEILING,
+            f"definition-of-done is {size} bytes, over its {DOD_CEILING} ceiling. "
+            "Five roles preload it on every dispatch: shrink another line by the same bytes "
+            "before raising DOD_CEILING, and state the token delta in the PR if you raise it.",
+        )
 
     def test_implementer_simple_preloads_only_definition_of_done(self):
         fm, _ = split(AGENTS / "implementer-simple.md")
