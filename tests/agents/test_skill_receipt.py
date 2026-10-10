@@ -46,7 +46,8 @@ class Receipt(unittest.TestCase):
 
     def test_the_engine_runs_skills_check_and_marks_a_miss(self):
         text = flat(RUN.read_text())
-        for token in ("skills_loaded:", "graph-control skills-check --required", "--loaded", "Exit 1",
+        for token in ("skills_loaded:", "graph-control skills-check --required", "--loaded", "--agent-id",
+                      "unobserved", "Exit 1",
                       "SKILLS_MISSING: <names>", "re-dispatch once", "Exit 2", "BLOCKED",
                       "`skills_loaded: <plugin>:<skill>, ...`", "goes to the owner"):
             with self.subTest(token=token):

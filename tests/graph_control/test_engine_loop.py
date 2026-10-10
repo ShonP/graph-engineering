@@ -188,7 +188,7 @@ class ClassesTests(Tokens):
         self.assert_tokens(step, (".graph/<run>/classes.md",
                                   "`- <class> | <finding id> | <task> round <n>`",
                                   "blocking or important", "`rule`", "no dispatch",
-                                  "every later dispatch in the run"))
+                                  "every later dispatch in the run", "graph-control findings", "--classes"))
 
     def test_ac_en_2_round_files_are_per_task(self):
         # Parallel tasks each run their own review rounds; run-global files would overwrite each other.
