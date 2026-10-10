@@ -1,6 +1,6 @@
 ---
 name: ux-evidence
-description: Use whenever a change touches anything a user sees or does - screens, components, copy, layout, states, flows, animations. House rule - every UX change ships before/after evidence (screenshot pairs for static changes, short video or GIF pairs for flows) attached to the PR or committed under the project's docs. Covers what counts, what to capture, how to capture it as code, where it lives, and who checks it.
+description: Use whenever a change touches anything a user sees or does - screens, components, copy, layout, states, flows, animations. House rule - every UX change ships before/after evidence (screenshot pairs for static changes, short video or GIF pairs for flows) attached to the PR, committed under the project's docs, or pushed to the profile's evidence store. Covers what counts, what to capture, how to capture it as code, where it lives, and who checks it.
 ---
 
 # UX change evidence
@@ -82,11 +82,28 @@ The profile's `uxEvidence.path` (default `docs/ux/changes`):
   after-<screen>[-<state>].png|mp4|gif
 ```
 
+With no `uxEvidence.store` (the default), the media is committed in the folder
+beside its README and capture script.
+
+When the profile sets `uxEvidence.store`, the media files (png, jpg, jpeg, gif,
+webp, mp4, webm, mov) are **not committed**: save them in the folder as above,
+run `<store.push> <folder>` and commit only README.md and the capture script.
+The repo-relative path is the storage key, so the README and PR body reference
+files by that path. Reviewers and qa read them with `<store.pull> <folder>`;
+the owner opens one with `<store.link> <file>`, a short-lived URL that is never
+written into the PR body or any file. `<store.push>`, `<store.pull>` and
+`<store.link>` are the profile's `uxEvidence.store` commands, each with the
+folder or file appended.
+
 - **PR body** gets a `## UX evidence` section: a two-column before | after table
-  embedding the committed images (they render inline on GitHub), and a link per
-  recording. A PR for a UX change with no such section is incomplete.
-- Recordings over ~5 MB are attached to the PR through the GitHub UI instead of
-  committed; the folder README links to the PR.
+  embedding the committed images when the media is committed (they render
+  inline on GitHub), and a link per recording; with `uxEvidence.store`, list
+  each pair's repo-relative paths in the table and drag the after images into
+  the PR description through the GitHub UI if they should render inline. A PR
+  for a UX change with no such section is incomplete.
+- Without a store, recordings over ~5 MB are attached to the PR through the
+  GitHub UI instead of committed; the folder README links to the PR. With
+  `uxEvidence.store`, they are pushed like every other file.
 - During a playbook run, also copy the folder to `.graph/<run>/assets/` so the
   merge gate can present it without leaving the ledger.
 
@@ -94,7 +111,7 @@ The profile's `uxEvidence.path` (default `docs/ux/changes`):
 
 | Role | Duty |
 | --- | --- |
-| implementer | captures before at task start, after at task end; a UI task is not `DONE` without both, and the report lists the paths |
-| qa | uses the after capture as the row evidence for UI criteria; re-captures if it no longer matches the running system, and files a `FAILED` row if before and after are indistinguishable when the criteria say they should differ |
-| reviewer | UI diff with no evidence folder or PR section = **Blocking** (stated house rule); evidence that contradicts the experience spec = Important |
+| implementer | captures before at task start, after at task end; with `uxEvidence.store`, pushes the folder and commits only its text; a UI task is not `DONE` without both, and the report lists the paths |
+| qa | runs `<store.pull> <folder>` first when the profile sets `uxEvidence.store`; uses the after capture as the row evidence for UI criteria; re-captures if it no longer matches the running system, and files a `FAILED` row if before and after are indistinguishable when the criteria say they should differ |
+| reviewer | UI diff with no evidence folder (or, with `uxEvidence.store`, no pushed media under it: `<store.pull>` returns nothing) = **Blocking**, and the same for no PR section (stated house rule); evidence that contradicts the experience spec = Important |
 | planner (merge node) | presents the pairs beside the diff; the owner approves what they can see |

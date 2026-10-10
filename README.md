@@ -370,7 +370,9 @@ standing rules and every agent carries them:
 - **UX evidence.** Every change a user can see ships before/after evidence -
   screenshot pairs for static changes, ≤30s recording pairs for flows - captured
   as code, committed under the profile's `uxEvidence.path` (default
-  `docs/ux/changes`) and embedded in the PR body. The implementer captures
+  `docs/ux/changes`) and embedded in the PR body, or, when the profile sets
+  `uxEvidence.store`, pushed with its command and kept out of git (only the
+  README and capture script are committed). The implementer captures
   *before* on the base commit, first, before touching UI. The reviewer treats a
   missing pair on a UI diff as Blocking. `skills/process/ux-evidence`.
 - **API contract.** Every change to an API surface ships its Bruno requests in
