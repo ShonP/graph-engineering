@@ -22,7 +22,6 @@
     "./skills/ux",
     "./skills/process",
     "./skills/python",
-    "./skills/messaging",
     "./skills/agents",
     "./skills/k8s-gitops",
     "./skills/temporal",
