@@ -91,8 +91,9 @@ class LeadProtocol(Case):  # AC-W3-QL-02
                  "`<run8>:qa-<lane>`", "at most 4 lanes", "Never end a turn with children outstanding")
 
     def test_leaf_prompt_parts(self):
-        self.has(self.body, LEAF_LINE, "case IDs", "base URLs", "`.graph/<run>/qa/<lane>/`",
-                 "`.graph/<run>/qa/<lane>.md`", "`.graph/<run>/qa/<lane>-findings.json`",
+        # Per-round paths (review F1): a fix round never appends to an earlier round's files.
+        self.has(self.body, LEAF_LINE, "case IDs", "base URLs", "`.graph/<run>/qa/r<N>/<lane>/`",
+                 "`.graph/<run>/qa/r<N>/<lane>.md`", "`.graph/<run>/qa/r<N>/<lane>-findings.json`",
                  "scripts/lane-run.sh")
 
     def test_file_reports_merged_from_disk(self):
