@@ -83,8 +83,8 @@ behavior against the agreed case before releasing consumers.
 Every acceptance case names an ID, risk, setup, input/action, expected observable
 values, an independent oracle, required surface, and evidence path. Include
 composed failures (for example invalid schema followed by an unreachable lab),
-empty output, cancellation and the edge cases that matter for the task (empty,
-limits, invalid input, failures, permissions, concurrency, time) when relevant. Preserve case IDs across plan,
+cancellation and the edge cases that matter for the task (empty output, limits,
+invalid input, permissions, concurrency, time). Preserve case IDs across plan,
 implementation, Bruno/browser checks, review and QA. A missing runner is blocked,
 not N/A. A skipped test cannot satisfy a required case.
 

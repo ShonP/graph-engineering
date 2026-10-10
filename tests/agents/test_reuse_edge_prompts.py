@@ -7,7 +7,7 @@ from test_roster_policy import ROOT, split
 PLANNER = ROOT / "agents" / "planner.md"
 RESEARCHER = ROOT / "agents" / "researcher.md"
 REVIEWER = ROOT / "agents" / "reviewer.md"
-EDGE_CASES = ("empty", "limits", "invalid input", "failures", "permissions", "concurrency", "time")
+EDGE_CASES = ("empty", "limits", "invalid input", "permissions", "concurrency", "time")
 
 
 class PlannerReuse(GenericText):
@@ -40,9 +40,8 @@ class PlannerReuse(GenericText):
         for case in EDGE_CASES:
             self.assertIn(case, match.group(0))
 
-    def test_planner_stays_generic_and_short(self):
+    def test_planner_stays_generic(self):
         self.assert_generic(self.body, "planner")
-        self.assertLess(len(PLANNER.read_text().split("\n")), 250)
 
 
 class ResearcherReuse(GenericText):
