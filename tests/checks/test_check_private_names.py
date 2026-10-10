@@ -86,8 +86,8 @@ class PrivateNames(unittest.TestCase):
         self.assertRegex(out.stdout, r"(?m)^ok check-private-names: 1 name\(s\), \d+ tracked file")
 
     def test_env_list_overrides_the_file_and_ignores_comments(self):
-        self.track("a.md", "globex inside\n")
-        self.names_file("# a comment\nacmecorp\n")
+        self.track("a.md", "globex inside\n- a list item\n")
+        self.names_file("# a comment\n\n   \nacmecorp\n")
         self.assertEqual(self.run_check().returncode, 0)
         self.assertEqual(self.run_check(env_names="initech, globex").returncode, 1)
 
