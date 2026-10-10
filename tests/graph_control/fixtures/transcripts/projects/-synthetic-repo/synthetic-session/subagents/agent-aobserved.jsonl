@@ -1,0 +1,5 @@
+{"type": "user", "isSidechain": true, "message": {"content": "<command-name>graph-engineering:definition-of-done</command-name> synthetic preload"}}
+{"type": "user", "isSidechain": true, "message": {"content": [{"type": "text", "text": "<command-message>impact-map</command-message>\n<command-name>graph-engineering:impact-map</command-name>"}]}}
+{"type": "assistant", "isSidechain": true, "message": {"content": [{"type": "tool_use", "id": "toolu_synthetic_01", "name": "Skill", "input": {"skill": "graph-engineering:prior-art"}}]}}
+{"type": "user", "isSidechain": true, "message": {"content": [{"type": "tool_result", "tool_use_id": "toolu_synthetic_01", "content": "Launching skill: graph-engineering:prior-art"}]}}
+{"type": "assistant", "isSidechain": true, "message": {"content": [{"type": "text", "text": "skills_loaded: <command-name>graph-engineering:bruno</command-name>"}]}}

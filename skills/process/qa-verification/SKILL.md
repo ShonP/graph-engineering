@@ -52,7 +52,39 @@ the whole run unless the plan splits it.
    labelled; they cannot satisfy criteria requiring a real backend/scanner.
    Otherwise follow the standalone mode below.
 
-   **Standalone runtime.** If `runtime.none` holds a reason, skip this step: verify through the repo's own public surface instead (the CLI as a user runs it, the package imported from a clean environment, the documented commands) and say so in the report. Otherwise, in this order. **Every Bash call is a fresh shell**: an `export` does not survive to the next call (spiked), so prefix every runtime command, in every call, with `GRAPH_RUN_ID=<the run id from your dispatch>` - the profile's commands use `${GRAPH_RUN_ID:?}`, which fails loudly instead of running as project `ge-`. The names in `runtime.env` are read from the environment you were started with (never write their values anywhere). For a compose `up`, run the isolation check below and refuse to start (`BLOCKED`, naming each line it prints) until it exits 0; check `runtime.port` is free (`lsof -nP -iTCP:<port> -sTCP:LISTEN` prints nothing - a taken port is `BLOCKED`, because health would be answered by another process), run `up` (its `-p ge-${GRAPH_RUN_ID:?}` gives the run its own project), wait on `health` (`url`: `curl -fsS --max-time 5 --retry <n> --retry-delay 2 --retry-max-time <timeout> --retry-connrefused --retry-all-errors <url>`, and the body must contain `health.expect`; or run `command`), then `seed`. Run `down` as its own final call, whatever the outcome - including after a failed `up` or health check. Not a `trap`: a trap set in the `up` call fires when that call ends, before anything is verified. An empty `up`, `baseUrl` or `health`, a name in `runtime.env` that is not exported, or health never passing: `BLOCKED`, naming the field that is missing or the command that failed and its output. Fall back to the repo's README / CLAUDE.md only to fill a gap the profile leaves, and say you did. Seeded, deterministic data - never verify against empty or random state, and never against a shared environment. The one exception is the `post-deploy` node, which runs under `post-deploy-verification` instead of this step: vetted read-only smoke requests, no hostile probes.
+   **Standalone runtime.** If `runtime.none` holds a reason, skip this step:
+   verify through the repo's own public surface (the CLI as a user runs it, the
+   package imported from a clean environment, the documented commands) and say
+   so in the report. Otherwise, in this order:
+
+   1. Every Bash call is a fresh shell, so an `export` does not survive: prefix
+      every runtime command, in every call, with
+      `GRAPH_RUN_ID=<the run id from your dispatch>`. The profile's
+      `${GRAPH_RUN_ID:?}` fails loudly instead of running as project `ge-`.
+   2. Read the names in `runtime.env` from the environment you were started
+      with; never write their values anywhere.
+   3. For a compose `up`, run the isolation check below; until it exits 0,
+      refuse to start (`BLOCKED`, naming each line it prints).
+   4. Check `runtime.port` is free: `lsof -nP -iTCP:<port> -sTCP:LISTEN`
+      prints nothing. A taken port is `BLOCKED`: another process would answer
+      health.
+   5. Run `up` (its `-p ge-${GRAPH_RUN_ID:?}` gives the run its own project),
+      wait on `health`, then run `seed`. A `url` health is
+      `curl -fsS --max-time 5 --retry <n> --retry-delay 2 --retry-max-time <timeout> --retry-connrefused --retry-all-errors <url>`
+      and its body must contain `health.expect`; otherwise run its `command`.
+   6. Run `down` as its own final call, whatever the outcome, including after
+      a failed `up` or health check. Never a `trap`: one set in the `up` call
+      fires when that call ends, before anything is verified.
+
+   `BLOCKED`, naming the missing field or the failed command and its output:
+   an empty `up`, `baseUrl` or `health`, a name in `runtime.env` that is not
+   exported, or health never passing. Fall back to the repo's README /
+   CLAUDE.md only to fill a gap the profile leaves, and say you did. Use
+   seeded, deterministic data: never empty or random state, never a shared
+   environment. The one exception is the `post-deploy` node, which runs
+   `post-deploy-verification` instead of this step: vetted read-only smoke
+   requests, no hostile probes.
+
    **Compose isolation check.** `-p` renames only project-scoped resources.
    Anything with its own `name:`, a `container_name:`, anything `external:
    true`, a host-backed volume, `network_mode: host` / `container:...`,

@@ -5,6 +5,7 @@ qa-findings.json in the same shape (PASS or FAIL). The prose contract lives in
 skills/process/review-protocol/SKILL.md, whose JSON example a test parses here.
 """
 
+import fcntl
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -12,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from .common import Invalid, array, boolean, choice, integer, load, obj, require, text, unique, version
+from .plan import measure_key
 
 SEVERITIES = ("blocking", "important", "nit")
 ROUTES = {"patch", "bad_plan", "intent_gap", "defer"}
@@ -72,6 +74,7 @@ class Findings:
     def parse(cls, value: Any) -> "Findings":
         row = obj(value, "schema_version verdict reviewed findings")
         version(row["schema_version"])
+        require(isinstance(row["reviewed"], dict), 'reviewed must be {"base": <full sha>, "head": <full sha>}')
         reviewed = obj(row["reviewed"], "base head")
         items = []
         for index, item in enumerate(array(row["findings"])):
@@ -113,6 +116,23 @@ def read_all(paths: Iterable[Path]) -> list[tuple[Path, Findings]]:
     require(bool(paths), "no findings files named")
     require(len({path.resolve() for path in paths}) == len(paths), "a findings file is named twice")
     return [(path, read(path)) for path in paths]
+
+
+def class_lines(findings: Findings, task: str, round_number: int) -> list[str]:
+    """classes.md rows for the open blocking and important findings of one round."""
+    return [f"- {measure_key(item.rule)} | {item.id} | {task} round {round_number}"
+            for item in findings.open() if item.severity != "nit"]
+
+
+def append_classes(path: Path, lines: Iterable[str]) -> int:
+    """Append the lines the file does not hold yet, under one lock across the read and the write."""
+    with path.open("a+") as stream:
+        fcntl.flock(stream, fcntl.LOCK_EX)
+        stream.seek(0)
+        held = set(stream.read().splitlines())
+        new = [line for line in dict.fromkeys(lines) if line not in held]
+        stream.write("".join(f"{line}\n" for line in new))
+        return len(new)
 
 
 def counts(paths: Iterable[Path]) -> dict[str, int]:

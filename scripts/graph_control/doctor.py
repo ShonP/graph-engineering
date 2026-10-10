@@ -10,7 +10,6 @@ mode (the cached SessionStart check) starts none.
 import importlib.util
 import json
 import os
-import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,12 +19,12 @@ from . import evidence_store
 from .common import Invalid, load
 from .preflight import read_profile
 from .risk import CONTROL, BadPattern, nested, parse_rows
+from .skill_resolve import resolves, ships
 
 LEVELS = ("error", "warn", "info")
 TIERS = ("opus", "sonnet")
 CLASS_KEYS = ("owner_classes", "auto_classes")
 SKILL_KEYS = {"impl", "review", "qa", "design"}
-SKILL_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 UPGRADE = "run /graph-init --upgrade"
 
 
@@ -180,13 +179,10 @@ def _routing(profile: dict[str, Any], root: Path, plugin_root: Path, plugin: str
     missing, bare_names = [], []
     for name in sorted(_skill_names(profile.get("routing"))):
         prefix, _, bare = name.rpartition(":")
-        if prefix and prefix != plugin:
-            continue  # another plugin's skill: not resolvable from here
-        valid = SKILL_NAME.fullmatch(bare) is not None
-        in_plugin = valid and any(plugin_root.glob(f"skills/*/{bare}/SKILL.md"))
-        if not (in_plugin or valid and (root / ".claude" / "skills" / bare / "SKILL.md").is_file()):
+        found = resolves(name, plugin_root, root, plugin)
+        if found is False:
             missing.append(name)
-        elif in_plugin and not prefix:
+        elif found and not prefix and ships(bare, plugin_root):
             bare_names.append(name)
     findings = [Finding("warn", "routing-skill",
                         f"routing names skills that resolve to no plugin or repo skill: {', '.join(missing)}",

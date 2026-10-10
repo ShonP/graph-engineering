@@ -1,0 +1,11 @@
+{"type": "assistant", "isSidechain": true, "message": {"content": [{"type": "tool_use", "id": "toolu_synthetic_11", "name": "Skill", "input": {"skill": "graph-engineering:bruno"}}]}}
+{"type": "user", "isSidechain": true, "message": {"content": [{"type": "tool_result", "tool_use_id": "toolu_synthetic_11", "is_error": true, "content": "Unknown skill"}]}}
+{"type": "assistant", "isSidechain": true, "message": {"content": [{"type": "tool_use", "id": "toolu_synthetic_12", "name": "Read", "input": {"file_path": "/synthetic/repo/.claude/skills/local-baseline/SKILL.md"}}]}}
+{"type": "user", "isSidechain": true, "message": {"content": [{"type": "tool_result", "tool_use_id": "toolu_synthetic_12", "content": "synthetic skill body"}]}}
+{"type": "assistant", "isSidechain": true, "message": {"content": [{"type": "tool_use", "id": "toolu_synthetic_13", "name": "Read", "input": {"file_path": "/synthetic/repo/docs/skills/other/SKILL.md"}}]}}
+{"type": "assistant", "isSidechain": tr
+["not", "a", "row"]
+{"type": "user", "isSidechain": true, "message": "not an object"}
+{"type": "assistant", "isSidechain": true, "message": {"content": ["not a block", {"type": "tool_use", "id": "toolu_synthetic_15", "name": "Skill", "input": "graph-engineering:bruno"}, {"type": "tool_use", "id": "toolu_synthetic_16", "name": "Skill", "input": {"skill": " "}}]}}
+{"type": "assistant", "isSidechain": true, "message": {"content": [{"type": "tool_use", "id": "toolu_synthetic_14", "name": "Skill", "input": {"skill": "Superpowers:Test-Driven-Development"}}]}}
+{"type": "user", "isSidechain": true, "message": {"content": [{"type": "tool_result", "tool_use_id": "toolu_synthetic_14", "content": "Launching skill"}]}}

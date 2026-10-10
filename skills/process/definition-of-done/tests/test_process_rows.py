@@ -62,7 +62,7 @@ class Matrix(unittest.TestCase):
     def test_env_parity_and_clean_checkout_cells(self):
         row = self.row("Config / feature flag / build")
         for needle in (
-            "`ci.parity`", "auth, build or flag config", "CI green on the run branch",
+            "`ci.parity`", "auth, build or flag config", "CI green on the run branch where CI exists",
             "`git archive $(git write-tree)`", ".gitignore, compose, build or generated paths",
         ):
             self.assertIn(needle, row)

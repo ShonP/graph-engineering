@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # PreToolUse(Bash) hook: deny a shell loop that sleeps (until, while or for with
-# a sleep in its condition or body) when the call comes from an implementer
+# a sleep in its condition or body) when the call comes from a roster
 # subagent. Waiting belongs to hooks/scripts/wait-run.sh. poll_loop.py owns the
 # decision; the payload fields it reads (agent_id, agent_type) and the output
 # shape (hookSpecificOutput.permissionDecision) are from

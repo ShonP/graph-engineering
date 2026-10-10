@@ -1,18 +1,30 @@
 """skills-check: a dispatch's REQUIRED skills against the child's `skills_loaded:` line.
 
 Skill names here are SYNTHETIC or plugin names. A qualified name is proven only by
-the identical qualified name; there is no host built-in list.
+the identical qualified name; there is no host built-in list. The transcripts
+under fixtures/transcripts are SYNTHETIC (see its README) and are read from a
+temp CLAUDE_CONFIG_DIR copy, never the real config dir.
 """
 
 import contextlib
 import io
 import json
+import os
+import shutil
+import tempfile
 import unittest
+from pathlib import Path
+from unittest import mock
 
 import helpers  # noqa: F401  (puts scripts/ on sys.path)
 from graph_control import cli, skills
 from graph_control.common import Invalid
-from graph_control.skills import missing, names
+from graph_control.skills import missing, names, unobserved
+from graph_control.transcript import observed_skills, subagent_transcript
+
+FIXTURES = Path(__file__).resolve().parent / "fixtures" / "transcripts"
+SUBAGENTS = Path("projects/-synthetic-repo/synthetic-session/subagents")
+CLAIMED = "graph-engineering:prior-art,graph-engineering:definition-of-done,graph-engineering:bruno"
 
 
 def invoke(argv):
@@ -98,6 +110,119 @@ class Command(unittest.TestCase):
                 self.assertEqual((code, out["status"]), (2, "BLOCKED"))
                 self.assertIn("'not a name'", out["reason"])
                 self.assertIn("skills_loaded: <plugin>:<skill>", out["reason"])
+
+
+class Unobserved(unittest.TestCase):
+    def test_claimed_names_the_transcript_lacks_in_claim_order(self):
+        self.assertEqual(unobserved(("b:two", "a:one", "c:three"), frozenset({"a:one"})), ["b:two", "c:three"])
+
+    def test_everything_observed_is_nothing_unobserved(self):
+        self.assertEqual(unobserved(("a:one",), {"a:one", "b:two"}), [])
+
+
+class ConfigDir(unittest.TestCase):
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.config = Path(temp.name) / "config"
+        shutil.copytree(FIXTURES, self.config)
+        self.subagents = self.config / SUBAGENTS
+        patch = mock.patch.dict(os.environ, {"CLAUDE_CONFIG_DIR": str(self.config)})
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def check(self, required, loaded, agent_id=None):
+        argv = ["skills-check", "--required", required, "--loaded", loaded]
+        return invoke(argv + (["--agent-id", agent_id] if agent_id is not None else []))
+
+
+class ObservedSkills(ConfigDir):
+    def test_invoked_and_preloaded_skills_are_observed_and_assistant_text_is_not(self):
+        self.assertEqual(observed_skills(self.subagents / "agent-aobserved.jsonl"),
+                         {"graph-engineering:prior-art", "graph-engineering:definition-of-done",
+                          "graph-engineering:impact-map"})
+
+    def test_edges_errored_call_local_read_malformed_line_and_case(self):
+        self.assertEqual(observed_skills(self.subagents / "agent-aedges.jsonl"),
+                         {"local-baseline", "superpowers:test-driven-development"})
+
+    def test_an_empty_transcript_observes_nothing(self):
+        self.assertEqual(observed_skills(self.subagents / "agent-aempty.jsonl"), frozenset())
+
+
+class Locate(ConfigDir):
+    def test_finds_the_transcript_under_any_project(self):
+        self.assertEqual(subagent_transcript("aobserved"), self.subagents / "agent-aobserved.jsonl")
+
+    def test_unknown_id_is_none(self):
+        self.assertIsNone(subagent_transcript("aunknown"))
+
+    def test_two_matches_take_the_first_in_path_order(self):
+        later = self.config / "projects/zz-later-repo/other-session/subagents"
+        later.mkdir(parents=True)
+        (later / "agent-aobserved.jsonl").write_text("")
+        self.assertEqual(subagent_transcript("aobserved"), self.subagents / "agent-aobserved.jsonl")
+
+    def test_malformed_ids_are_invalid(self):
+        for value in ("../x", "a/b", "", "a" * 65, "a.b", "*"):
+            with self.subTest(value=value), self.assertRaises(Invalid):
+                subagent_transcript(value)
+
+    def test_a_decoy_outside_projects_is_never_read(self):
+        (self.config / "agent-x.jsonl").write_text((self.subagents / "agent-aobserved.jsonl").read_text())
+        decoy = self.config / "elsewhere/p/s/subagents"
+        decoy.mkdir(parents=True)
+        (decoy / "agent-x.jsonl").write_text("")
+        self.assertIsNone(subagent_transcript("x"))
+
+    def test_a_symlink_out_of_projects_is_never_followed(self):
+        outside = self.config / "outside.jsonl"
+        outside.write_text("")
+        (self.subagents / "agent-alink.jsonl").symlink_to(outside)
+        self.assertIsNone(subagent_transcript("alink"))
+
+
+class CommandWithAgentId(ConfigDir):
+    def test_a_claimed_but_unobserved_skill_is_missing(self):
+        code, out = self.check(CLAIMED, CLAIMED, "aobserved")
+        self.assertEqual((code, out), (1, {"status": "SKILLS_MISSING", "missing": ["graph-engineering:bruno"],
+                                           "unobserved": ["graph-engineering:bruno"]}))
+
+    def test_the_same_lists_without_the_flag_pass_as_before(self):
+        self.assertEqual(self.check(CLAIMED, CLAIMED),
+                         (0, {"status": "PASS", "required": 3, "missing": []}))
+
+    def test_claimed_and_observed_passes_from_the_transcript(self):
+        required = "graph-engineering:prior-art,graph-engineering:definition-of-done"
+        self.assertEqual(self.check(required, "Graph-Engineering:Prior-Art, " + required, "aobserved"),
+                         (0, {"status": "PASS", "required": 2, "missing": [], "observed": "transcript"}))
+
+    def test_observed_but_not_claimed_is_still_missing_and_not_unobserved(self):
+        code, out = self.check("graph-engineering:definition-of-done,graph-engineering:prior-art",
+                               "graph-engineering:prior-art", "aobserved")
+        self.assertEqual((code, out), (1, {"status": "SKILLS_MISSING",
+                                           "missing": ["graph-engineering:definition-of-done"], "unobserved": []}))
+
+    def test_an_errored_skill_call_does_not_prove_the_claim(self):
+        code, out = self.check("graph-engineering:bruno,local-baseline", "graph-engineering:bruno, local-baseline",
+                               "aedges")
+        self.assertEqual((code, out["missing"], out["unobserved"]),
+                         (1, ["graph-engineering:bruno"], ["graph-engineering:bruno"]))
+
+    def test_no_transcript_falls_back_to_the_claim_marked_unavailable(self):
+        self.assertEqual(self.check(CLAIMED, CLAIMED, "aunknown"),
+                         (0, {"status": "PASS", "required": 3, "missing": [], "observed": "unavailable"}))
+        self.assertEqual(self.check(CLAIMED, "graph-engineering:bruno", "aunknown"),
+                         (1, {"status": "SKILLS_MISSING", "observed": "unavailable",
+                              "missing": ["graph-engineering:prior-art", "graph-engineering:definition-of-done"]}))
+
+    def test_a_malformed_agent_id_is_blocked_naming_the_id_rule(self):
+        for value in ("../x", "a/b", ""):
+            with self.subTest(value=value):
+                code, out = self.check(CLAIMED, CLAIMED, value)
+                self.assertEqual((code, out["status"]), (2, "BLOCKED"))
+                self.assertIn("[A-Za-z0-9_-]{1,64}", out["reason"])
+                self.assertIn(repr(value), out["reason"])
 
 
 if __name__ == "__main__":

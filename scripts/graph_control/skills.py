@@ -39,3 +39,8 @@ def missing(required: tuple[str, ...], loaded: tuple[str, ...]) -> list[str]:
     """The required names, in order, that no identical loaded name proves."""
     proven = set(loaded)
     return [name for name in required if name not in proven]
+
+
+def unobserved(claimed: tuple[str, ...], observed: frozenset[str] | set[str]) -> list[str]:
+    """The claimed names, in order, that the child's transcript does not show it loading."""
+    return [name for name in claimed if name not in observed]
