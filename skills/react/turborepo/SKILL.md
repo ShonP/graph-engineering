@@ -42,9 +42,8 @@ Sources (fetched 2026-09-24, turbo 2.11.3 current):
   `package_manager`). A workspace package has no lockfile of its own, so inside one the hook
   runs `npm run lint <file>`: the package scripts must work under npm (plain binaries, no
   `pnpm`-only syntax); `pnpm` is chosen only at the root, where `pnpm-lock.yaml` lives.
-  *Measured* (npm 11.12.1): `npm run lint <file>` runs fine in a package with `workspace:*` deps.
 - **Every workspace package declares its own `lint` and `typecheck`** (and `test` where it has
-  tests). *Measured:* when a package declares neither, the hook walks up to the root and runs
+  tests). When a package declares neither, the hook walks up to the root and runs
   `pnpm run lint /abs/path/file.tsx`, which becomes `turbo run lint /abs/path/file.tsx` and fails
   with ``Could not find task `/abs/path/file.tsx` in project``. The hook informs, never blocks,
   so this failure is silent unless you read it.
