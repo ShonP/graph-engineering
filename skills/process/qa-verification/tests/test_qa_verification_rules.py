@@ -67,6 +67,52 @@ class VerdictRules(unittest.TestCase):
             self.assertIn(needle, SKILL)
 
 
+STANDALONE_RULES = (
+    "If `runtime.none` holds a reason, skip this step", "public surface",
+    "fresh shell", "`GRAPH_RUN_ID=<the run id from your dispatch>`", "`${GRAPH_RUN_ID:?}` fails loudly",
+    "`runtime.env`", "never write their values",
+    "isolation check", "exits 0",
+    "`lsof -nP -iTCP:<port> -sTCP:LISTEN`", "A taken port is `BLOCKED`",
+    "`-p ge-${GRAPH_RUN_ID:?}`",
+    "`curl -fsS --max-time 5 --retry <n> --retry-delay 2 --retry-max-time <timeout> "
+    "--retry-connrefused --retry-all-errors <url>`",
+    "`health.expect`", "run its `command`", "then run `seed`",
+    "Run `down` as its own final call, whatever the outcome", "Never a `trap`",
+    "an empty `up`, `baseUrl` or `health`", "not exported", "health never passing",
+    "README / CLAUDE.md only to fill a gap", "seeded, deterministic data", "never a shared environment",
+    "`post-deploy` node", "`post-deploy-verification`", "no hostile probes",
+)
+STEP_LINE_CAP = 400
+
+
+def stand_up_step():
+    return SKILL.split("2. **Stand the system up", 1)[1].split("\n3. **Verify each criterion", 1)[0]
+
+
+def standalone_block():
+    return flat(stand_up_step().split("**Standalone runtime.**", 1)[1].split("**Compose isolation check.**", 1)[0])
+
+
+class StandaloneRuntime(unittest.TestCase):
+    def test_every_rule_survives(self):
+        block = standalone_block()
+        for needle in STANDALONE_RULES:
+            with self.subTest(needle=needle):
+                self.assertIn(needle, block)
+
+    def test_rules_run_in_order(self):
+        block = standalone_block()
+        order = ["isolation check", "`lsof", "Run `up`", "then run `seed`", "Run `down`"]
+        positions = [block.index(needle) for needle in order]
+        self.assertEqual(positions, sorted(positions))
+
+    def test_no_narration_and_short_lines(self):
+        step = stand_up_step()
+        self.assertNotIn("(spiked)", step)
+        long_lines = [line[:60] for line in step.splitlines() if len(line) > STEP_LINE_CAP]
+        self.assertEqual(long_lines, [])
+
+
 class HarnessContract(unittest.TestCase):
     def setUp(self):
         self.assertTrue(CONTRACT_PATH.is_file(), CONTRACT_PATH)
