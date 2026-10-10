@@ -45,14 +45,19 @@ ordering, locks, repeats and idle time change.
   acquire line gains ` (elastic: <load and memory read>)` for an extra slot.
   The ceiling follows GNU make's `--max-load` and GNU parallel's `--load`
   (per core here), the floor GNU parallel's `--memfree`.
-- **`graph-control.py qa-lanes <qa dir> --lanes <ids> [--wait <s>]`.** The
-  qa-lead's wait gate. Each leaf writes `<lane>.done` (verdict counts, report
-  and findings paths) as its last act, or `<lane>.checkpoint.json` (rows done,
-  next row, remaining rows, driver and fixture paths) when it stops at its turn
-  budget. Exit 0 when every marker is present and valid (counts add up, the
-  findings file passes `findings`), 75 while a lane is pending, 1 on a
-  malformed marker. `--wait` blocks at most 270 s, so the lead never writes a
-  sleep loop.
+- **`graph-control.py qa-lanes <qa round dir> --lanes <ids> --round <N>
+  [--wait <s>]`.** The qa-lead's wait gate. Each qa round gets a fresh
+  directory, `.graph/<run>/qa/r<N>/`, so a fix round never reads an earlier
+  round's markers or appends to its reports. Each leaf writes `<lane>.done`
+  (round, verdict counts, report and findings paths) as its last act, or
+  `<lane>.checkpoint.json` (round, rows done, next row, at least one remaining
+  row, driver and fixture paths) when it stops at its turn budget. A marker of
+  another round is stale and never counts as finished; a checkpoint newer than
+  the `.done` means the lane is not done. Exit 0 when every marker is present,
+  of this round and valid (counts add up, the findings file passes
+  `findings`), 75 while a lane is pending, 1 on a malformed marker. `--wait`
+  blocks at most 270 s (the lead calls it with a 300 s Bash timeout), so the
+  lead never writes a sleep loop.
 - **Leaf templates** under `skills/process/qa-verification/templates/`:
   `qa-findings.json`, `lane.done.json`, `lane.checkpoint.json`. Tests parse
   each with the same validators the engine runs, so a leaf copying a template
@@ -76,8 +81,11 @@ ordering, locks, repeats and idle time change.
   `stalled` and open a decision card. It never kills or messages a child. The
   retro saw a 62-minute idle run that only the owner's "continue" ended.
 - **Implementer progress checkpoint.** At 85% of its turns the implementer
-  writes `.graph-checkpoint.md` (base, commits, cases done and left, last test
-  command and result, next step) in its worktree, never committed.
+  writes a checkpoint (base, commits, cases done and left, last test command
+  and result, next step) at `git rev-parse --git-path graph-checkpoint.md`:
+  inside the worktree's own git directory, so it is never an untracked file,
+  never committed, and never blocks the engine's unforced `git worktree remove`
+  after a `PARTIAL`.
 
 ### Changed
 
@@ -98,7 +106,9 @@ ordering, locks, repeats and idle time change.
   headless browser cannot observe (screen-reader output, OS settings panes,
   real push delivery, events with no local sink, runtimes not running) into
   `.graph/<run>/qa/device-checklist.md`; they stay in `qa.md` as `BLOCKED`
-  with a `DEVICE-ONLY` note and still count in the verdict.
+  with a `DEVICE-ONLY` note and still count in the verdict. Such a `BLOCKED`
+  is not a setup stop (`NEEDS_SETUP`): the engine lists the rows in the merge
+  exhibit's `## Device checks` for the owner.
 - **qa leaves:** `maxTurns` 250 to 400; report rows appended as each is
   decided; a checkpoint at about 85% of the turn budget; a new driver smoked on
   one locale and one color scheme before the matrix; at most 2 fix-reruns per

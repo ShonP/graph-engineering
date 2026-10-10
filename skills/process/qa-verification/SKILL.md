@@ -121,17 +121,21 @@ follows `agents/qa-lead.md`: it stands the runtime up once
 under the run's `GRAPH_RUN_ID`, dispatches every leaf in the foreground in one
 message with the line `leaf mode: the runtime is up and owned by the lead -
 never run up, seed or down`, merges their reports from disk and runs `down`
-last. Each lane writes evidence to `.graph/<run>/qa/<lane>/`, its criterion
-table and verdict line to `.graph/<run>/qa/<lane>.md` and its findings to
-`.graph/<run>/qa/<lane>-findings.json`; only the lead writes `qa.md` and
+last. Each qa round gets a fresh directory, `.graph/<run>/qa/r<N>/` (`N` from
+the dispatch's `qa round: <N>` line), so a fix round never reads an earlier
+round's markers or appends to its reports. Each lane writes evidence to
+`.graph/<run>/qa/r<N>/<lane>/`, its criterion table and verdict line to
+`.graph/<run>/qa/r<N>/<lane>.md` and its findings to
+`.graph/<run>/qa/r<N>/<lane>-findings.json`; only the lead writes `qa.md` and
 `qa-findings.json`, so parallel lanes never overwrite each other.
 A leaf gets at most 20 rows; a bigger lane is split into shards
 `<lane>-<k>`, each with its own report, findings and marker. A leaf appends
 each row as it is decided, writes `<lane>.checkpoint.json`
 (`templates/lane.checkpoint.json`) when it stops at its turn budget, and
-writes `<lane>.done` (`templates/lane.done.json`) as its last act. The lead
-waits on the markers with `graph-control.py qa-lanes`, never on its own turn
-ending, and re-dispatches a checkpointed lane from its `remaining_rows`.
+writes `<lane>.done` (`templates/lane.done.json`) as its last act; both carry
+the round. The lead waits on the markers with `graph-control.py qa-lanes` and
+its `--round`, never on its own turn ending, and re-dispatches a checkpointed
+lane from its `remaining_rows`.
 
 ## Rules
 

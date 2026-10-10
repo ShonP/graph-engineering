@@ -59,7 +59,7 @@ class ResumeFromState(unittest.TestCase):
             "git -C <worktree> status --short",
             "last test command",
             "done_cases",
-            ".graph-checkpoint.md",
+            "--git-path graph-checkpoint.md",
         ):
             with self.subTest(token=token):
                 self.assertIn(token, self.execution)

@@ -7,9 +7,12 @@ a raised turn cap (both retro agents stopped at 40 turns mid-analysis).
 """
 
 import re
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
+CHECKPOINT_PATH = "git rev-parse --path-format=absolute --git-path graph-checkpoint.md"
 ROOT = Path(__file__).resolve().parents[2]
 IMPLEMENTER = ROOT / "agents" / "implementer.md"
 RETRO = ROOT / "agents" / "retro.md"
@@ -37,9 +40,33 @@ class ImplementerFixRounds(unittest.TestCase):
 class ImplementerCheckpoint(unittest.TestCase):
     def test_checkpoint_at_85_percent_of_turns(self):
         box = section(IMPLEMENTER.read_text(), "Time-box")
-        for token in ("85%", ".graph-checkpoint.md", "never commit it", "last test command"):
+        for token in ("85%", CHECKPOINT_PATH, "outside the working tree", "last test command"):
             with self.subTest(token=token):
                 self.assertIn(token, box)
+
+    def test_no_surface_puts_the_checkpoint_in_the_working_tree(self):
+        # Review F2: an untracked checkpoint at the worktree root makes the never-forced remove fail.
+        for path in (IMPLEMENTER, ROOT / "docs" / "engine" / "run.md"):
+            with self.subTest(path=path.name):
+                self.assertNotIn(".graph-checkpoint.md", path.read_text())
+
+    def test_a_checkpoint_at_the_git_path_does_not_block_worktree_remove(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo, tree = Path(tmp) / "repo", Path(tmp) / "tree"
+            git = ["git", "-c", "user.email=t@example.invalid", "-c", "user.name=t"]
+            subprocess.run([*git, "init", "-q", str(repo)], check=True)
+            subprocess.run([*git, "-C", str(repo), "commit", "-q", "--allow-empty", "-m", "base"], check=True)
+            subprocess.run([*git, "-C", str(repo), "worktree", "add", "-q", str(tree)], check=True)
+            where = subprocess.run(["git", "-C", str(tree), "rev-parse", "--path-format=absolute",
+                                    "--git-path", "graph-checkpoint.md"],
+                                   check=True, capture_output=True, text=True).stdout.strip()
+            Path(where).write_text("base: x\nnext: y\n")
+            status = subprocess.run(["git", "-C", str(tree), "status", "--short"],
+                                    check=True, capture_output=True, text=True).stdout
+            self.assertEqual(status, "", "the checkpoint must not be an untracked file")
+            removed = subprocess.run(["git", "-C", str(repo), "worktree", "remove", str(tree)],
+                                     capture_output=True, text=True)
+            self.assertEqual(removed.returncode, 0, removed.stderr)
 
     def test_turn_count_matches_the_frontmatter_cap(self):
         cap = turns(IMPLEMENTER)

@@ -24,6 +24,7 @@ def flat(path):
 LEAD = flat(ROOT / "agents" / "qa-lead.md")
 LEAF = flat(ROOT / "agents" / "qa.md")
 SKILL = flat(SKILL_DIR / "SKILL.md")
+RUN = flat(ROOT / "docs" / "engine" / "run.md")
 PROFILE = (ROOT / "templates" / "graph-profile.yaml").read_text(encoding="utf-8")
 CHANGELOG = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
 
@@ -36,11 +37,33 @@ class Case(unittest.TestCase):
 
 class LeadWaitsOnMarkers(Case):
     def test_markers_gate_the_merge(self):
-        self.has(LEAD, "`.graph/<run>/qa/<lane>.done`", "graph-control.py qa-lanes",
+        self.has(LEAD, "`.graph/<run>/qa/r<N>/<lane>.done`", "graph-control.py qa-lanes",
                  "exit 75", "never on your own turn ending", "Never return while a lane is pending")
 
     def test_background_leaves_are_waited_on(self):
         self.has(LEAD, "run_in_background: true", "--wait 270")
+
+    def test_the_wait_call_outlasts_its_block(self):
+        # Review F4: under the default 120 s Bash timeout a 270 s wait is killed, not answered with exit 75.
+        self.has(LEAD, "Bash timeout of 300000 ms")
+
+    def test_rounds_are_unambiguous(self):
+        # Review F1: a fix round's qa must never read round 1's markers or append to round 1's reports.
+        self.has(LEAD, "`qa round: <N>`", "a fresh directory", "never reuse an earlier round's", "--round <N>")
+        self.has(LEAF, '`"round"`', "never append to an earlier round's report")
+        self.has(SKILL, "`.graph/<run>/qa/r<N>/`", "`--round`")
+        self.has(RUN, "`qa round: <N>`")
+
+    def test_an_empty_checkpoint_is_a_done_marker(self):
+        # Review F3: a checkpoint with no remaining row is refused; the leaf writes `.done` instead.
+        self.has(LEAF, "No row left: write `<lane>.done`, never a checkpoint")
+
+
+class DeviceOnlyAtTheGate(Case):
+    def test_device_only_blocked_is_not_a_setup_stop(self):
+        # Review F5: a DEVICE-ONLY BLOCKED row reaches the merge gate as a device check, not NEEDS_SETUP.
+        self.has(RUN, "A `DEVICE-ONLY` `BLOCKED` row is not a setup failure", "device-checklist.md",
+                 "the merge gate's card lists those rows")
 
     def test_checkpointed_lane_gets_a_continuation(self):
         self.has(LEAD, "`<lane>.checkpoint.json`", "`remaining_rows`", "never re-runs a decided row")
