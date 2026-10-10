@@ -4,6 +4,7 @@ The template must be right for any repo (TS, Python, Swift, Kotlin, Go, infra):
 framework skills come only from the dependency-derived block that /graph-init
 applies, never from a static row that fires on a bare file extension.
 """
+import hashlib
 import importlib.util
 import json
 import re
@@ -18,9 +19,9 @@ from graph_control.preflight import UniqueLoader
 ROOT = Path(__file__).resolve().parents[2]
 TEMPLATE = ROOT / "templates" / "graph-profile.yaml"
 FALLBACK_DOC = ROOT / "docs" / "competency-routing.md"
-PARSED = Path(__file__).resolve().parent / "fixtures" / "profile-template-parsed.json"
 MANIFEST = ROOT / ".claude-plugin" / "plugin.json"
 TEMPLATE_BYTES = 30_000
+VALUES_SHA256 = "e72ec67860fd6dbf4c37287879711b1dcfd3bc7594603b74d48aedd43533a714"
 TITLE = "Dependency-derived rows (applied by /graph-init)"
 HAS_WCMATCH = importlib.util.find_spec("wcmatch") is not None
 
@@ -167,9 +168,11 @@ class TemplateTests(unittest.TestCase):
         self.assertLessEqual(len(TEMPLATE.read_bytes()), TEMPLATE_BYTES)
 
     def test_parsed_template_matches_the_frozen_values(self):
-        frozen = json.loads(PARSED.read_text())
-        self.assertEqual(json.loads(json.dumps(self.profile)), frozen["profile"])
-        self.assertEqual(json.loads(json.dumps(derived_rows())), frozen["derived"])
+        canonical = json.dumps({"profile": self.profile, "derived": derived_rows()},
+                               sort_keys=True, separators=(",", ":"))
+        digest = hashlib.sha256(canonical.encode()).hexdigest()
+        self.assertEqual(digest, VALUES_SHA256,
+                         f"a template value or derived row changed; if deliberate, set VALUES_SHA256 = {digest!r}")
 
     def test_every_manifest_skill_directory_exists(self):
         dirs = json.loads(MANIFEST.read_text())["skills"]
