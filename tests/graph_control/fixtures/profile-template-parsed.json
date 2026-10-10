@@ -1,0 +1,800 @@
+{
+ "derived": [
+  {
+   "glob": "<dir>/**/*.{ts,tsx,js,jsx}",
+   "impl": [
+    "graph-engineering:react-rules",
+    "graph-engineering:frontend-rules",
+    "graph-engineering:ux-evidence"
+   ],
+   "qa": [
+    "graph-engineering:ux-evidence"
+   ],
+   "review": [
+    "graph-engineering:react-rules",
+    "graph-engineering:frontend-rules",
+    "graph-engineering:ux-evidence"
+   ],
+   "when": "package.json in <dir> depends on react (react-dom, next, ...)"
+  },
+  {
+   "glob": "<dir>/**/*.{ts,tsx,js,jsx}",
+   "impl": [
+    "graph-engineering:tanstack-query-rules"
+   ],
+   "review": [
+    "graph-engineering:tanstack-query-rules"
+   ],
+   "when": "the react package.json also depends on @tanstack/react-query"
+  },
+  {
+   "glob": "<dir>/**/*.{ts,tsx,js,jsx}",
+   "impl": [
+    "graph-engineering:tanstack-router"
+   ],
+   "when": "the react package.json also depends on @tanstack/react-router"
+  },
+  {
+   "glob": "<dir>/**/*.{ts,tsx,js,jsx}",
+   "impl": [
+    "graph-engineering:tailwind"
+   ],
+   "review": [
+    "graph-engineering:tailwind"
+   ],
+   "when": "the react package.json also depends on tailwindcss"
+  },
+  {
+   "glob": "<dir>/**/*.css",
+   "impl": [
+    "graph-engineering:tailwind"
+   ],
+   "review": [
+    "graph-engineering:tailwind"
+   ],
+   "when": "package.json in <dir> depends on tailwindcss"
+  },
+  {
+   "glob": "<dir>/**/*.{ts,tsx,js,jsx}",
+   "impl": [
+    "graph-engineering:forms-i18n"
+   ],
+   "review": [
+    "graph-engineering:forms-i18n"
+   ],
+   "when": "the react package.json also depends on react-hook-form, i18next or react-i18next"
+  },
+  {
+   "glob": "<dir>/**/*.{ts,js}",
+   "impl": [
+    "graph-engineering:backend-rules"
+   ],
+   "review": [
+    "graph-engineering:backend-rules"
+   ],
+   "when": "package.json in <dir> has no UI framework (express, fastify, hono, @nestjs/core or none)"
+  },
+  {
+   "glob": "{**/turbo.json,pnpm-workspace.yaml,**/package.json}",
+   "impl": [
+    "graph-engineering:turborepo"
+   ],
+   "review": [
+    "graph-engineering:turborepo"
+   ],
+   "when": "turbo.json at the repo root"
+  },
+  {
+   "glob": "<dir>/**/*.py",
+   "impl": [
+    "graph-engineering:pydantic",
+    "graph-engineering:pydantic-house-rules"
+   ],
+   "review": [
+    "graph-engineering:pydantic",
+    "graph-engineering:pydantic-house-rules"
+   ],
+   "when": "pyproject.toml in <dir> depends on pydantic (fastapi implies it)"
+  },
+  {
+   "glob": "<dir>/**/*.py",
+   "impl": [
+    "graph-engineering:fastapi",
+    "graph-engineering:backend-rules",
+    "graph-engineering:architecture-resilience-rules"
+   ],
+   "review": [
+    "graph-engineering:fastapi",
+    "graph-engineering:backend-rules",
+    "graph-engineering:architecture-resilience-rules"
+   ],
+   "when": "pyproject.toml in <dir> depends on fastapi"
+  },
+  {
+   "glob": "<dir>/**/{models,db,migrations}/**/*.py",
+   "impl": [
+    "graph-engineering:sqlalchemy"
+   ],
+   "review": [
+    "graph-engineering:sqlalchemy"
+   ],
+   "when": "pyproject.toml in <dir> depends on sqlalchemy or alembic"
+  },
+  {
+   "glob": "<dir>/**/alembic/**",
+   "impl": [
+    "graph-engineering:sqlalchemy"
+   ],
+   "review": [
+    "graph-engineering:sqlalchemy"
+   ],
+   "when": "pyproject.toml in <dir> depends on sqlalchemy or alembic"
+  },
+  {
+   "glob": "<dir>/**/{workflows,activities}/**/*.py",
+   "impl": [
+    "graph-engineering:temporal-developer",
+    "graph-engineering:architecture-resilience-rules"
+   ],
+   "review": [
+    "graph-engineering:temporal-developer",
+    "graph-engineering:architecture-resilience-rules"
+   ],
+   "when": "pyproject.toml in <dir> depends on temporalio"
+  },
+  {
+   "glob": "<dir>/**/agents/**/*.py",
+   "impl": [
+    "graph-engineering:microsoft-agent-framework",
+    "graph-engineering:agent-workflow-rules"
+   ],
+   "review": [
+    "graph-engineering:microsoft-agent-framework",
+    "graph-engineering:agent-workflow-rules"
+   ],
+   "when": "pyproject.toml in <dir> depends on agent-framework"
+  },
+  {
+   "glob": "<dir>/**/agents/**/*.py",
+   "impl": [
+    "graph-engineering:building-pydantic-ai-agents",
+    "graph-engineering:agent-workflow-rules"
+   ],
+   "review": [
+    "graph-engineering:building-pydantic-ai-agents",
+    "graph-engineering:agent-workflow-rules"
+   ],
+   "when": "pyproject.toml in <dir> depends on pydantic-ai"
+  },
+  {
+   "glob": "<dir>/**/logging*.py",
+   "impl": [
+    "graph-engineering:loguru"
+   ],
+   "review": [
+    "graph-engineering:loguru"
+   ],
+   "when": "pyproject.toml in <dir> depends on loguru"
+  },
+  {
+   "glob": "<dir>/**/*.swift",
+   "impl": [
+    "graph-engineering:swiftui-pro",
+    "graph-engineering:ux-evidence"
+   ],
+   "qa": [
+    "graph-engineering:ux-evidence"
+   ],
+   "review": [
+    "graph-engineering:swiftui-pro",
+    "graph-engineering:ux-evidence"
+   ],
+   "when": "a .swift file under <dir> imports SwiftUI (<dir> holds Package.swift, project.yml or the .xcodeproj)"
+  },
+  {
+   "glob": "<dir>/**/*.{kt,kts}",
+   "impl": [
+    "graph-engineering:compose-state",
+    "graph-engineering:compose-ui",
+    "graph-engineering:ux-evidence"
+   ],
+   "qa": [
+    "graph-engineering:compose-build-and-test",
+    "graph-engineering:ux-evidence"
+   ],
+   "review": [
+    "graph-engineering:compose-performance",
+    "graph-engineering:compose-state",
+    "graph-engineering:ux-evidence"
+   ],
+   "when": "the Gradle build in <dir> uses androidx.compose"
+  },
+  {
+   "glob": "<dir>/supabase/**",
+   "impl": [
+    "graph-engineering:supabase",
+    "graph-engineering:supabase-postgres-best-practices"
+   ],
+   "review": [
+    "graph-engineering:supabase",
+    "graph-engineering:supabase-postgres-best-practices"
+   ],
+   "when": "supabase/config.toml under <dir> (<dir> holds the supabase/ directory)"
+  },
+  {
+   "gap": "the plugin has no Go, Rust, Ruby or Java stack skill; name the language found",
+   "glob": "<dir>/**",
+   "impl": [
+    "graph-engineering:backend-rules"
+   ],
+   "review": [
+    "graph-engineering:backend-rules"
+   ],
+   "when": "go.mod, Cargo.toml, Gemfile or pom.xml in <dir>"
+  }
+ ],
+ "profile": {
+  "api": {
+   "collection": "bruno",
+   "env": "local",
+   "schema": "/openapi.json"
+  },
+  "board": {
+   "platform": "github",
+   "project": "Graph Runs"
+  },
+  "bootstrap": [],
+  "ci": {
+   "parity": ""
+  },
+  "deploy": {
+   "bruEnv": "",
+   "checks": [],
+   "env": [],
+   "rollback": "",
+   "startedAt": "",
+   "testTenant": "",
+   "wait": ""
+  },
+  "digest": {
+   "exclude": [
+    "**/*.test.*",
+    "**/tests/**",
+    "**/*.stories.*",
+    "**/generated/**",
+    "**/*.spec.*",
+    "**/*_test.*",
+    "**/test_*.*",
+    "**/test/**",
+    "**/*Tests/**",
+    "**/androidTest/**"
+   ]
+  },
+  "docsPath": "docs/superpowers",
+  "gates": {
+   "auto_classes": [],
+   "merge": "owner",
+   "owner_classes": [
+    "destructive",
+    "credentials-and-access",
+    "spend",
+    "outbound-messaging"
+   ],
+   "plan": "owner",
+   "quick": ""
+  },
+  "host": {
+   "min_free_gb": 20
+  },
+  "infra": {
+   "cluster": {
+    "context": "",
+    "create": "",
+    "delete": ""
+   },
+   "policy": "",
+   "prereqs": [],
+   "render": ""
+  },
+  "instructionPaths": [
+   "CLAUDE.md",
+   "**/CLAUDE.md",
+   "AGENTS.md",
+   ".claude/**"
+  ],
+  "integration": "pr",
+  "lanes": {},
+  "localAgents": {},
+  "localLanes": {},
+  "ownerAccess": "",
+  "policy": {
+   "block_types": [
+    "general-purpose"
+   ],
+   "never": [
+    "haiku",
+    "fable"
+   ],
+   "roles": {
+    "implementer": "opus",
+    "implementer-simple": "sonnet",
+    "planner": "opus",
+    "qa": "sonnet",
+    "qa-lead": "sonnet",
+    "researcher": "sonnet",
+    "researcher-spike": "sonnet",
+    "retro": "sonnet",
+    "reviewer": "opus",
+    "reviewer-lead": "opus",
+    "ux-designer": "opus"
+   }
+  },
+  "pulse": {
+   "command": ""
+  },
+  "qa": {
+   "runtimes": []
+  },
+  "review": {
+   "panel_lines": 2000,
+   "seams": []
+  },
+  "risk": [
+   {
+    "id": "db-schema",
+    "keywords": [
+     "DROP TABLE",
+     "ALTER TABLE"
+    ],
+    "paths": [
+     "**/migrations/**",
+     "**/*.sql",
+     "**/alembic/**"
+    ]
+   },
+   {
+    "id": "api-surface",
+    "keywords": [],
+    "paths": [
+     "**/{routers,controllers,endpoints}/**/*.{py,go,java,kt,rb,ts,js}",
+     "**/{routes,handlers}/**/*.{py,go,java,kt,rb}",
+     "{**/*.controller.{ts,js},**/app/api/**/route.{ts,js},**/pages/api/**/*.{ts,js}}",
+     "**/{openapi,asyncapi,swagger}*.{yaml,yml,json}"
+    ]
+   },
+   {
+    "id": "auth",
+    "keywords": [],
+    "paths": [
+     "**/{auth,authz,authentication,permissions,rbac}/**"
+    ]
+   },
+   {
+    "id": "infra",
+    "keywords": [],
+    "paths": [
+     "argocd/**",
+     "manifests/**",
+     "**/Chart.yaml",
+     "**/*.tf",
+     ".github/workflows/**"
+    ]
+   },
+   {
+    "id": "public-copy",
+    "keywords": [],
+    "paths": []
+   },
+   {
+    "id": "outbound-messaging",
+    "keywords": [],
+    "paths": [
+     "**/{email,emails,mailers,notifications,notifier*}/**"
+    ]
+   },
+   {
+    "id": "spend",
+    "keywords": [
+     "stripe.",
+     "Stripe("
+    ],
+    "paths": [
+     "**/{billing,payments}/**"
+    ]
+   },
+   {
+    "id": "destructive",
+    "keywords": [
+     "DROP TABLE",
+     "DROP DATABASE",
+     "DROP SCHEMA",
+     "DROP COLUMN",
+     "DROP VIEW",
+     "DROP INDEX",
+     "DELETE FROM",
+     "re:\\bTRUNCATE\\s+(?:TABLE\\b|ONLY\\b|[A-Za-z_\"'`{$])",
+     "re:(?:^|[\"'`(;])\\s*(?:drop|truncate)\\s+(?:table|database|schema|view|index)\\b",
+     "re:(?:^|[\"'`(;])\\s*delete\\s+from\\s+\\S",
+     "re:\\balter\\s+table\\s+\\S+\\s+drop\\s+column\\b"
+    ],
+    "paths": []
+   },
+   {
+    "id": "credentials-and-access",
+    "keywords": [],
+    "paths": [
+     ".sops.yaml",
+     "**/*.enc.{yaml,yml}",
+     "**/.env*"
+    ]
+   },
+   {
+    "id": "outside-the-run",
+    "keywords": [],
+    "paths": []
+   }
+  ],
+  "routing": {
+   "**/*-pg-*/**": {
+    "impl": [
+     "graph-engineering:cloudnativepg"
+    ],
+    "review": [
+     "graph-engineering:cloudnativepg"
+    ]
+   },
+   "**/*-pg/**": {
+    "impl": [
+     "graph-engineering:cloudnativepg"
+    ],
+    "review": [
+     "graph-engineering:cloudnativepg"
+    ]
+   },
+   "**/*.py": {
+    "impl": [
+     "graph-engineering:uv",
+     "graph-engineering:ruff"
+    ],
+    "qa": [],
+    "review": [
+     "graph-engineering:ruff"
+    ]
+   },
+   "**/*.sql": {
+    "impl": [
+     "graph-engineering:supabase-postgres-best-practices"
+    ],
+    "qa": [],
+    "review": [
+     "graph-engineering:supabase-postgres-best-practices"
+    ]
+   },
+   "**/*.{kt,kts}": {
+    "impl": [
+     "graph-engineering:kotlin-concurrency",
+     "graph-engineering:kotlin-types-value-class"
+    ],
+    "review": [
+     "graph-engineering:kotlin-control-flow"
+    ]
+   },
+   "**/*[Nn]otification*.swift": {
+    "impl": [
+     "graph-engineering:push-notifications"
+    ]
+   },
+   "**/Chart.yaml": {
+    "impl": [
+     "graph-engineering:helm",
+     "graph-engineering:infra-verification"
+    ],
+    "qa": [
+     "graph-engineering:infra-verification"
+    ],
+    "review": [
+     "graph-engineering:helm"
+    ]
+   },
+   "**/alembic/**": {
+    "impl": [
+     "graph-engineering:sqlalchemy"
+    ],
+    "review": [
+     "graph-engineering:sqlalchemy"
+    ]
+   },
+   "**/kustomization.{yaml,yml}": {
+    "impl": [
+     "graph-engineering:kustomize",
+     "graph-engineering:infra-verification"
+    ],
+    "qa": [
+     "graph-engineering:infra-verification"
+    ],
+    "review": [
+     "graph-engineering:kustomize"
+    ]
+   },
+   "**/{Health,Workout}*.swift": {
+    "impl": [
+     "graph-engineering:healthkit"
+    ]
+   },
+   "**/{Photo,Camera}*.swift": {
+    "impl": [
+     "graph-engineering:photokit"
+    ]
+   },
+   "**/{Widget,LiveActivity}*.swift": {
+    "impl": [
+     "graph-engineering:widgetkit",
+     "graph-engineering:activitykit"
+    ]
+   },
+   "**/{ai-gateway,agent-router,llm-gateway}/**": {
+    "impl": [
+     "graph-engineering:agent-router",
+     "graph-engineering:envoy-gateway"
+    ],
+    "review": [
+     "graph-engineering:agent-router",
+     "graph-engineering:security-review"
+    ]
+   },
+   "**/{chart,charts}/**/templates/**/*.{yaml,yml,tpl}": {
+    "impl": [
+     "graph-engineering:helm",
+     "graph-engineering:infra-verification"
+    ],
+    "qa": [
+     "graph-engineering:infra-verification"
+    ],
+    "review": [
+     "graph-engineering:helm"
+    ]
+   },
+   "**/{gateway,gateway-*}/**": {
+    "impl": [
+     "graph-engineering:envoy-gateway"
+    ],
+    "review": [
+     "graph-engineering:envoy-gateway",
+     "graph-engineering:security-review"
+    ]
+   },
+   "**/{httproute,securitypolicy,backendtlspolicy,backendtrafficpolicy,clienttrafficpolicy,gateway,gatewayclass,referencegrant}*.{yaml,yml}": {
+    "impl": [
+     "graph-engineering:envoy-gateway"
+    ],
+    "review": [
+     "graph-engineering:envoy-gateway",
+     "graph-engineering:security-review"
+    ]
+   },
+   "**/{migrations,schemas}/**": {
+    "impl": [
+     "graph-engineering:gdpr-erasure-retention"
+    ],
+    "qa": [],
+    "review": [
+     "graph-engineering:gdpr-erasure-retention",
+     "graph-engineering:gdpr-consent"
+    ]
+   },
+   "**/{openapi,asyncapi,swagger}*.{yaml,yml,json}": {
+    "impl": [
+     "graph-engineering:bruno",
+     "graph-engineering:schemathesis",
+     "graph-engineering:api-contract"
+    ],
+    "qa": [
+     "graph-engineering:bruno",
+     "graph-engineering:schemathesis",
+     "graph-engineering:api-contract"
+    ],
+    "review": [
+     "graph-engineering:api-contract"
+    ]
+   },
+   "**/{postgres,cnpg}/**": {
+    "impl": [
+     "graph-engineering:cloudnativepg"
+    ],
+    "review": [
+     "graph-engineering:cloudnativepg"
+    ]
+   },
+   "**/{pyproject.toml,uv.lock,.python-version}": {
+    "impl": [
+     "graph-engineering:uv"
+    ],
+    "review": [
+     "graph-engineering:uv"
+    ]
+   },
+   "**/{routers,controllers,endpoints}/**/*.{py,go,java,kt,rb,ts,js}": {
+    "impl": [
+     "graph-engineering:bruno",
+     "graph-engineering:schemathesis",
+     "graph-engineering:api-contract"
+    ],
+    "qa": [
+     "graph-engineering:bruno",
+     "graph-engineering:schemathesis",
+     "graph-engineering:api-contract"
+    ],
+    "review": [
+     "graph-engineering:api-contract"
+    ]
+   },
+   "**/{routes,handlers}/**/*.{py,go,java,kt,rb}": {
+    "impl": [
+     "graph-engineering:bruno",
+     "graph-engineering:schemathesis",
+     "graph-engineering:api-contract"
+    ],
+    "qa": [
+     "graph-engineering:bruno",
+     "graph-engineering:schemathesis",
+     "graph-engineering:api-contract"
+    ],
+    "review": [
+     "graph-engineering:api-contract"
+    ]
+   },
+   "always": {
+    "design": [
+     "graph-engineering:ux-journey",
+     "graph-engineering:ui-ux-pro-max"
+    ],
+    "impl": [
+     "graph-engineering:prior-art",
+     "graph-engineering:review-testing-rules"
+    ],
+    "review": [
+     "graph-engineering:review-protocol",
+     "graph-engineering:security-review",
+     "graph-engineering:privacy-review"
+    ]
+   },
+   "argocd/**/*.{yaml,yml}": {
+    "impl": [
+     "graph-engineering:argocd",
+     "graph-engineering:helm",
+     "graph-engineering:kubectl",
+     "graph-engineering:architecture-resilience-rules",
+     "graph-engineering:infra-verification"
+    ],
+    "qa": [
+     "graph-engineering:kubectl",
+     "graph-engineering:infra-verification"
+    ],
+    "review": [
+     "graph-engineering:argocd",
+     "graph-engineering:helm"
+    ]
+   },
+   "manifests/**": {
+    "impl": [
+     "graph-engineering:kubectl",
+     "graph-engineering:kustomize",
+     "graph-engineering:infra-verification"
+    ],
+    "qa": [
+     "graph-engineering:kubectl",
+     "graph-engineering:infra-verification"
+    ],
+    "review": [
+     "graph-engineering:kubectl"
+    ]
+   },
+   "{**/*.bru,**/bruno.json}": {
+    "impl": [
+     "graph-engineering:bruno",
+     "graph-engineering:api-contract"
+    ],
+    "qa": [
+     "graph-engineering:bruno",
+     "graph-engineering:api-contract"
+    ],
+    "review": [
+     "graph-engineering:bruno",
+     "graph-engineering:api-contract"
+    ]
+   },
+   "{**/*.controller.{ts,js},**/app/api/**/route.{ts,js},**/pages/api/**/*.{ts,js}}": {
+    "impl": [
+     "graph-engineering:bruno",
+     "graph-engineering:schemathesis",
+     "graph-engineering:api-contract"
+    ],
+    "qa": [
+     "graph-engineering:bruno",
+     "graph-engineering:schemathesis",
+     "graph-engineering:api-contract"
+    ],
+    "review": [
+     "graph-engineering:api-contract"
+    ]
+   },
+   "{**/turbo.json,pnpm-workspace.yaml}": {
+    "impl": [
+     "graph-engineering:turborepo"
+    ],
+    "review": [
+     "graph-engineering:turborepo"
+    ]
+   },
+   "{.sops.yaml,**/*.enc.yaml,**/*.enc.yml}": {
+    "impl": [
+     "graph-engineering:sops-age"
+    ],
+    "qa": [],
+    "review": [
+     "graph-engineering:sops-age",
+     "graph-engineering:security-review"
+    ]
+   },
+   "{observability/**,**/dashboards/**/*.json,**/*rule*.{yaml,yml}}": {
+    "impl": [
+     "graph-engineering:promql",
+     "graph-engineering:loki",
+     "graph-engineering:tempo"
+    ],
+    "qa": [
+     "graph-engineering:promql",
+     "graph-engineering:loki",
+     "graph-engineering:tempo"
+    ],
+    "review": [
+     "graph-engineering:promql",
+     "graph-engineering:loki",
+     "graph-engineering:tempo"
+    ]
+   },
+   "{tests/**/*.spec.ts,playwright.config.ts}": {
+    "impl": [
+     "graph-engineering:playwright-cli",
+     "graph-engineering:playwright-component-testing"
+    ],
+    "qa": [
+     "graph-engineering:playwright-cli",
+     "graph-engineering:playwright-trace",
+     "graph-engineering:ux-evidence"
+    ],
+    "review": [
+     "graph-engineering:playwright-cli"
+    ]
+   }
+  },
+  "rules": [
+   ".claude/rules/*.md"
+  ],
+  "runtime": {
+   "baseUrl": "",
+   "command": "",
+   "down": "",
+   "env": [],
+   "health": {
+    "expect": "",
+    "timeout": 120,
+    "url": ""
+   },
+   "none": "",
+   "port": null,
+   "seed": "",
+   "up": ""
+  },
+  "schema_version": 2,
+  "stacks": {},
+  "uxEvidence": {
+   "path": "docs/ux/changes",
+   "store": {
+    "link": "",
+    "pull": "",
+    "push": ""
+   }
+  }
+ }
+}

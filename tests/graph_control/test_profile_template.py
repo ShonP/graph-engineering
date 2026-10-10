@@ -5,6 +5,7 @@ framework skills come only from the dependency-derived block that /graph-init
 applies, never from a static row that fires on a bare file extension.
 """
 import importlib.util
+import json
 import re
 import unittest
 from pathlib import Path
@@ -17,6 +18,9 @@ from graph_control.preflight import UniqueLoader
 ROOT = Path(__file__).resolve().parents[2]
 TEMPLATE = ROOT / "templates" / "graph-profile.yaml"
 FALLBACK_DOC = ROOT / "docs" / "competency-routing.md"
+PARSED = Path(__file__).resolve().parent / "fixtures" / "profile-template-parsed.json"
+MANIFEST = ROOT / ".claude-plugin" / "plugin.json"
+TEMPLATE_BYTES = 30_000
 TITLE = "Dependency-derived rows (applied by /graph-init)"
 HAS_WCMATCH = importlib.util.find_spec("wcmatch") is not None
 
@@ -59,8 +63,6 @@ DERIVED = [
     ("<dir>/**/agents/**/*.py", MAF, MAF, []),
     ("<dir>/**/agents/**/*.py", PAI, PAI, []),
     ("<dir>/**/logging*.py", ["loguru"], ["loguru"], []),
-    ("<dir>/**/{bus,events,messaging}/**", ["nats", "architecture-resilience-rules"],
-     ["nats", "architecture-resilience-rules", "security-review"], []),
     ("<dir>/**/*.swift", ["swiftui-pro", "ux-evidence"], ["swiftui-pro", "ux-evidence"], ["ux-evidence"]),
     ("<dir>/**/*.{kt,kts}", ["compose-state", "compose-ui", "ux-evidence"],
      ["compose-performance", "compose-state", "ux-evidence"], ["compose-build-and-test", "ux-evidence"]),
@@ -160,6 +162,18 @@ class TemplateTests(unittest.TestCase):
         self.assertEqual([r["glob"] for r in gaps], ["<dir>/**"])
         for language in ("Go", "Rust", "Ruby", "Java"):
             self.assertIn(language, gaps[0]["gap"])
+
+    def test_template_stays_under_its_byte_ceiling(self):
+        self.assertLessEqual(len(TEMPLATE.read_bytes()), TEMPLATE_BYTES)
+
+    def test_parsed_template_matches_the_frozen_values(self):
+        frozen = json.loads(PARSED.read_text())
+        self.assertEqual(json.loads(json.dumps(self.profile)), frozen["profile"])
+        self.assertEqual(json.loads(json.dumps(derived_rows())), frozen["derived"])
+
+    def test_every_manifest_skill_directory_exists(self):
+        dirs = json.loads(MANIFEST.read_text())["skills"]
+        self.assertEqual([d for d in dirs if not (ROOT / d).is_dir()], [])
 
 
 @unittest.skipUnless(HAS_WCMATCH, "needs wcmatch: uv run --with PyYAML==6.0.2 --with wcmatch==11.0.1")
