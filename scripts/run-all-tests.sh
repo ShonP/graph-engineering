@@ -10,7 +10,8 @@
 #     (pins only its tests need, such as wcmatch for the template's globs)
 #   - every tests/**/test_*.sh via bash; exit 77 means skipped (the automake
 #     convention the skill tests use), reported, never counted as a pass
-#   - the check scripts (skill tests, skill and agent frontmatter, routing)
+#   - the check scripts (skill tests, skill and agent frontmatter, routing,
+#     private consumer names: SKIP, so partial, when no list is configured)
 #
 # Prints `<step>: exit=<n>` per step, then
 # `run-all-tests: exit=<0|1> complete`, or `partial` when a step was skipped or
@@ -82,6 +83,7 @@ step check-skill-scripts bash scripts/check-skill-scripts.sh
 step check-skill-frontmatter bash scripts/check-skill-frontmatter.sh "$ROOT"
 step check-routing-resolves bash scripts/check-routing-resolves.sh "$ROOT"
 step check-agent-frontmatter bash scripts/check-agent-frontmatter.sh "$ROOT"
+step check-private-names python3 scripts/check-private-names.py "$ROOT"
 
 word=complete
 [ "$skipped" -eq 0 ] || word=partial

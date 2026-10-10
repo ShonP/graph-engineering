@@ -127,7 +127,7 @@ class TemplateTests(unittest.TestCase):
         self.assertEqual(self.profile["stacks"], {})
 
     def test_no_consumer_specific_names(self):
-        pattern = re.compile(r"apps/\*/web|forge|koach|fitness", re.IGNORECASE)
+        pattern = re.compile(r"apps/\*/web", re.IGNORECASE)
         files = [p for p in (ROOT / "templates").rglob("*") if p.is_file()] + [FALLBACK_DOC]
         hits = [f"{p.relative_to(ROOT)}:{n}" for p in files
                 for n, line in enumerate(p.read_text().split("\n"), 1) if pattern.search(line)]

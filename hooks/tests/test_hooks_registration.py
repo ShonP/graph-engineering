@@ -182,7 +182,7 @@ class ReadmeContract(unittest.TestCase):
         for name in ("README.md", "hooks.json"):
             body = (HOOKS_DIR / name).read_text(encoding="utf-8")
             self.assertNotIn(chr(0x2014), body, name + " has an em dash")
-            self.assertNotRegex(body, r"(?i)koach|fitness", name + " names a consumer")
+            # Consumer names: scripts/check-private-names.py, from a list outside the repo.
 
 
 if __name__ == "__main__":

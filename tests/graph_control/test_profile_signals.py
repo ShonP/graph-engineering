@@ -14,7 +14,7 @@ from test_profile_v2 import comment_before
 
 HAS_WCMATCH = importlib.util.find_spec("wcmatch") is not None
 BRIEF_EXCLUDES = ["**/*.test.*", "**/tests/**", "**/*.stories.*", "**/generated/**"]
-CONSUMER_WORDS = ("koach", "fitness", "supabase", "swiftui", "nestjs", "apps/")
+CONSUMER_WORDS = ("supabase", "swiftui", "nestjs", "apps/")
 
 
 class PulseAndDigestBlocks(unittest.TestCase):

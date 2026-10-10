@@ -17,7 +17,7 @@ PROTOCOL = ROOT / "skills/process/review-protocol/SKILL.md"
 VERDICT = "`PASS|CHANGES-REQUESTED blocking=<n> important=<m> findings=<path>`"
 LEAF_FILE = "`.graph/<run>/review/<slice>.json`"
 # App names and stack tools that would tie the panel to one consumer repo.
-CONSUMER_SPECIFIC = ("koach", "fitness", "supabase", "pnpm", "xcodebuild", "swiftui", "nestjs", "fastapi")
+CONSUMER_SPECIFIC = ("supabase", "pnpm", "xcodebuild", "swiftui", "nestjs", "fastapi")
 
 
 def flat(text):

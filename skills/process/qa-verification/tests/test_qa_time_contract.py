@@ -134,7 +134,7 @@ class Hygiene(unittest.TestCase):
                      *sorted((SKILL_DIR / "templates").glob("*.json"))):
             text = path.read_text(encoding="utf-8")
             self.assertNotIn(chr(0x2014), text, path.name)
-            for word in ("koach", "fitness", "supabase", "voiceover"):
+            for word in ("supabase", "voiceover"):
                 self.assertNotIn(word, text.lower(), f"{path.name}: {word}")
 
 

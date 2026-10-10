@@ -15,7 +15,7 @@ PROTOCOL = ROOT / "skills/process/review-protocol/SKILL.md"
 SCRIPT = ROOT / "skills/process/review-protocol/scripts/mutate-witness.sh"
 IMPLEMENTERS = (ROOT / "agents/implementer.md", ROOT / "agents/implementer-simple.md")
 # App names and stack tools that would tie the witness to one consumer repo.
-CONSUMER_SPECIFIC = ("koach", "fitness", "supabase", "pnpm", "xcodebuild", "swiftui", "nestjs", "fastapi")
+CONSUMER_SPECIFIC = ("supabase", "pnpm", "xcodebuild", "swiftui", "nestjs", "fastapi")
 EM_DASH = chr(0x2014)
 
 

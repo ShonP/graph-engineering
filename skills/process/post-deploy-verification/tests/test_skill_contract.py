@@ -55,7 +55,7 @@ class Generic(unittest.TestCase):
     def test_dash_free_and_names_no_consumer(self):
         body = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
         self.assertNotIn(chr(0x2014), body)
-        self.assertNotRegex(body, r"(?i)koach|fitness")
+        # Consumer names: scripts/check-private-names.py, from a list outside the repo.
 
 
 if __name__ == "__main__":

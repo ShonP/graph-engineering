@@ -74,7 +74,7 @@ class GraphInitCommandTests(unittest.TestCase):
         self.assertIn("--upgrade", hint)
 
     def test_no_consumer_specific_names_or_em_dashes(self):
-        pattern = re.compile(r"apps/\*/web|forge|koach|fitness", re.IGNORECASE)
+        pattern = re.compile(r"apps/\*/web", re.IGNORECASE)
         hits = [n for n, line in enumerate(text().split("\n"), 1) if pattern.search(line)]
         self.assertEqual(hits, [])
         self.assertNotIn("\u2014", text())

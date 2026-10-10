@@ -26,7 +26,8 @@ def write(path, text, mode=0o644):
 
 
 class RunAllTests(unittest.TestCase):
-    def fixture(self, demo, requirements=None, skill_checks='exit 0\n'):
+    def fixture(self, demo, requirements=None, skill_checks='exit 0\n',
+                private_names='print("ok check-private-names")\n'):
         root = Path(tempfile.mkdtemp()).resolve()
         self.addCleanup(shutil.rmtree, root)
         write(root / 'scripts' / 'run-all-tests.sh', RUNNER.read_text(), 0o755)
@@ -34,6 +35,7 @@ class RunAllTests(unittest.TestCase):
         for name in ('check-skill-frontmatter', 'check-routing-resolves', 'check-agent-frontmatter'):
             write(root / 'scripts' / f'{name}.sh', 'exit 0\n', 0o755)
         write(root / 'scripts' / 'check-skill-scripts.sh', skill_checks, 0o755)
+        write(root / 'scripts' / 'check-private-names.py', private_names)
         write(root / 'hooks' / 'tests' / 'run-tests.sh', 'exit 0\n', 0o755)
         write(root / 'hooks' / 'tests' / 'test_hooks_ok.py', PASSING)
         write(root / 'tests' / 'demo' / 'test_demo.py', demo)
@@ -66,6 +68,17 @@ class RunAllTests(unittest.TestCase):
         code, lines = self.run_all(self.fixture(PASSING, skill_checks=checks))
         self.assertEqual((code, lines[-1]), (0, 'run-all-tests: exit=0 partial'), lines)
         self.assertIn('check-skill-scripts: exit=0 (tests skipped)', lines)
+
+    def test_private_names_check_runs_and_its_failure_fails_the_run(self):
+        code, lines = self.run_all(self.fixture(PASSING))
+        self.assertIn('check-private-names: exit=0', lines)
+        code, lines = self.run_all(self.fixture(PASSING, private_names='raise SystemExit(1)\n'))
+        self.assertEqual((code, lines[-1]), (1, 'run-all-tests: exit=1 complete'), lines)
+
+    def test_unconfigured_private_names_reads_partial(self):
+        skip = 'print("SKIP check-private-names: no list configured")\n'
+        code, lines = self.run_all(self.fixture(PASSING, private_names=skip))
+        self.assertEqual((code, lines[-1]), (0, 'run-all-tests: exit=0 partial'), lines)
 
     def test_directory_requirements_reach_uv(self):
         self.run_all(self.fixture(PASSING, requirements='wcmatch==11.0.1\n'))

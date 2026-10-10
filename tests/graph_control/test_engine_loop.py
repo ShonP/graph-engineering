@@ -17,7 +17,7 @@ from test_router import lane_block
 
 ROOT = Path(__file__).resolve().parents[2]
 RESEARCH = ROOT / "graphs" / "research.md"
-CONSUMER_WORDS = ("koach", "fitness", "pnpm", "xcodegen", "xcodebuild", "supabase", "sentry",
+CONSUMER_WORDS = ("pnpm", "xcodegen", "xcodebuild", "supabase", "sentry",
                   "ga4", "clarity", "doppler", "hormozi", "fable", "haiku")
 
 

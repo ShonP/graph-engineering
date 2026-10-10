@@ -288,7 +288,7 @@ class Unit(unittest.TestCase):
     def test_counter_module_is_generic_and_dash_free(self):
         body = (HOOKS / "scripts" / "wait_count.py").read_text(encoding="utf-8")
         self.assertNotIn(chr(0x2014), body)
-        self.assertNotRegex(body, r"(?i)koach|fitness")
+        # Consumer names: scripts/check-private-names.py, from a list outside the repo.
 
 
 if __name__ == "__main__":

@@ -143,7 +143,7 @@ class Generic(unittest.TestCase):
         for path in (LEAD_PATH, LEAF_PATH, SKILL_PATH):
             text = read(path)
             self.assertNotIn(chr(0x2014), text, path.name)
-            for word in ("fable", "koach", "fitness", "supabase"):
+            for word in ("fable", "supabase"):
                 self.assertNotIn(word, text.lower(), f"{path.name}: {word}")
 
     def test_lead_under_line_budget(self):
