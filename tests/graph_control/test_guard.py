@@ -122,10 +122,10 @@ class Rewrite(unittest.TestCase):
                 self.assertEqual(decide(payload(subagent_type=subagent_type, **extra), POLICY).kind, "none")
 
     def test_local_agents_take_their_legs_tier_in_both_shapes(self):
-        profile = {"policy": {}, "localAgents": {"review": "my-reviewer", "qa": "forge:forge-qa",
+        profile = {"policy": {}, "localAgents": {"review": "my-reviewer", "qa": "team:team-qa",
                                                  "implement": {"web": "web-impl", "ios": "ios-impl"},
                                                  "visual": "visual-reviewer"}}
-        for subagent_type, tier in (("my-reviewer", "opus"), ("forge:forge-qa", "sonnet"), ("ios-impl", "opus")):
+        for subagent_type, tier in (("my-reviewer", "opus"), ("team:team-qa", "sonnet"), ("ios-impl", "opus")):
             with self.subTest(subagent_type=subagent_type):
                 data = payload(subagent_type=subagent_type)
                 self.assert_rewritten(decide(data, profile), data["tool_input"], tier)

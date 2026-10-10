@@ -77,6 +77,39 @@ class PrivateNames(unittest.TestCase):
         self.assertIn("b.md:1", out.stdout)
         self.assertNotIn("a.md:1", out.stdout)
 
+    def test_compound_identifiers_are_caught(self):
+        self.names_file("acmecorp\n")
+        shapes = ["AcmecorpKit", "acmecorp_sdk", "AcmecorpSettings", "acmecorp2",
+                  "myAcmecorp", "ACMECORP_TOKEN", "_acmecorp"]
+        for number, shape in enumerate(shapes):
+            with self.subTest(shape=shape):
+                self.track(f"c{number}.md", f"x {shape} y\n")
+                out = self.run_check()
+                self.assertEqual(out.returncode, 1, out.stdout)
+                self.assertIn(f"c{number}.md:1", out.stdout)
+                git(self.repo, "rm", "-q", "--cached", f"c{number}.md")
+
+    def test_a_longer_word_that_starts_with_a_name_is_not_caught(self):
+        self.names_file("equiv\n")
+        self.track("a.md", "an equivalent, Equivalents, EQUIVALENT, equivalentKit, unequiv\n")
+        out = self.run_check()
+        self.assertEqual(out.returncode, 0, out.stdout)
+
+    def test_tracked_paths_are_scanned_and_reported_without_the_name(self):
+        self.track("notes/acmecorp-notes.md", "clean\n")
+        self.track("AcmecorpKit/a.md", "clean\n")
+        self.names_file("acmecorp\n")
+        out = self.run_check()
+        self.assertEqual(out.returncode, 1, out.stdout)
+        self.assertIn("FAIL notes/acmecorp-notes.md: path names a private consumer", out.stdout)
+        self.assertIn("FAIL AcmecorpKit/a.md: path names a private consumer", out.stdout)
+        self.assertEqual(out.stdout.count("acmecorp-notes"), 1)
+
+    def test_allow_globs_exempt_matching_paths_by_name_too(self):
+        self.track("acmecorp/plugin.json", "{}\n")
+        self.names_file("acmecorp allow=acmecorp/*\n")
+        self.assertEqual(self.run_check().returncode, 0)
+
     def test_untracked_files_are_not_scanned(self):
         self.track("a.md", "clean\n")
         (self.repo / "scratch.md").write_text("acmecorp\n")
@@ -89,7 +122,17 @@ class PrivateNames(unittest.TestCase):
         self.track("a.md", "globex inside\n- a list item\n")
         self.names_file("# a comment\n\n   \nacmecorp\n")
         self.assertEqual(self.run_check().returncode, 0)
-        self.assertEqual(self.run_check(env_names="initech, globex").returncode, 1)
+        self.assertEqual(self.run_check(env_names="initech; globex").returncode, 1)
+        self.assertEqual(self.run_check(env_names="initech\nglobex").returncode, 1)
+
+    def test_env_entries_keep_their_comma_separated_allow_globs(self):
+        self.track("x/plugin.json", "globex\n")
+        self.track("y/plugin.json", "globex\n")
+        self.track("README.md", "globex\n")
+        out = self.run_check(env_names="initech; globex allow=x/*,y/*")
+        self.assertEqual(out.returncode, 1, out.stdout)
+        self.assertIn("README.md:1", out.stdout)
+        self.assertNotIn("plugin.json", out.stdout)
 
     def test_allow_globs_exempt_only_their_paths(self):
         self.track(".meta/plugin.json", '{"author": "Jane Acmecorp"}\n')

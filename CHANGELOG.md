@@ -18,12 +18,13 @@ consumer product, person, private repo, cloud account or internal metric.
 ### Added
 
 - **`scripts/check-private-names.py`**, a `run-all-tests.sh` step. It fails
-  when a tracked file names an entry from a list kept outside the repo
-  (`GRAPH_PRIVATE_NAMES`, or
+  when a tracked file's path or text names an entry from a list kept outside
+  the repo (`GRAPH_PRIVATE_NAMES`, `;` or newline separated, or
   `${XDG_CONFIG_HOME:-~/.config}/graph-engineering/private-names.txt`):
-  case-insensitive, whole word, binary files skipped, `allow=<glob>` per name
-  for a path where the name belongs. A hit prints the path and line, never the
-  name. With no list it prints `SKIP`, so public CI reads `partial`.
+  case-insensitive, at word edges and identifier seams (`NameKit`,
+  `name_sdk`, `name2`, `myName`) but never inside a longer lowercase word,
+  binary files skipped, `allow=<glob>` per name for a path where the name
+  belongs. A hit prints the path and line, never the name. With no list it prints `SKIP`, so public CI reads `partial`.
 - **README "Genericity" rule** under Develop.
 - **`skills/android/NOTICE` and `skills/android/LICENSES/`**: the two
   Apache-2.0 upstreams of the Android packs, each license verbatim, and a map
