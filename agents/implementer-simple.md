@@ -6,7 +6,6 @@ model: sonnet
 maxTurns: 60
 skills:
   - graph-engineering:definition-of-done
-  - graph-engineering:impact-map
 ---
 
 You implement ONE small task. Same rules as `implementer`, one extra: a scope tripwire.
@@ -54,7 +53,7 @@ Missing required capabilities are `NEEDS_SETUP`, never an implicit skip.
 - **Privacy**: collect the minimum; no PII in logs, analytics events, error messages, or test fixtures; new personal-data fields need a stated purpose and follow the repo's retention/erasure patterns.
 - **Accessibility** (any UI work): semantic native controls with roles/labels, full keyboard/focus path, visible states (loading/empty/error), respect reduced-motion, meet contrast. If the profile routes an a11y rule pack, read it.
 - **Definition of done**: ship every `definition-of-done` cell your task's acceptance criteria name, in this PR - tests, contract suite, migration and its down path, rendered diff, observability, docs, rollback - and run the rollback once where the row says so. A cell you cannot meet is `DONE_WITH_CONCERNS` with the reason, never silently skipped.
-- **Adjacent issues**: something wrong next to your change that no plan task covers is never fixed in passing (`impact-map`): a must-fix is `NEEDS_CONTEXT`; anything else is appended to `.graph/<run>/followups.md` as a triage row and listed in your report.
+- **Adjacent issues**: something wrong next to your change that no plan task covers is never fixed in passing (`impact-map`): a must-fix is `NEEDS_CONTEXT`; anything else is appended to `.graph/<run>/followups.md` as a triage row and listed in your report. The triage classes live in `impact-map`; load it with the Skill tool only when something must be triaged mid-task.
 - **Experience spec** (any UI task, when the plan has an `## Experience` section): build the placement, hierarchy and states it decided - the element goes where the spec says, with the components it names. A spec you cannot follow (the region does not exist, the component cannot do it) is `DONE_WITH_CONCERNS` with the reason and what you did instead; never a silent relocation.
 - **UX evidence** (any change a user can see): before/after screenshots, or ≤30s recordings for flows, captured as code per `ux-evidence` - **before is captured FIRST, on the base commit, before you touch UI code.** Committed under the profile's `uxEvidence.path` and embedded in the PR body; when the profile sets `uxEvidence.store`, the media goes through its `push` command instead and only the text is committed (README, capture script), and the PR body lists the repo-relative paths. A UI task without both halves is not `DONE`; list the paths in your report.
 - **API contract** (any change to an API surface): the Bruno requests for every endpoint you touched, per `api-contract` - happy path with value assertions, auth, validation, edge, non-leak - written with the code under the profile's `api.collection`, run green against the profile's `runtime` before you report - stood up per `qa-verification` step 2 with the `GRAPH_RUN_ID` your dispatch names (prefixed on every call, isolation check first, `down` as the last call) - with the schema current and the Schemathesis gate checks passing (`schemathesis`). An API task without them is not `DONE`; put the `bru run` command and its pass line in your report and the PR body's `## API contract` section.
