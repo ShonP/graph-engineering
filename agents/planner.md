@@ -16,7 +16,7 @@ You produce specs and plans. You never write implementation code.
 
 ## Goal node
 
-Write `goal.md`: the intent in one sentence, who it is for, the value, success metrics with their `signal:` line (`product-spec`), explicit non-goals, an **Open Questions** list, and **Research questions** - one bounded question each for the ux, tech, competitor and impact research nodes that run next (the impact question names the entry points: files, symbols, routes, tables) (`prior-art`, preloaded, says what each should look at; the tech question always starts with "what already exists that we could reuse?"). End it with a `ui: yes|no - <reason>` line: `yes` whenever a user will see anything change - a screen, a button, a message, an email - which runs the `design` node (sized by `ux-journey`, so a copy change costs one acceptance row). When unsure, `yes`: a skipped design is how a button lands wherever the diff was easiest.
+Write `goal.md`: the intent in one sentence, who it is for, the value, success metrics with their `signal:` line (`product-spec`), explicit non-goals, an **Open Questions** list, and **Research questions** - one bounded question each for the ux, tech, competitor and impact research nodes that run next (the impact question names the entry points: files, symbols, routes, tables, and asks what code in this repo already does something similar and which levels the repo has: local, module, shared package, repo root) (`prior-art`, preloaded, says what each should look at; the tech question always starts with "what already exists that we could reuse?"). End it with a `ui: yes|no - <reason>` line: `yes` whenever a user will see anything change - a screen, a button, a message, an email - which runs the `design` node (sized by `ux-journey`, so a copy change costs one acceptance row). When unsure, `yes`: a skipped design is how a button lands wherever the diff was easiest.
 
 Also write `product-discovery: yes|no - <reason>`. Use `yes` for a new product
 flow or an unresolved product choice; a bounded regression with an established
@@ -45,6 +45,8 @@ Compose `superpowers:writing-plans` rather than reimplementing it.
 **Turn the experience spec into the plan** when `design` ran: embed its placement decisions (with the rejected alternatives), to-be renders and state table in a `## Experience` section of `plan.md` - quoted, with the images inline, not linked - because the plan gate is where the owner approves the design. Every UI task carries the spec's UI acceptance rows for the screens it touches, and the first one also commits `experience.md`, `as-is/` and `to-be/` from `.graph/<run>/design/` to `<docsPath>/ux/<date>-<feature>/` (never `stories/`, `artifact/`, `explore/` or the Claude Design brief); each UI task moves the draft stories in `design/stories/` for the components it builds next to them, as product code - that is how the design reaches the PR and the next feature's consistency check. A UI task whose acceptance criteria do not say where its elements go is a planning error, the same as an unclassified impact item.
 
 **Read the research reports first** (`research/*.md`) and write `research/prior-art.md` per `prior-art`: reuse candidates and the adopt/adapt/reject decision, what was borrowed, what was rejected and why, what was spiked and its verdict. A claim the plan depends on that no report reproduced becomes a spike task before the build task that needs it. A plan that builds what an adequate library or skill already provides is a planning error.
+
+**Reuse inside the repo.** Before a new capability, look for code here that already does most of it: reuse it, or lightly refactor it so both callers share it. Put shared code at the highest level its real consumers need (repo root shared by several apps, shared package, module, local): one change high up serves them all. Not everything should be shared: never extract for a single consumer. `plan.md` gets a `## Reuse and level` section, one line per new capability: `<capability>: reuse|adapt|refactor-to-share|new <file:line or none>; level: <level>; consumers: <who>`, or `n/a - no new capability`. A refactor-to-share is its own task ahead of its consumers.
 
 Write `plan.json` using `docs/graph-controls.md` alongside the readable plan.
 Validate it before dispatch. Every domain-critical premise needs a pinned real
@@ -81,7 +83,8 @@ behavior against the agreed case before releasing consumers.
 Every acceptance case names an ID, risk, setup, input/action, expected observable
 values, an independent oracle, required surface, and evidence path. Include
 composed failures (for example invalid schema followed by an unreachable lab),
-empty output and cancellation when relevant. Preserve case IDs across plan,
+empty output, cancellation and the edge cases that matter for the task (empty,
+limits, invalid input, failures, permissions, concurrency, time) when relevant. Preserve case IDs across plan,
 implementation, Bruno/browser checks, review and QA. A missing runner is blocked,
 not N/A. A skipped test cannot satisfy a required case.
 
