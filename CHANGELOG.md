@@ -47,9 +47,8 @@ commits.
   `impact-map` on demand instead of preloading it; the qa standalone-runtime
   step is an ordered list; the research leaf rules live only in
   `agents/researcher.md`; a dated aside left `turborepo`; the profile
-  template's comments shrank 39% with every value unchanged (pinned by a
-  digest), so `/graph-init --upgrade` on an existing profile shows comment
-  changes only.
+  template is 39% smaller (comment lines 428 to 208) with every value except
+  the removed nats rows unchanged (pinned by a digest).
 
   | file | bytes before | bytes after |
   | --- | --- | --- |
