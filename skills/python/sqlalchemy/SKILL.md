@@ -8,7 +8,7 @@ license: MIT
 
 Written for **SQLAlchemy 2.0.54** (PyPI, published 2026-09-15), **psycopg 3.3.6**
 (2026-09-18), **alembic 1.20.0** (2026-09-11) and
-**opentelemetry-instrumentation-sqlalchemy 0.65b0** — the versions `forge-libs` pins
+**opentelemetry-instrumentation-sqlalchemy 0.65b0**, the versions the measured shared library pins
 with `==` — against **PostgreSQL 18** (CNPG `postgresql:18.6`). Fetched 2026-09-23, all
 HTTP 200; each pinned to that version (`en/20` is the 2.0 series, the rest are tags):
 
@@ -23,10 +23,10 @@ HTTP 200; each pinned to that version (`en/20` is the 2.0 series, the rest are t
 - https://github.com/open-telemetry/opentelemetry-python-contrib/tree/v0.65b0/instrumentation/opentelemetry-instrumentation-sqlalchemy
 
 Measured in-house, rung 1 — verdicts from live runs, not docs claims. **ADR 00nn** below is
-`Equival-io/forge-platform` `docs/adr/00nn-*.md` (a private repo): 0016 §§5, 8, 10 (the
+an ADR in a private consumer repo: 0016 §§5, 8, 10 (the
 cursor trap, the poll); 0017 §3 (psycopg3 on CNPG certificates, libpq's exact refusals) and
-§4 (the async savepoint recipe); 0018 §5 (instrumenting an async engine). **forge-libs** is
-`Equival-io/forge-libs` @ `552a9b9` (also private): `src/forge_sdk/db/{session,engine}.py`.
+§4 (the async savepoint recipe); 0018 §5 (instrumenting an async engine). **The shared library** is
+that consumer's private Python SDK, modules `db/session.py` and `db/engine.py`.
 
 ## When to apply
 
@@ -52,7 +52,7 @@ cursor trap, the poll); 0017 §3 (psycopg3 on CNPG certificates, libpq's exact r
   caller holding a 200 for work that did not land. This is the mainstream pattern and it is
   fine for writes the caller need not confirm; **a handler whose caller must be told the
   commit succeeded opens its own session inside the handler body** and returns after the
-  block. Know which one you are writing. Source: forge-libs `db/session.py`, `db_session`'s
+  block. Know which one you are writing. Source: the shared library's `db/session.py`, `db_session`'s
   docstring (FastAPI runs a `yield` dependency's exit after the response is sent).
 - **Never swallow the exception in a session dependency.** `except: await session.rollback()`
   with no `raise` turns a failed write into a success at the call site. Roll back and re-raise,
@@ -107,8 +107,8 @@ Measured, ADR 0017 §4 (VALIDATED).
   (`"postgresql+psycopg://"`). The psycopg dialect passes a URL-derived DSN positionally, so
   `connect_args={"conninfo": ...}` is a `TypeError`; and at instrumentation 0.65b0 span
   attributes (`server.address`, `db.user`, `db.namespace`) are read off `engine.url`, so a
-  bare URL keeps host, user and database off every span. Measured: forge-libs
-  `db/engine.py` (module docstring; the call at lines 181-187).
+  bare URL keeps host, user and database off every span. Measured: the shared
+  library's `db/engine.py` (module docstring and the engine call).
 - **libpq refuses a group-readable private key**, which is exactly what a Kubernetes Secret
   volume gives you at its default 0644. Copy the key to a **0600** file at startup and point
   `sslkey` at the copy. Do not "fix" it with `defaultMode` in the manifest: that hides the
@@ -231,7 +231,7 @@ grep -rn 'instrument(engine=' src/
 #    clobber it the way a dictConfig does, then call the project's re-quiet hook.
 uv run python -c '
 import logging, logging.config
-from forge_sdk.db import silence_sql_logging  # <- this project: swap in yours
+from app_sdk.db import silence_sql_logging  # <- this project: swap in yours
 sql = logging.getLogger("sqlalchemy")
 logging.config.dictConfig({"version": 1, "disable_existing_loggers": False,
                            "loggers": {"sqlalchemy": {"level": "NOTSET"}}})

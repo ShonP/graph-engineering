@@ -1,4 +1,4 @@
-<!-- Adapted from the `migrating-to-modifier-node` Agent Skill in the koach repo. -->
+<!-- Adapted from `migrating-to-modifier-node` in `skydoves/compose-performance-skills` @ `1b32f81` (Apache-2.0). -->
 
 # Migrating to Modifier.Node - Persistent Nodes Over `composed { }`
 

@@ -1,4 +1,4 @@
-<!-- Adapted from the `generating-baseline-profiles` Agent Skill in the koach repo. -->
+<!-- Adapted from `generating-baseline-profiles` in `skydoves/compose-performance-skills` @ `1b32f81` (Apache-2.0). -->
 
 # Generating Baseline Profiles - ship the AOT compilation hint list and prove it moved the needle
 

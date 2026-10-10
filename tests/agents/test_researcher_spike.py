@@ -19,7 +19,7 @@ RESEARCHER = ROOT / "agents" / "researcher.md"
 CHECK = ROOT / "scripts" / "check-agent-frontmatter.sh"
 
 # Stack and consumer names the plugin core must never hard-code.
-CONSUMER_WORDS = ("koach", "fitness", "supabase", "swiftui", "nestjs")
+CONSUMER_WORDS = ("supabase", "swiftui", "nestjs")
 
 
 class ResearcherSpikeFrontmatter(unittest.TestCase):

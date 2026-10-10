@@ -300,7 +300,7 @@ class EngineParallelTests(unittest.TestCase):
 
     def test_engine_is_generic(self):
         lowered = self.text.lower()
-        for name in ("koach", "fitness", "pnpm", "xcodegen", "xcodebuild", "supabase"):
+        for name in ("pnpm", "xcodegen", "xcodebuild", "supabase"):
             with self.subTest(name=name):
                 self.assertNotIn(name, lowered)
 

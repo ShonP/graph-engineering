@@ -1,3 +1,4 @@
+<!-- Adapted from `migrating-to-modifier-node/references/modifier-node-anatomy.md` in `skydoves/compose-performance-skills` @ `1b32f81` (Apache-2.0). -->
 # Modifier.Node Anatomy - Lifecycle, Interfaces, and Manual Invalidation
 
 This reference expands the Workflow in `../SKILL.md` with the deeper mechanics: the full lifecycle diagram, every specialized node interface with its override surface, when to use `DelegatingNode` to compose multiple node behaviors, and the manual-invalidation knobs.

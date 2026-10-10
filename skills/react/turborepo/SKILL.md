@@ -92,8 +92,8 @@ The house `turbo.json`:
 ```
 
 `lint` has no build edge, so without the `transit` node a change to a dependency's lint config
-(`@forge/config`'s eslint rules) never enters the consumer's cache key and `pnpm lint` replays a
-stale pass. *Measured* on forge-frontend (turbo 2.11.3): a rule added to `packages/config` gave
+(`@acme/config`'s eslint rules) never enters the consumer's cache key and `pnpm lint` replays a
+stale pass. *Measured* on a private consumer frontend monorepo (turbo 2.11.3): a rule added to `packages/config` gave
 `hello-web:lint: cache hit` and exit 0 before, `cache miss` and exit 1 after
 (https://turborepo.dev/docs/crafting-your-repository/configuring-tasks, "Transit Nodes").
 

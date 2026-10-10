@@ -23,7 +23,7 @@ Version note: `docs/concepts/configuration/overview/` now redirects (HTTP 301)
 to the 2025-11-25 blog post above, which is a community article on
 kubernetes.io rather than a reference page: treat it as guidance and prefer the
 reference and concept pages for anything load bearing. Written against kubectl
-1.35.8 (the version forge pins in `mise.toml`); the flags below were exercised
+1.35.8 (the version the measured platform repo pins in `mise.toml`); the flags below were exercised
 with client v1.36.4, embedded Kustomize v5.8.1.
 
 ## When to apply
@@ -60,7 +60,7 @@ with client v1.36.4, embedded Kustomize v5.8.1.
 
 - In a GitOps repo the reconciler owns `apply`. A hand `kubectl apply` in a
   namespace an Argo CD Application owns is drift you then have to revert.
-  Evidence (rung 1, forge-platform 2026-09-10): `kubectl diff -k manifests/ntfy`
+  Evidence (rung 1, a private consumer platform repo, 2026-09-10): `kubectl diff -k manifests/ntfy`
   against the live cluster exits 1 and the only difference is the removal of
   `argocd.argoproj.io/tracking-id`, because a workstation client-side apply
   would strip the annotation the controller wrote. Read with kubectl, write
@@ -179,7 +179,7 @@ kubectl diff -f <file>                         # 0 in sync, 1 drift, >1 error
 kubectl get <kind> <name> -n <ns> -o jsonpath='{.status.phase}'; echo
 ```
 
-Run on forge-platform, 2026-09-10, cluster up:
+Run on a private consumer platform repo, 2026-09-10, cluster up:
 
 ```
 $ kubectl kustomize manifests/ntfy | kubectl apply --dry-run=server -f -
@@ -190,7 +190,7 @@ deployment.apps/ntfy configured (server dry run)
 httproute.gateway.networking.k8s.io/ntfy configured (server dry run)
 
 $ kubectl diff -k manifests/ntfy ; echo "exit=$?"
--    argocd.argoproj.io/tracking-id: ntfy:apps/Deployment:forge-obs/ntfy
+-    argocd.argoproj.io/tracking-id: ntfy:apps/Deployment:obs/ntfy
 exit=1
 ```
 

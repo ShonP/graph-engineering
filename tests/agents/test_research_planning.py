@@ -18,7 +18,7 @@ PLANNER = ROOT / "agents" / "planner.md"
 PRODUCT_SPEC = ROOT / "skills" / "process" / "product-spec" / "SKILL.md"
 
 # Consumer and stack names the plugin core must never hard-code.
-CONSUMER_WORDS = ("koach", "fitness", "supabase", "swiftui", "nestjs", "apps/")
+CONSUMER_WORDS = ("supabase", "swiftui", "nestjs", "apps/")
 CLAIM_KEYS = {"claim", "source", "pub_date", "rung", "confidence"}
 SIGNAL_KEYS = {"goal", "source", "command", "success_condition", "window_days"}
 SIGNAL_SOURCES = {"prometheus", "sentry", "sql-readonly", "command"}

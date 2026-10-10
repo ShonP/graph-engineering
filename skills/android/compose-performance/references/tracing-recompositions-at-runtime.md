@@ -1,4 +1,4 @@
-<!-- Adapted from the `tracing-recompositions-at-runtime` Agent Skill in the koach repo. -->
+<!-- Adapted from `tracing-recompositions-at-runtime` in `skydoves/compose-performance-skills` @ `1b32f81` (Apache-2.0). -->
 
 # Tracing Recompositions at Runtime - `@TraceRecomposition`, logcat, and the live heatmap
 

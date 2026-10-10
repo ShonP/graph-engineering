@@ -1,4 +1,4 @@
-<!-- Adapted from the `compose-focus-navigation` Agent Skill in the koach repo. -->
+<!-- Adapted from `compose-focus-navigation` in `chrisbanes/skills` @ `078d3e5` (Apache-2.0). -->
 
 # Compose: focus navigation
 

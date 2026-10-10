@@ -1,4 +1,4 @@
-<!-- Adapted from the `collecting-flows-safely` Agent Skill in the koach repo. -->
+<!-- Adapted from `collecting-flows-safely` in `skydoves/compose-performance-skills` @ `1b32f81` (Apache-2.0). -->
 
 # Collecting Flows Safely - keep upstream work tied to the UI lifecycle
 

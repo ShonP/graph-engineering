@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 SKILL = ROOT / "skills" / "process" / "retro" / "SKILL.md"
 CHECK = ROOT / "scripts" / "check-skill-frontmatter.sh"
-CONSUMER_WORDS = ("koach", "fitness", "supabase", "swiftui", "nestjs")
+CONSUMER_WORDS = ("supabase", "swiftui", "nestjs")
 WORD_BUDGET = 800
 
 

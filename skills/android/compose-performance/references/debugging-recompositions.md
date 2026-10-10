@@ -1,4 +1,4 @@
-<!-- Adapted from the `debugging-recompositions` Agent Skill in the koach repo. -->
+<!-- Adapted from `debugging-recompositions` in `skydoves/compose-performance-skills` @ `1b32f81` (Apache-2.0). -->
 
 # Debugging Recompositions - make the invisible visible, then map status to action
 

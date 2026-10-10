@@ -7,7 +7,7 @@ license: MIT
 # loguru
 
 Written for **loguru 0.7.3** (PyPI, published 2024-12-06 — still the latest release, and the
-version `forge-libs` pins with `==`; uvicorn 0.53.0, sentry-sdk 2.69.2). Fetched 2026-09-23,
+version the measured shared library pins with `==`; uvicorn 0.53.0, sentry-sdk 2.69.2). Fetched 2026-09-23,
 HTTP 200, each pinned to that version:
 
 - https://loguru.readthedocs.io/en/0.7.3/overview.html - "Overview"
@@ -17,11 +17,11 @@ HTTP 200, each pinned to that version:
 - https://github.com/encode/uvicorn/blob/0.53.0/uvicorn/config.py - `LOGGING_CONFIG`
   (`"propagate": False`) and `Config.configure_logging()`
 
-Measured in-house, rung 1. **ADR 0018** is `Equival-io/forge-platform`
-`docs/adr/0018-sdk-observability-contract.md` (a private repo): §2 (SP3 — one line, once,
-five keys; VALIDATED), §3 (the Sentry attribution finding SP3 could not make), §5 (the
-contract as shipped). **forge-libs** is `Equival-io/forge-libs` @ `552a9b9` (also private):
-`src/forge_sdk/{logging,_intercept,_tracker}.py`. "Measured" = a row watched going red.
+Measured in-house, rung 1. **ADR 0018** is an SDK observability contract ADR in a private
+consumer repo: §2 (SP3 - one line, once, five keys; VALIDATED), §3 (the Sentry attribution
+finding SP3 could not make), §5 (the contract as shipped). **The shared library** is that
+consumer's private Python SDK, modules `logging`, `_intercept` and `_tracker`. "Measured" =
+a row watched going red.
 
 ## When to apply
 
@@ -96,7 +96,7 @@ Measured, ADR 0018 §3 — the finding a logging-only spike cannot make.
 
 - **Stamp the per-record fields with `logger.configure(patcher=...)`**, read from the active
   span **at emit time**. The keys, exactly: **`trace_id`, `span_id`, `request_id`,
-  `service`, `version`** (forge-libs `logging.py`, `EXTRA_KEYS`). A patcher runs per record;
+  `service`, `version`** (the shared library's `logging.py`, `EXTRA_KEYS`). A patcher runs per record;
   binding once at startup captures a span that has since ended.
 - **Write into `record["extra"]` rather than replacing it**, so `logger.bind()` and
   `logger.contextualize()` keep working. `contextualize()` is the request-scope mechanism;
@@ -142,7 +142,7 @@ Measured, ADR 0018 §3 — the finding a logging-only spike cannot make.
   handler). When the tracker refuses an envelope, that logger's ERROR carries the refusal
   body — **the raw DSN key** — and through `InterceptHandler` it reaches the sink and the log
   store; it also becomes a new event that is itself refused: **1124 envelopes in 3 s**. Both
-  measured live (forge-libs `_tracker.py:163-190`).
+  measured live (the shared library's `_tracker.py`).
 
 ### Testing a loguru logger
 
@@ -207,8 +207,8 @@ uv run python - <<'PY'
 import json, logging, pathlib, sys, tempfile
 import sentry_sdk
 from loguru import logger
-from forge_sdk.logging import EXTRA_KEYS, configure_logging  # <- this project: swap in yours
-from forge_sdk.settings import ForgeSettings
+from app_sdk.logging import EXTRA_KEYS, configure_logging  # <- this project: swap in yours
+from app_sdk.settings import AppSettings
 probe = tempfile.TemporaryDirectory()
 pathlib.Path(probe.name, "probe_caller.py").write_text(
     'import logging\ndef emit():\n    logging.getLogger("uvicorn").info("probe")\n')
@@ -216,7 +216,7 @@ sys.path.insert(0, probe.name)
 import probe_caller
 sentry_sdk.init(dsn=None)  # installs the patch the frame walk must step over
 assert logging.Logger.callHandlers.__module__ == "sentry_sdk.integrations.logging"
-configure_logging(ForgeSettings(service="probe", env="home"))
+configure_logging(AppSettings(service="probe", env="home"))
 lines = []
 logger.remove()  # only the list sink, so stdout is the verdict
 logger.add(lines.append, serialize=True, level="INFO")
@@ -229,7 +229,7 @@ assert rec["name"] == "probe_caller", "the walk stopped on a plumbing frame"
 PY
 # expect: emissions: 1 | extra keys: [request_id, service, span_id, trace_id, version]
 #         | attributed to: probe_caller:emit
-# With the verbatim walk (forge-libs: InterceptHandler(sentry_aware=False)) it prints
+# With the verbatim walk (the shared library: InterceptHandler(sentry_aware=False)) it prints
 #   attributed to: sentry_sdk.integrations.logging:sentry_patched_callhandlers, exit 1
 
 # 6. The negative control has been seen failing. Temporarily install the

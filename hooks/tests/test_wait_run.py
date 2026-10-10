@@ -229,7 +229,7 @@ class Edges(Base):
         for path in (SCRIPT, HOOKS / "scripts" / "wait_run.py"):
             body = path.read_text(encoding="utf-8")
             self.assertNotIn(chr(0x2014), body, path.name)
-            self.assertNotRegex(body, r"(?i)koach|fitness", path.name)
+            # Consumer names: scripts/check-private-names.py, from a list outside the repo.
         self.assertTrue(os.access(SCRIPT, os.X_OK), "wait-run.sh is not executable")
 
 

@@ -1,4 +1,4 @@
-<!-- Adapted from the `diagnosing-compose-stability` Agent Skill in the koach repo. -->
+<!-- Adapted from `diagnosing-compose-stability` in `skydoves/compose-performance-skills` @ `1b32f81` (Apache-2.0). -->
 
 # Diagnosing Compose Stability - Read the Compiler Reports First
 

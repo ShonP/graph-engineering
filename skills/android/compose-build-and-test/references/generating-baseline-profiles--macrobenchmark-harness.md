@@ -1,3 +1,4 @@
+<!-- Adapted from `generating-baseline-profiles/references/macrobenchmark-harness.md` in `skydoves/compose-performance-skills` @ `1b32f81` (Apache-2.0). -->
 # Macrobenchmark harness reference
 
 Full Gradle, manifest, and metric setup for the `:baselineprofile` module. Pulled out of the parent `SKILL.md` so the skill body stays under the 500-line ceiling.

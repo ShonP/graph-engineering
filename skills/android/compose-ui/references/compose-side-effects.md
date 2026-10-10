@@ -1,4 +1,4 @@
-<!-- Adapted from the `compose-side-effects` Agent Skill in the koach repo. -->
+<!-- Adapted from `compose-side-effects` in `chrisbanes/skills` @ `078d3e5` (Apache-2.0). -->
 
 # Compose: side effects
 

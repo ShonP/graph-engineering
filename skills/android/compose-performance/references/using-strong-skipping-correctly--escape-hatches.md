@@ -1,3 +1,4 @@
+<!-- Adapted from `using-strong-skipping-correctly/references/escape-hatches.md` in `skydoves/compose-performance-skills` @ `1b32f81` (Apache-2.0). -->
 # Strong Skipping Escape Hatches - full reference
 
 A complete reference for the four Compose compiler annotations that opt a function or lambda out of a default skipping/memoization behavior. All four ship in `androidx.compose.runtime`.

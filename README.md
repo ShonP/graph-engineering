@@ -104,6 +104,19 @@ claude plugin update graph-engineering
 
 Then restart the session to apply.
 
+**Genericity:** this plugin is public. Its text names stacks and tools, never a
+consumer product, person, private repo, cloud account or internal metric.
+Consumer specifics go in the consumer's `.claude/graph-profile.yaml`, rules and
+docs. Evidence measured in a private repo is cited as "a private consumer repo".
+`scripts/check-private-names.py` (a `run-all-tests.sh` step) enforces it from a
+list kept outside the repo: `GRAPH_PRIVATE_NAMES` (entries separated by `;` or
+newlines) or `${XDG_CONFIG_HOME:-~/.config}/graph-engineering/private-names.txt`,
+one entry per line. It matches case-insensitively over tracked file paths and
+text, at word edges and identifier seams (`NameKit`, `name_sdk`, `myName`), never
+inside a longer lowercase word, and `<name> allow=<glob>,...` exempts a path
+such as the manifest's author field.
+With no list it prints `SKIP`, so public CI reads `partial`.
+
 ## Use
 
 ```

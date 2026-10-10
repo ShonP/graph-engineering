@@ -1,0 +1,70 @@
+Android and Kotlin skill packs (skills/android/)
+
+Parts of these packs are adapted from two Apache-2.0 projects. Each adapted
+reference file names its source on its first line. Both upstream licenses are
+reproduced verbatim under LICENSES/. Changes from upstream: files were
+consolidated into the eight skills here, renamed under references/, trimmed,
+reformatted, and edited for house style (hyphens in place of em dashes).
+
+1. chrisbanes/skills @ 078d3e561aa62a131ee7229731eb6df9098be112
+   https://github.com/chrisbanes/skills
+   License: Apache-2.0 (LICENSES/chrisbanes-skills.txt)
+   Copyright Chris Banes
+   Adapted:
+     compose-state/references/compose-state-authoring.md
+     compose-state/references/compose-state-deferred-reads.md
+     compose-state/references/compose-state-hoisting.md
+     compose-state/references/compose-state-holder-ui-split.md
+     compose-ui/references/compose-animations.md
+     compose-ui/references/compose-focus-navigation.md
+     compose-ui/references/compose-modifier-and-layout-style.md
+     compose-ui/references/compose-side-effects.md
+     compose-ui/references/compose-slot-api-pattern.md
+     compose-performance/references/compose-recomposition-performance.md
+     compose-performance/references/compose-stability-diagnostics.md
+     compose-build-and-test/references/compose-ui-testing-patterns.md
+     kotlin-concurrency/references/kotlin-coroutines-structured-concurrency.md
+     kotlin-concurrency/references/kotlin-flow-state-event-modeling.md
+     kotlin-control-flow/SKILL.md (from skills/kotlin-control-flow)
+     kotlin-functions/SKILL.md (from skills/kotlin-functions)
+     kotlin-types-value-class/SKILL.md (from skills/kotlin-types-value-class)
+
+2. skydoves/compose-performance-skills @ 1b32f81724c0d71fe9ef093ca44697f559fdab6e
+   https://github.com/skydoves/compose-performance-skills
+   License: Apache-2.0 (LICENSES/skydoves-compose-performance-skills.txt)
+   Copyright 2026 Jaewoong Eum (skydoves)
+   Adapted (a `<skill>--<name>.md` file is that skill's references/<name>.md):
+     compose-state/references/choosing-derivedstateof.md
+     compose-state/references/collecting-flows-safely.md
+     compose-state/references/deferring-state-reads.md
+     compose-state/references/deferring-state-reads--three-phases.md
+     compose-ui/references/migrating-to-modifier-node.md
+     compose-ui/references/migrating-to-modifier-node--modifier-node-anatomy.md
+     compose-ui/references/ordering-modifier-chains.md
+     compose-ui/references/using-efficient-effects.md
+     compose-performance/references/auditing-compose-performance.md
+     compose-performance/references/avoiding-subcomposition-pitfalls.md
+     compose-performance/references/configuring-lazy-prefetch.md
+     compose-performance/references/debugging-recompositions.md
+     compose-performance/references/diagnosing-compose-stability.md
+     compose-performance/references/diagnosing-compose-stability--reading-classes-txt.md
+     compose-performance/references/diagnosing-compose-stability--reading-composables-txt.md
+     compose-performance/references/optimizing-lazy-layouts.md
+     compose-performance/references/stabilizing-compose-types.md
+     compose-performance/references/stabilizing-compose-types--stability-config-syntax.md
+     compose-performance/references/tracing-recompositions-at-runtime.md
+     compose-performance/references/understanding-stability-inference.md
+     compose-performance/references/understanding-stability-inference--bitmask-encoding.md
+     compose-performance/references/understanding-stability-inference--twelve-phase-algorithm.md
+     compose-performance/references/using-stability-analyzer-ide-plugin.md
+     compose-performance/references/using-strong-skipping-correctly.md
+     compose-performance/references/using-strong-skipping-correctly--escape-hatches.md
+     compose-performance/references/visualizing-recomposition-cascades.md
+     compose-build-and-test/references/configuring-r8-for-compose.md
+     compose-build-and-test/references/enforcing-stability-in-ci.md
+     compose-build-and-test/references/generating-baseline-profiles.md
+     compose-build-and-test/references/generating-baseline-profiles--macrobenchmark-harness.md
+     compose-build-and-test/references/testing-compose-in-release-mode.md
+
+The SKILL.md overviews of compose-state, compose-ui, compose-performance,
+compose-build-and-test and kotlin-concurrency are original to this plugin.

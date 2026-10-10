@@ -10,12 +10,48 @@ commits.
 
 ## [Unreleased]
 
+## [0.17.2] - 2026-10-10
+
+The plugin is public, so it stays generic: it names stacks and tools, never a
+consumer product, person, private repo, cloud account or internal metric.
+
+### Added
+
+- **`scripts/check-private-names.py`**, a `run-all-tests.sh` step. It fails
+  when a tracked file's path or text names an entry from a list kept outside
+  the repo (`GRAPH_PRIVATE_NAMES`, `;` or newline separated, or
+  `${XDG_CONFIG_HOME:-~/.config}/graph-engineering/private-names.txt`):
+  case-insensitive, at word edges and identifier seams (`NameKit`,
+  `name_sdk`, `name2`, `myName`) but never inside a longer lowercase word,
+  binary files skipped, `allow=<glob>` per name for a path where the name
+  belongs. A hit prints the path and line, never the name. With no list it prints `SKIP`, so public CI reads `partial`.
+- **README "Genericity" rule** under Develop.
+- **`skills/android/NOTICE` and `skills/android/LICENSES/`**: the two
+  Apache-2.0 upstreams of the Android packs, each license verbatim, and a map
+  of every adapted file to its source.
+
+### Changed
+
+- **Android pack attribution.** Each adapted reference now reads "Adapted from
+  `<skill>` in `chrisbanes/skills` @ `078d3e5`" or "in
+  `skydoves/compose-performance-skills` @ `1b32f81`" (Apache-2.0), replacing a
+  wrong attribution to a private repo; the nine split-out sub-references gained
+  the same header.
+- **Measured-evidence skills** (kubectl, kustomize, nats, loguru, ruff,
+  sqlalchemy, tailwind, turborepo) cite "a private consumer repo" in place of
+  repo and org names; code samples use neutral placeholders (`app_sdk`,
+  `app-*`, `@acme/config`). The measured findings are unchanged.
+- **CHANGELOG 0.17.0 and 0.17.1 intros** keep the findings and drop one
+  consumer's name and session statistics.
+- **Genericity tests** keep their stack-agnostic word lists; the product names
+  they hard-coded move to the private-names check.
+
 ## [0.17.1] - 2026-10-10
 
-A consumer repo can keep UX evidence media outside git. One consumer's
-evidence tree reached 420 MB in git, grew about 100 MB a week, and every
-worktree and CI checkout copied it; it moved the media to a private object
-store and asked the plugin to stop telling agents to commit it.
+A consumer repo can keep UX evidence media outside git. Committed evidence
+media grows a repo by hundreds of megabytes and every worktree and CI
+checkout copies it; a consumer moved its media to an object store and asked
+the plugin to stop telling agents to commit it.
 
 ### Added
 
@@ -49,15 +85,15 @@ store and asked the plugin to stop telling agents to commit it.
 
 ## [0.17.0] - 2026-10-10
 
-Less wall-clock per bundle at the same quality bar, from the koach session
-retro 2026-10-09: QA lanes, qa-lead contracts, ready-set engine. The retro
-(two days, 146 subagents) found 36% of simulator qa time was lane queueing (a
-20 s `test-without-building` run waited 100 to 250 s behind a 17 minute
-compile), qa leaves hit the 250-turn cap with no report while their lead
-returned `FAIL INCOMPLETE`, rows a simulator can never observe were driven for
-30-45 minutes before ending `BLOCKED`, and full-suite repeats per fix finding
-cost 100-140 agent minutes. Same builds, rows, evidence rules and gates; only
-ordering, locks, repeats and idle time change.
+Less wall-clock per bundle at the same quality bar, from a consumer session
+retro: QA lanes, qa-lead contracts, ready-set engine. The retro found that a
+large share of simulator qa time was lane queueing (a short
+`test-without-building` run waited minutes behind a long compile), qa leaves
+hit the turn cap with no report while their lead returned `FAIL INCOMPLETE`,
+rows a simulator can never observe were driven for a long time before ending
+`BLOCKED`, and full-suite repeats per fix finding cost agent hours. Same
+builds, rows, evidence rules and gates; only ordering, locks, repeats and idle
+time change.
 
 ### Added
 
@@ -104,8 +140,8 @@ ordering, locks, repeats and idle time change.
 - **Profile key `gates.quick`.** One command string, the repo's fast pre-push
   check (secrets scan, banned characters, generated-file drift, ordering
   lints). `definition-of-done` and the implementer run it in the task worktree
-  before reporting `DONE`, so the class of failure that blocked 12 pushes in the
-  retro window is caught where it is cheap to fix. The template ships `""`
+  before reporting `DONE`, so the class of failure that blocked repeated pushes in
+  the retro window is caught where it is cheap to fix. The template ships `""`
   (none); `/graph-init` proposes it from an existing pre-commit or pre-push
   hook, and `--upgrade` adds the empty key. `graph-control doctor` warns
   (`gates-quick`) when it is not a string.
@@ -116,7 +152,7 @@ ordering, locks, repeats and idle time change.
   only background work in flight schedules its own wakeup about 10 minutes out
   and processes what finished when it wakes; three quiet wakeups mark the leaf
   `stalled` and open a decision card. It never kills or messages a child. The
-  retro saw a 62-minute idle run that only the owner's "continue" ended.
+  retro saw an idle run that only the owner's "continue" ended.
 - **Implementer progress checkpoint.** At 85% of its turns the implementer
   writes a checkpoint (base, commits, cases done and left, last test command
   and result, next step) at `git rev-parse --git-path graph-checkpoint.md`:
@@ -161,8 +197,8 @@ ordering, locks, repeats and idle time change.
 - **Fix rounds test narrowly, then once in full.** The fix-round brief and the
   implementer's new Fix rounds section: targeted tests on the files and classes
   the findings name while fixing, then exactly one full suite at the end of the
-  round. The retro measured full-suite repeats per finding at 100-140 agent
-  minutes in two days.
+  round. The retro measured full-suite repeats per finding as a large share of
+  agent time.
 - **Retro agent turn cap 40 to 100,** and it writes `retro.md` as a draft within
   its first 15 turns and refines it, so a capped retro still leaves a report.
 
@@ -1139,10 +1175,9 @@ built with `rg`. Every cited URL returned 200 on 2026-09-23.
   lists its sources, pinned to the version it was written against: a versioned
   docs path such as `docs.sqlalchemy.org/en/20/` or `loguru.readthedocs.io/en/0.7.3/`,
   the source at the release tag, or, for docs.nats.io, which has no versions,
-  the `nats.docs` commit. Measured claims cite the ADR section by its
-  location, `Equival-io/forge-platform` `docs/adr/`, a private repo, and the
-  header says so. Every Verify recipe was run against forge-libs `552a9b9`,
-  and each check shown to fail on a real violation. Sourcing pass:
+  the `nats.docs` commit. Measured claims cite an ADR in a private consumer
+  repo, and the header says so. Every Verify recipe was run against a private
+  consumer library, and each check shown to fail on a real violation. Sourcing pass:
   `docs/research/2026-09-23-python-skills-sourcing.md`.
   - `skills/python/ruff` — rule selection that survives a codebase, banning
     **symbols rather than modules** (a module ban also flags

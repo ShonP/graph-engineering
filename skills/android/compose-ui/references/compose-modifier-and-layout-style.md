@@ -1,4 +1,4 @@
-<!-- Adapted from the `compose-modifier-and-layout-style` Agent Skill in the koach repo. -->
+<!-- Adapted from `compose-modifier-and-layout-style` in `chrisbanes/skills` @ `078d3e5` (Apache-2.0). -->
 
 # Compose modifier and layout style
 

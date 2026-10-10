@@ -1,4 +1,4 @@
-<!-- Adapted from the `using-strong-skipping-correctly` Agent Skill in the koach repo. -->
+<!-- Adapted from `using-strong-skipping-correctly` in `skydoves/compose-performance-skills` @ `1b32f81` (Apache-2.0). -->
 
 # Using Strong Skipping Correctly - make every restartable composable skippable, intentionally
 

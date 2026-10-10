@@ -1,4 +1,4 @@
-<!-- Adapted from the `auditing-compose-performance` Agent Skill in the koach repo. -->
+<!-- Adapted from `auditing-compose-performance` in `skydoves/compose-performance-skills` @ `1b32f81` (Apache-2.0). -->
 
 # Auditing Compose Performance - the Measure → Diagnose → Fix → Verify orchestrator
 

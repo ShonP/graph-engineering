@@ -1,4 +1,4 @@
-<!-- Adapted from the `compose-recomposition-performance` Agent Skill in the koach repo. -->
+<!-- Adapted from `compose-recomposition-performance` in `chrisbanes/skills` @ `078d3e5` (Apache-2.0). -->
 
 # Compose recomposition performance
 

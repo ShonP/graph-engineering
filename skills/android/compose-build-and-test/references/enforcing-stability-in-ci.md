@@ -1,4 +1,4 @@
-<!-- Adapted from the `enforcing-stability-in-ci` Agent Skill in the koach repo. -->
+<!-- Adapted from `enforcing-stability-in-ci` in `skydoves/compose-performance-skills` @ `1b32f81` (Apache-2.0). -->
 
 # Enforcing Stability in CI - make stability regressions fail the build
 
