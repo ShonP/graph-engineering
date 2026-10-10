@@ -34,6 +34,9 @@ VERSION = json.loads((PLUGIN / ".claude-plugin" / "plugin.json").read_text())["v
 RUNTIME = "runtime:\n  none: CLI verified through public commands\n"
 LIST_ROW = '  - {id: db-schema, paths: ["migrations/**"]}\n'
 MAP_ROW = '  db-schema: {paths: ["migrations/**"]}\n'
+MEDIA = ("png", "jpg", "jpeg", "gif", "webp", "mp4", "webm", "mov")
+IGNORED_MEDIA = ".graph/\n" + "".join(f"docs/ux/changes/**/*.{ext}\n" for ext in MEDIA)
+STORE = 'uxEvidence:\n  path: "docs/ux/changes"\n  store: {push: "git evidence push", pull: "git evidence pull", link: ""}\n'
 QUICK = {"no-profile", "profile-invalid", "schema-version", "stale-key", "checks-missing",
          "version-mismatch", "cannot-determine"}
 
@@ -87,6 +90,11 @@ class Fixture:
 
     def profile(self, text: str) -> None:
         (self.root / ".claude" / "graph-profile.yaml").write_text(text)
+
+    def store(self, block: str) -> None:
+        """A profile with this uxEvidence block, and every media type ignored under its path."""
+        self.profile(CLEAN + block)
+        (self.root / ".gitignore").write_text(IGNORED_MEDIA)
 
     def checks(self, text: str | None) -> None:
         _write(self.root / ".claude" / "graph-checks.json", text)
@@ -146,6 +154,12 @@ CASES = {
     "risk keyword nests quantifiers": (swap(LIST_ROW, '  - {id: db-schema, paths: ["migrations/**"], keywords: ["re:(a+)+$"]}\n'),
                                        {("warn", "risk-nested")}),
     ".graph not ignored": (lambda f: (f.root / ".gitignore").write_text("node_modules/\n"), {("warn", "graph-not-ignored")}),
+    "evidence store with media not ignored": (lambda f: f.profile(CLEAN + STORE), {("warn", "ux-store-unignored")}),
+    "evidence store command not on PATH": (lambda f: f.store(STORE.replace("git evidence pull", "no-such-evidence-cli pull")),
+                                           {("warn", "ux-store-command")}),
+    "evidence store without pull": (lambda f: f.store(STORE.replace("git evidence pull", "")), {("warn", "ux-store-shape")}),
+    "evidence store as one string": (lambda f: f.store('uxEvidence:\n  store: "git evidence"\n'),
+                                     {("warn", "ux-store-shape")}),
     "installed version differs": (lambda f: f.installed(installed("0.0.1")), {("warn", "version-mismatch")}),
     "installed_plugins.json absent": (lambda f: f.installed(None), {("info", "cannot-determine")}),
     "plugin not in installed_plugins.json": (lambda f: f.installed(installed(key="other@market")),
@@ -209,6 +223,68 @@ class Checks(unittest.TestCase):
         self.assertIn(VERSION, finding.message)
         self.assertIn("0.0.1", finding.message)
         self.assertIn("restart", finding.fix)
+
+
+class EvidenceStore(unittest.TestCase):
+    def test_empty_store_is_todays_behaviour_and_silent(self):
+        for block in ('uxEvidence:\n  path: "docs/ux/changes"\n  store: {push: "", pull: "", link: ""}\n',
+                      'uxEvidence:\n  path: "docs/ux/changes"\n'):
+            with self.subTest(block=block):
+                fixture = Fixture(self)
+                fixture.profile(CLEAN + block)
+                self.assertEqual(diagnose(fixture.root, PLUGIN, quick=False), [])
+
+    def test_a_working_store_with_media_ignored_is_silent(self):
+        fixture = Fixture(self)
+        fixture.store(STORE)
+        self.assertEqual(diagnose(fixture.root, PLUGIN, quick=False), [])
+
+    def test_a_repo_relative_script_resolves(self):
+        fixture = Fixture(self)
+        (fixture.root / "scripts").mkdir()
+        (fixture.root / "scripts" / "evidence.sh").write_text("#!/usr/bin/env bash\n")
+        fixture.store(STORE.replace("git evidence pull", "scripts/evidence.sh pull"))
+        self.assertEqual(diagnose(fixture.root, PLUGIN, quick=False), [])
+
+    def test_unignored_finding_names_the_extensions_and_the_path(self):
+        fixture = Fixture(self)
+        fixture.store(STORE)
+        (fixture.root / ".gitignore").write_text(IGNORED_MEDIA.replace("docs/ux/changes/**/*.mp4\n", ""))
+        [finding] = diagnose(fixture.root, PLUGIN, quick=False)
+        self.assertEqual((finding.level, finding.id), ("warn", "ux-store-unignored"))
+        self.assertIn(".mp4", finding.message)
+        self.assertNotIn(".png", finding.message)
+        self.assertIn("docs/ux/changes", finding.fix)
+
+    def test_command_finding_names_the_key_and_runs_nothing(self):
+        fixture = Fixture(self)
+        fixture.store(STORE.replace('link: ""', 'link: "no-such-evidence-cli link"'))
+        calls = []
+        real = subprocess.run
+
+        def spy(argv, *args, **kwargs):
+            calls.append(argv[0])
+            return real(argv, *args, **kwargs)
+
+        with mock.patch("subprocess.run", side_effect=spy):
+            [finding] = diagnose(fixture.root, PLUGIN, quick=False)
+        self.assertEqual(finding.id, "ux-store-command")
+        self.assertIn("uxEvidence.store.link", finding.message)
+        self.assertIn("no-such-evidence-cli", finding.message)
+        self.assertEqual(set(calls), {"git"})  # doctor never runs a configured command
+
+    def test_outside_git_the_ignore_check_stays_silent(self):
+        fixture = Fixture(self)
+        fixture.profile(CLEAN + STORE)
+        shutil.rmtree(fixture.root / ".git")
+        found = {finding.id for finding in diagnose(fixture.root, PLUGIN, quick=False)}
+        self.assertNotIn("ux-store-unignored", found)
+
+    def test_quick_mode_skips_the_store_checks(self):
+        fixture = Fixture(self)
+        fixture.profile(CLEAN + STORE.replace("git evidence pull", "no-such-evidence-cli pull"))
+        with mock.patch("subprocess.run", side_effect=AssertionError("quick mode spawned a process")):
+            self.assertEqual(diagnose(fixture.root, PLUGIN, quick=True), [])
 
 
 class Gates(unittest.TestCase):  # AC-W2-DR-03

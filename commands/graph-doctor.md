@@ -1,5 +1,5 @@
 ---
-description: Check this repo's graph-engineering setup and report what is broken with its fix - profile schema and removed keys, runtime, graph-checks.json, policy tiers, gate risk ids, routing skills, .graph ignore, and whether this session runs the installed plugin version. Read-only.
+description: Check this repo's graph-engineering setup and report what is broken with its fix - profile schema and removed keys, runtime, graph-checks.json, policy tiers, gate risk ids, routing skills, .graph ignore, the UX evidence store (commands resolve, media ignored), and whether this session runs the installed plugin version. Read-only.
 ---
 
 # /graph-doctor - is this repo's setup healthy

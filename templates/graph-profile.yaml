@@ -37,8 +37,19 @@ docsPath: "docs/superpowers"
 # House rule: every change a user can see ships before/after evidence
 # (screenshots, or <=30s recordings for flows), captured as code and committed
 # here as <path>/<date>-<slug>/, embedded in the PR body. See `ux-evidence`.
+#
+# Optional `store`: keep the media (png jpg jpeg gif webp mp4 webm mov) out of
+# git. Each value is a repo-root command prefix; the evidence folder or file is
+# appended. push uploads under the repo-relative path (the storage key), pull
+# downloads for reviewers and qa, link prints a short-lived URL for the owner.
+# With a store, only README and capture script are committed. Empty keeps the
+# media committed. /graph-doctor warns when the media is not ignored by git.
 uxEvidence:
   path: "docs/ux/changes"
+  store:
+    push: ""
+    pull: ""
+    link: ""
 
 # How qa stands this repo up, on a live stack and never a shared environment;
 # without it qa returns BLOCKED and the merge gate stays shut. Each field is a

@@ -10,6 +10,43 @@ commits.
 
 ## [Unreleased]
 
+## [0.17.1] - 2026-10-10
+
+A consumer repo can keep UX evidence media outside git. One consumer's
+evidence tree reached 420 MB in git, grew about 100 MB a week, and every
+worktree and CI checkout copied it; it moved the media to a private object
+store and asked the plugin to stop telling agents to commit it.
+
+### Added
+
+- **`uxEvidence.store` in the profile (optional).** `push`, `pull` and `link`
+  are the repo's own command prefixes; the evidence folder or file is
+  appended. Empty (the template default) keeps today's behaviour: the media is
+  committed. With a store, the media (png, jpg, jpeg, gif, webp, mp4, webm,
+  mov) is captured into `uxEvidence.path` as before, pushed under its
+  repo-relative path (the storage key), and only README and capture script are
+  committed.
+- **`graph-doctor` checks the store** when one is set: `ux-store-shape` (not a
+  mapping, or no `push` or `pull`), `ux-store-command` (a command's program is
+  not on PATH and not a repo file) and `ux-store-unignored` (git would not
+  ignore a media type under `uxEvidence.path`). Doctor still never runs a
+  configured command; it resolves the program only, so a CLI whose subcommand
+  is missing is not caught.
+
+### Changed
+
+- **`ux-evidence` "Where it lives" and "Who does what".** With a store:
+  capture locally, push, commit text only, reference repo-relative paths in
+  the README and PR body (drag after images into the PR description through
+  the GitHub UI to render inline), never write a `link` URL into a file or PR.
+  Reviewers and qa pull before viewing; a UI diff with nothing to pull is
+  Blocking, as a missing folder is.
+- **`implementer`, `implementer-simple`, `review-protocol`, `qa-verification`
+  and the README house rule** say the same in their UX evidence lines.
+- **`/graph-init`** proposes `uxEvidence.store` only from an evidence store
+  command the repo already has, never an invented one, and with a store
+  proposes `.gitignore` lines for the media under `uxEvidence.path`.
+
 ## [0.17.0] - 2026-10-10
 
 Less wall-clock per bundle at the same quality bar, from the koach session
