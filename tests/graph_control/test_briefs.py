@@ -32,8 +32,9 @@ class ValidateBriefs(unittest.TestCase):
     def setUp(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
-        self.run = Path(temp.name)
-        (self.run / "tasks").mkdir()
+        self.repo = Path(temp.name)
+        self.run = self.repo / ".graph" / "run-1"
+        (self.run / "tasks").mkdir(parents=True)
         data = plan_data()
         template = data["tasks"][0]
         data["tasks"] = [{**template, "id": key, "produces": [], "writable_paths": [f"app/{key.lower()}/**"]}
@@ -107,6 +108,57 @@ class ValidateBriefs(unittest.TestCase):
         dump(self.run / "plan.json", self.plan)
         (self.run / "T2.md").write_text(brief())
         self.blocked("../T2: task id is not a file name under tasks/")
+
+    def unknown(self, task, name):
+        return f"{task}: tasks/{task}.md names {name}, which this plugin does not ship"
+
+    def test_a_required_plugin_skill_the_plugin_does_not_ship_is_blocked(self):  # AC-BRIEF-UNKNOWN
+        self.write("T1", "REQUIRED skills: graph-engineering:prior-art, graph-engineering:accessibility-review, "
+                         "superpowers:test-driven-development\nDispatch graph-engineering:implementer for it.\n")
+        self.blocked(self.unknown("T1", "graph-engineering:accessibility-review"))
+
+    def test_bare_names_are_never_checked(self):  # AC-BRIEF-BARE
+        self.write("T1", "REQUIRED skills: workflow-authoring, local-baseline, graph-engineering:prior-art\n")
+        self.assertEqual(self.check(), (0, {"status": "PASS", "briefs": 2}))
+
+    def test_an_agent_type_on_a_required_line_is_flagged_because_required_lines_name_skills(self):
+        self.write("T1", "REQUIRED skills: graph-engineering:implementer\n")
+        self.blocked(self.unknown("T1", "graph-engineering:implementer"))
+
+    def test_lowercase_required_is_prose_and_not_scanned(self):
+        self.write("T1", "The required reading is graph-engineering:absent-skill.\n")
+        self.assertEqual(self.check()[0], 0)
+
+    def test_a_required_line_without_names_passes(self):
+        self.write("T1", "REQUIRED skills: none.\nREQUIRED skills: graph-engineering:\n")
+        self.assertEqual(self.check()[0], 0)
+
+    def test_punctuation_backticks_and_annotations_around_names(self):
+        self.write("T1", "REQUIRED: `graph-engineering:prior-art` (preloaded), graph-engineering:uv; "
+                         "(graph-engineering:absent-skill).\n")
+        self.blocked(self.unknown("T1", "graph-engineering:absent-skill"))
+
+    def test_each_unknown_named_once_per_task_in_plan_order(self):
+        self.write("T2", "REQUIRED skills: graph-engineering:absent-b\n")
+        self.write("T1", "REQUIRED skills: graph-engineering:absent-a, graph-engineering:absent-c\n"
+                         "REQUIRED again: graph-engineering:absent-a\n")
+        self.blocked("; ".join([self.unknown("T1", "graph-engineering:absent-a"),
+                                self.unknown("T1", "graph-engineering:absent-c"),
+                                self.unknown("T2", "graph-engineering:absent-b")]))
+
+    def test_a_size_problem_and_an_unknown_name_are_both_named(self):
+        self.write("T1", "REQUIRED skills: graph-engineering:absent-skill\n" + "prose\n" * 300)
+        self.blocked("T1: tasks/T1.md has 301 lines (limit 300); " + self.unknown("T1", "graph-engineering:absent-skill"))
+
+    def test_a_repo_local_skill_resolves_from_a_relative_run_dir(self):
+        local = self.repo / ".claude" / "skills" / "local-baseline"
+        local.mkdir(parents=True)
+        (local / "SKILL.md").write_text("---\nname: local-baseline\n---\n")
+        self.write("T1", "REQUIRED skills: graph-engineering:local-baseline\n")
+        with contextlib.chdir(self.repo):
+            self.assertEqual(invoke(["validate-briefs", ".graph/run-1"]), (0, {"status": "PASS", "briefs": 2}))
+        local.joinpath("SKILL.md").unlink()
+        self.blocked(self.unknown("T1", "graph-engineering:local-baseline"))
 
     def test_invalid_or_missing_plan_blocked(self):
         self.plan["tasks"][0]["depends_on"] = ["T1"]
