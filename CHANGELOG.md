@@ -139,8 +139,8 @@ time change.
 - **Profile key `gates.quick`.** One command string, the repo's fast pre-push
   check (secrets scan, banned characters, generated-file drift, ordering
   lints). `definition-of-done` and the implementer run it in the task worktree
-  before reporting `DONE`, so the class of failure that blocked 12 pushes in the
-  retro window is caught where it is cheap to fix. The template ships `""`
+  before reporting `DONE`, so the class of failure that blocked repeated pushes in
+  the retro window is caught where it is cheap to fix. The template ships `""`
   (none); `/graph-init` proposes it from an existing pre-commit or pre-push
   hook, and `--upgrade` adds the empty key. `graph-control doctor` warns
   (`gates-quick`) when it is not a string.
@@ -151,7 +151,7 @@ time change.
   only background work in flight schedules its own wakeup about 10 minutes out
   and processes what finished when it wakes; three quiet wakeups mark the leaf
   `stalled` and open a decision card. It never kills or messages a child. The
-  retro saw a 62-minute idle run that only the owner's "continue" ended.
+  retro saw an idle run that only the owner's "continue" ended.
 - **Implementer progress checkpoint.** At 85% of its turns the implementer
   writes a checkpoint (base, commits, cases done and left, last test command
   and result, next step) at `git rev-parse --git-path graph-checkpoint.md`:
@@ -196,8 +196,8 @@ time change.
 - **Fix rounds test narrowly, then once in full.** The fix-round brief and the
   implementer's new Fix rounds section: targeted tests on the files and classes
   the findings name while fixing, then exactly one full suite at the end of the
-  round. The retro measured full-suite repeats per finding at 100-140 agent
-  minutes in two days.
+  round. The retro measured full-suite repeats per finding as a large share of
+  agent time.
 - **Retro agent turn cap 40 to 100,** and it writes `retro.md` as a draft within
   its first 15 turns and refines it, so a capped retro still leaves a report.
 
