@@ -53,7 +53,8 @@ class Resolves(unittest.TestCase):
         self.assertIsNone(resolves("graph-engineering:plugin-skill", self.plugin, self.repo, plugin="other"))
 
     def test_an_invalid_name_is_false(self):
-        for name in ("graph-engineering:", "graph-engineering:*", "graph-engineering:../plugin-skill", "-x", ""):
+        self.skill(self.repo / ".claude" / "outside")
+        for name in ("graph-engineering:", "graph-engineering:*", "graph-engineering:../outside", "../outside", "-x", ""):
             with self.subTest(name=name):
                 self.assertIs(self.resolve(name), False)
 
