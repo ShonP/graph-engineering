@@ -12,5 +12,5 @@ reader uses plus one unrelated key, `isSidechain`, which the reader ignores.
 | File | Role in the tests |
 | --- | --- |
 | `agent-aobserved.jsonl` | Skill call for `graph-engineering:prior-art`; preload tags for `graph-engineering:definition-of-done` (string content) and `graph-engineering:impact-map` (text block); `graph-engineering:bruno` only in assistant text, so never observed |
-| `agent-aedges.jsonl` | an errored Skill call (`graph-engineering:bruno`), a Read of a repo-local `SKILL.md`, a malformed line, then a mixed-case Skill call that succeeds |
+| `agent-aedges.jsonl` | an errored Skill call (`graph-engineering:bruno`), a Read of a repo-local `SKILL.md`, a malformed line, rows of the wrong shape (a list row, a string message, a string block, a non-object and a blank Skill input), then a mixed-case Skill call that succeeds |
 | `agent-aempty.jsonl` | empty file |
