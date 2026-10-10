@@ -21,7 +21,7 @@ Sources (fetched 2026-09-10 with curl, all HTTP 200):
 - https://kubernetes.io/docs/reference/kubectl/generated/kubectl_kustomize/ - "kubectl kustomize | Kubernetes"
 
 Version note: kustomize ships both as a standalone binary and inside kubectl.
-forge-platform pins only `kubectl = "1.35.8"` in `mise.toml` and no standalone
+The measured platform repo pins only `kubectl = "1.35.8"` in `mise.toml` and no standalone
 `kustomize`, so `kubectl kustomize <dir>` and `kubectl apply -k <dir>` are the
 house commands; the run below used client v1.36.4 with embedded Kustomize
 v5.8.1. Some SIG CLI reference pages are old (the group index was last modified
@@ -142,7 +142,7 @@ are what the rules cite.
   keep in the repo.
   (https://kustomize.io/)
 - Argo CD renders a kustomize directory itself; the Application just points at
-  it. Evidence (rung 1, forge-platform 2026-09-10):
+  it. Evidence (rung 1, a private consumer platform repo, 2026-09-10):
   `argocd/apps/ntfy.yaml` has `source.path: manifests/ntfy` with no `plugin` or
   `kustomize` block, and `manifests/ntfy/kustomization.yaml` supplies the
   namespace and a hashed `configMapGenerator`. So the reconciler, not a CI step,
@@ -184,7 +184,7 @@ kubectl kustomize <dir> | kubectl apply --dry-run=server -f -
 kubectl diff -k <dir>                             # 0 in sync, 1 drift, >1 error
 ```
 
-Run on forge-platform, 2026-09-10:
+Run on a private consumer platform repo, 2026-09-10:
 
 ```
 $ kubectl version --client

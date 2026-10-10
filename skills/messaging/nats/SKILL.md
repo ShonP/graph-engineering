@@ -18,8 +18,8 @@ current on that date (`f115bec`, 2026-08-24, i.e. the 2.14 docs); source is pinn
   - the `$JS.API` subject namespace
 
 Measured in-house, rung 1 — every rule marked "measured" was run against a live 2.14.6 server
-and most were watched going red first. **ADR 00nn** is `Equival-io/forge-platform`
-`docs/adr/00nn-*.md` (a private repo): 0004 "Per-user permissions" and "What SP1's proposal
+and most were watched going red first. **ADR 00nn** is an ADR in a private
+consumer repo: 0004 "Per-user permissions" and "What SP1's proposal
 got wrong, measured on a real 2.14.6 server"; 0016 §§8, 10, 11.
 
 ## When to apply
@@ -80,11 +80,11 @@ Measured, ADR 0004: the sharpest failure in this file.
 Subjects are the only vocabulary. Once a user has an allow-list, anything "that has not been
 _allow listed_ ... fails and is logged at the server" (`authorization.md`, verbatim), and
 **a user with no `permissions` block — and no `default_permissions` — can do anything on
-the server** (ADR 0004, measured: such a user could purge `forge-events`).
+the server** (ADR 0004, measured: such a user could purge `app-events`).
 
-- **`*` is ONE WHOLE TOKEN, so `forge-*` matches nothing.** Measured: a list written as
-  `$JS.API.CONSUMER.MSG.NEXT.forge-*.>` reads as if it grants every `forge-` stream and
-  grants none of them — the token is the literal string `forge-*`. Name each stream.
+- **`*` is ONE WHOLE TOKEN, so `app-*` matches nothing.** Measured: a list written as
+  `$JS.API.CONSUMER.MSG.NEXT.app-*.>` reads as if it grants every `app-` stream and
+  grants none of them - the token is the literal string `app-*`. Name each stream.
 - **`_INBOX.>` on every subscribe allow-list** (`authorization.md`: "you need to add rules
   for the `_INBOX.>` pattern"). Without it every JetStream publish times out,
   and a relay reads a timeout as a failure and eventually marks the row dead (ADR 0016 §11).
@@ -157,7 +157,7 @@ the server** (ADR 0004, measured: such a user could purge `forge-events`).
 - **`pull_subscribe` where a declared consumer exists.** Creates a second consumer, or is
   denied and looks like a timeout.
 - **Binding without `consumer_info` first.** A typo becomes a permanently idle, healthy pod.
-- **`forge-*` (or any `prefix-*`) in a subject.** Matches nothing; reads as if it matches
+- **`app-*` (or any `prefix-*`) in a subject.** Matches nothing; reads as if it matches
   everything.
 - **`$JS.ACK.>`.** Lets one identity delete another's in-flight work-queue message, as an
   allowed publish with no log line.

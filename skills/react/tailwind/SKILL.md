@@ -32,11 +32,11 @@ Sources (fetched 2026-09-24):
   No `tailwind.config.js`, no `postcss.config.js`, no `autoprefixer` - v4 is configured in CSS.
   https://tailwindcss.com/docs/installation/using-vite
 - **Exactly one `@import "tailwindcss"`** per compiled stylesheet, and it lives in the token
-  preset (`@forge/config/tailwind.css` in the house layout). An app's entry CSS imports the
+  preset (`@acme/config/tailwind.css` in the house layout). An app's entry CSS imports the
   preset only. *Measured:* importing `tailwindcss` in both the app CSS and the preset emits
   preflight twice (9,280 vs 5,186 bytes for the same classes).
 - `packages/config` exports the preset (`"exports": { "./tailwind.css": "./tailwind.css" }`); the
-  app writes `@import "@forge/config/tailwind.css";`. *Measured:* resolved through the pnpm
+  app writes `@import "@acme/config/tailwind.css";`. *Measured:* resolved through the pnpm
   workspace symlink.
 
 ### `@source`: workspace packages are not scanned by default

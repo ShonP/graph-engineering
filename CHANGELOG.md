@@ -12,10 +12,10 @@ commits.
 
 ## [0.17.1] - 2026-10-10
 
-A consumer repo can keep UX evidence media outside git. One consumer's
-evidence tree reached 420 MB in git, grew about 100 MB a week, and every
-worktree and CI checkout copied it; it moved the media to a private object
-store and asked the plugin to stop telling agents to commit it.
+A consumer repo can keep UX evidence media outside git. Committed evidence
+media grows a repo by hundreds of megabytes and every worktree and CI
+checkout copies it; a consumer moved its media to an object store and asked
+the plugin to stop telling agents to commit it.
 
 ### Added
 
@@ -49,15 +49,15 @@ store and asked the plugin to stop telling agents to commit it.
 
 ## [0.17.0] - 2026-10-10
 
-Less wall-clock per bundle at the same quality bar, from the koach session
-retro 2026-10-09: QA lanes, qa-lead contracts, ready-set engine. The retro
-(two days, 146 subagents) found 36% of simulator qa time was lane queueing (a
-20 s `test-without-building` run waited 100 to 250 s behind a 17 minute
-compile), qa leaves hit the 250-turn cap with no report while their lead
-returned `FAIL INCOMPLETE`, rows a simulator can never observe were driven for
-30-45 minutes before ending `BLOCKED`, and full-suite repeats per fix finding
-cost 100-140 agent minutes. Same builds, rows, evidence rules and gates; only
-ordering, locks, repeats and idle time change.
+Less wall-clock per bundle at the same quality bar, from a consumer session
+retro: QA lanes, qa-lead contracts, ready-set engine. The retro found that a
+large share of simulator qa time was lane queueing (a short
+`test-without-building` run waited minutes behind a long compile), qa leaves
+hit the turn cap with no report while their lead returned `FAIL INCOMPLETE`,
+rows a simulator can never observe were driven for a long time before ending
+`BLOCKED`, and full-suite repeats per fix finding cost agent hours. Same
+builds, rows, evidence rules and gates; only ordering, locks, repeats and idle
+time change.
 
 ### Added
 
@@ -1139,10 +1139,9 @@ built with `rg`. Every cited URL returned 200 on 2026-09-23.
   lists its sources, pinned to the version it was written against: a versioned
   docs path such as `docs.sqlalchemy.org/en/20/` or `loguru.readthedocs.io/en/0.7.3/`,
   the source at the release tag, or, for docs.nats.io, which has no versions,
-  the `nats.docs` commit. Measured claims cite the ADR section by its
-  location, `Equival-io/forge-platform` `docs/adr/`, a private repo, and the
-  header says so. Every Verify recipe was run against forge-libs `552a9b9`,
-  and each check shown to fail on a real violation. Sourcing pass:
+  the `nats.docs` commit. Measured claims cite an ADR in a private consumer
+  repo, and the header says so. Every Verify recipe was run against a private
+  consumer library, and each check shown to fail on a real violation. Sourcing pass:
   `docs/research/2026-09-23-python-skills-sourcing.md`.
   - `skills/python/ruff` — rule selection that survives a codebase, banning
     **symbols rather than modules** (a module ban also flags

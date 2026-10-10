@@ -6,8 +6,8 @@ license: MIT
 
 # ruff
 
-Written for **ruff 0.16.8** (PyPI, uploaded 2026-09-16; the `==0.16.8` pin in `forge-libs`'
-`uv.lock`). docs.astral.sh serves only the latest docs, so every citation below is the
+Written for **ruff 0.16.8** (PyPI, uploaded 2026-09-16; the `==0.16.8` pin in the measured shared
+library's `uv.lock`). docs.astral.sh serves only the latest docs, so every citation below is the
 source of that page **at the `0.16.8` tag** (fetched 2026-09-23, all HTTP 200):
 
 - https://github.com/astral-sh/ruff/blob/0.16.8/docs/configuration.md - "Configuring Ruff"
@@ -17,10 +17,9 @@ source of that page **at the `0.16.8` tag** (fetched 2026-09-23, all HTTP 200):
 - https://github.com/astral-sh/ruff/blob/0.16.8/docs/formatter.md - "The Ruff Formatter"
 - https://docs.astral.sh/ruff/rules/blanket-noqa/ - PGH004 (verified against 0.16.8 by run)
 
-In-house measurement: **ADR 0021** = `Equival-io/forge-platform`
-`docs/adr/0021-temporal-converter-and-test-env.md`, "The lint: which `@dataclass` spellings
-ruff alone misses" (a private repo; the matrix is quoted below where it is load-bearing) — a
-thirteen-row matrix run against two real configurations. Every rule below that says
+In-house measurement: **ADR 0021** = a Temporal converter and test-env ADR in a private
+consumer repo, section "The lint: which `@dataclass` spellings ruff alone misses" (the matrix
+is quoted below where it is load-bearing): a thirteen-row matrix run against two real configurations. Every rule below that says
 "measured" points there, and it is rung 1 evidence: code that was run, not a docs claim.
 
 ## When to apply
@@ -72,7 +71,7 @@ This is the rule this skill exists for, and it was decided by measurement rather
   (`banned_api.rs` at 0.16.8).
 - **Ban the symbol.** Banning the `dataclasses` module also flags
   `from dataclasses import replace`, and `dataclasses.replace(...)` is the supported
-  composition for adapting a third-party object (in `forge-libs`, adding `external_storage`
+  composition for adapting a third-party object (in the shared library, adding `external_storage`
   to Temporal's `pydantic_data_converter`). A rule that flags borrowed, correct code gets
   `# noqa`'d on day one.
 - Measured coverage, from the thirteen-row matrix: the symbol ban catches **seven**
@@ -80,8 +79,8 @@ This is the rule this skill exists for, and it was decided by measurement rather
   `pydantic.dataclasses` pair, and the functional `make_dataclass` API. The module ban
   catches those seven **plus `from dataclasses import *`** — eight — and pays for the
   eighth with the `replace` false positive above. The house takes the symbol ban and
-  catches the star import with an AST check instead (`forge-libs`
-  `tools/forge_libs_dev/no_dataclass.py`), so the house lint catches eight with no false
+  catches the star import with an AST check instead (the shared
+  library's `tools/dev/no_dataclass.py`), so the house lint catches eight with no false
   positive. **Four escape both configurations**, and really are dataclasses at runtime:
   `__import__("dataclasses").dataclass`, `importlib.import_module("dataclasses").dataclass`,
   a house module that re-exports the symbol, and `class Payload(SomeDataclass)` — inherited,
