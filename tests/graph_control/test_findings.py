@@ -161,6 +161,102 @@ class Counts(unittest.TestCase):
         self.assertIn(str(garbled), out["reason"])
 
 
+class Classes(unittest.TestCase):
+    """AC-CLASSES-APPEND, AC-CLASSES-FAIL and AC-C4-FIXTURE"""
+
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        self.classes = self.root / "classes.md"
+        self.round = dump(self.root / "findings.T3.json", document(findings=[
+            finding(rule="untested\n  guard"), finding(id="F2", severity="important", rule="a|b"),
+            finding(id="F3", severity="nit", route="defer"),
+            finding(id="F4", severity="important", status="refuted")]))
+
+    def append(self, path, task="T3", number="2"):
+        return invoke(["findings", path, "--classes", str(self.classes), "--task", task, "--round", number])
+
+    def test_first_run_appends_open_blocking_and_important_then_rerun_appends_nothing(self):
+        code, out = self.append(self.round)
+        self.assertEqual((code, out["classes_appended"]), (0, 2))
+        first = self.classes.read_bytes()
+        self.assertEqual(first, b"- untested guard | F1 | T3 round 2\n- a/b | F2 | T3 round 2\n")
+        code, out = self.append(self.round)
+        self.assertEqual((code, out["classes_appended"], self.classes.read_bytes()), (0, 0, first))
+
+    def test_qa_task_appends_after_existing_lines_without_rewriting_them(self):
+        self.classes.write_text("- earlier | F9 | T1 round 1\n")
+        code, out = self.append(self.round, task="qa", number="1")
+        self.assertEqual((code, out["classes_appended"]), (0, 2))
+        self.assertEqual(self.classes.read_text().splitlines(), [
+            "- earlier | F9 | T1 round 1", "- untested guard | F1 | qa round 1", "- a/b | F2 | qa round 1"])
+
+    def test_empty_findings_appends_nothing_and_creates_the_file_when_absent(self):
+        empty = dump(self.root / "empty.json", document("PASS", []))
+        code, out = self.append(empty)
+        self.assertEqual((code, out["classes_appended"], self.classes.read_bytes()), (0, 0, b""))
+
+    def test_rejections_leave_classes_untouched(self):
+        self.classes.write_text("- earlier | F9 | T1 round 1\n")
+        before = self.classes.read_bytes()
+        off_schema = dump(self.root / "off.json", document(findings=[finding(route="rewrite")]))
+        other = dump(self.root / "other.json", document())
+        flags = ["--classes", str(self.classes)]
+        cases = {
+            "off-schema file": [off_schema, *flags, "--task", "T3", "--round", "2"],
+            "missing file": [str(self.root / "absent.json"), *flags, "--task", "T3", "--round", "2"],
+            "two paths": [self.round, other, *flags, "--task", "T3", "--round", "2"],
+            "missing --task": [self.round, *flags, "--round", "2"],
+            "missing --round": [self.round, *flags, "--task", "T3"],
+            "--round 0": [self.round, *flags, "--task", "T3", "--round", "0"],
+            "--task with a pipe": [self.round, *flags, "--task", "T3|x", "--round", "2"],
+            "--task without --classes": [self.round, "--task", "T3", "--round", "2"],
+        }
+        for label, argv in cases.items():
+            with self.subTest(label):
+                code, out = invoke(["findings", *argv])
+                self.assertEqual((code, out["status"]), (1, "BLOCKED"))
+                self.assertEqual(self.classes.read_bytes(), before)
+
+    def test_flag_errors_name_the_flag(self):
+        for argv, flag in [(["--round", "2"], "--task"), (["--task", "T3"], "--round"),
+                           (["--task", "T3", "--round", "-1"], "--round")]:
+            with self.subTest(flag):
+                code, out = invoke(["findings", self.round, "--classes", str(self.classes), *argv])
+                self.assertIn(flag, out["reason"])
+
+    def test_unwritable_classes_path_blocks(self):
+        self.classes.mkdir()
+        code, out = self.append(self.round)
+        self.assertEqual((code, out["status"]), (1, "BLOCKED"))
+
+    def test_append_waits_for_the_lock_and_parallel_rounds_keep_both_sets(self):
+        import fcntl
+        import threading
+        from graph_control.findings import append_classes
+        with self.classes.open("a") as held:
+            fcntl.flock(held, fcntl.LOCK_EX)
+            first = threading.Thread(target=append_classes, args=(self.classes, ["- a | F1 | T1 round 1"]))
+            second = threading.Thread(target=append_classes, args=(self.classes, ["- b | F1 | T2 round 1"]))
+            first.start()
+            second.start()
+            first.join(0.3)
+            self.assertTrue(first.is_alive())
+            self.assertEqual(self.classes.read_bytes(), b"")
+        first.join(5)
+        second.join(5)
+        self.assertEqual(sorted(self.classes.read_text().splitlines()),
+                         ["- a | F1 | T1 round 1", "- b | F1 | T2 round 1"])
+
+    def test_c4_fixture_names_the_field_to_fix(self):
+        data = {"schema_version": 1, "verdict": "approve", "reviewed": "ebc126b qa", "findings": []}
+        with self.assertRaisesRegex(Invalid, "reviewed|verdict"):
+            Findings.parse(data)
+        code, out = invoke(["findings", dump(self.root / "c4.json", data)])
+        self.assertEqual((code, out["status"]), (1, "BLOCKED"))
+
+
 class Registry(unittest.TestCase):
     def test_plugin_package_ships_findings_command(self):
         self.assertIn("findings", [module.NAME for module in iter_commands()])
