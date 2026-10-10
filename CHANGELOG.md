@@ -10,6 +10,23 @@ commits.
 
 ## [Unreleased]
 
+### Added
+
+- **`CLAUDE.md`** at the repo root: the project goals (quality, token cost,
+  wall time, owner attention, low friction, generality, maintainability) and
+  the rules that follow from them.
+
+### Changed
+
+- **Planner, researcher and reviewer look for reuse inside the repo and plan
+  edge cases.** The planner's impact question asks for similar code and the
+  repo's levels; `plan.md` gets a `## Reuse and level` line per new capability
+  (shared code at the highest level its consumers need, never extracted for a
+  single consumer); acceptance cases cover the edge cases that matter. Impact
+  research lists similar code with file:line; the reviewer flags missed reuse,
+  single-consumer extraction and missed planned edge cases. Pinned by
+  `tests/agents/test_reuse_edge_prompts.py`.
+
 ## [0.17.2] - 2026-10-10
 
 The plugin is public, so it stays generic: it names stacks and tools, never a

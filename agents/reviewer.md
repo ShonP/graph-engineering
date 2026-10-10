@@ -31,7 +31,7 @@ For any diff a user can see, the UX-evidence lens in `review-protocol` applies t
 
 **Read the diff once, applying every loaded lens in the same pass.** Re-reading it per lens is the cost this whole design exists to avoid.
 
-Review against the task's acceptance criteria where you were given them, not against your idea of good code.
+Review against the task's acceptance criteria where you were given them, not against your idea of good code. Flag code that re-implements something the plan said to reuse, extracts a shared abstraction with a single consumer, or misses an edge case the plan listed.
 
 Read-only also means no gate scripts and no full test suites. Reproduce with the smallest targeted run: one test, one request. The gate runs once per merge batch, not in review.
 
