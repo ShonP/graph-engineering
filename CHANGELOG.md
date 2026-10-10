@@ -10,6 +10,41 @@ commits.
 
 ## [Unreleased]
 
+## [0.17.2] - 2026-10-10
+
+The plugin is public, so it stays generic: it names stacks and tools, never a
+consumer product, person, private repo, cloud account or internal metric.
+
+### Added
+
+- **`scripts/check-private-names.py`**, a `run-all-tests.sh` step. It fails
+  when a tracked file names an entry from a list kept outside the repo
+  (`GRAPH_PRIVATE_NAMES`, or
+  `${XDG_CONFIG_HOME:-~/.config}/graph-engineering/private-names.txt`):
+  case-insensitive, whole word, binary files skipped, `allow=<glob>` per name
+  for a path where the name belongs. A hit prints the path and line, never the
+  name. With no list it prints `SKIP`, so public CI reads `partial`.
+- **README "Genericity" rule** under Develop.
+- **`skills/android/NOTICE` and `skills/android/LICENSES/`**: the two
+  Apache-2.0 upstreams of the Android packs, each license verbatim, and a map
+  of every adapted file to its source.
+
+### Changed
+
+- **Android pack attribution.** Each adapted reference now reads "Adapted from
+  `<skill>` in `chrisbanes/skills` @ `078d3e5`" or "in
+  `skydoves/compose-performance-skills` @ `1b32f81`" (Apache-2.0), replacing a
+  wrong attribution to a private repo; the nine split-out sub-references gained
+  the same header.
+- **Measured-evidence skills** (kubectl, kustomize, nats, loguru, ruff,
+  sqlalchemy, tailwind, turborepo) cite "a private consumer repo" in place of
+  repo and org names; code samples use neutral placeholders (`app_sdk`,
+  `app-*`, `@acme/config`). The measured findings are unchanged.
+- **CHANGELOG 0.17.0 and 0.17.1 intros** keep the findings and drop one
+  consumer's name and session statistics.
+- **Genericity tests** keep their stack-agnostic word lists; the product names
+  they hard-coded move to the private-names check.
+
 ## [0.17.1] - 2026-10-10
 
 A consumer repo can keep UX evidence media outside git. Committed evidence
