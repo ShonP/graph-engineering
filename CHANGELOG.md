@@ -15,8 +15,56 @@ commits.
 - **`CLAUDE.md`** at the repo root: the project goals (quality, token cost,
   wall time, owner attention, low friction, generality, maintainability) and
   the rules that follow from them.
+- **`graph-control findings <round file> --classes <path> --task <id|qa>
+  --round <n>`** appends each open blocking or important finding to the run's
+  `classes.md` as `- <rule> | <id> | <task> round <n>`, under a lock, once per
+  line (a rerun appends nothing), and prints `classes_appended`. Bad flags are
+  BLOCKED with the file untouched. The engine runs it after every review and
+  qa round, so `classes.md` now has a writer.
+- **Observed skills receipt.** `skills-check --agent-id <id>` reads that
+  child's transcript under `$CLAUDE_CONFIG_DIR/projects`: a REQUIRED name
+  passes only when claimed and seen loaded (a Skill call that did not error, a
+  preload tag, or a Read of a repo skill's `SKILL.md`). A claimed but unseen
+  name is missing and listed under `unobserved`; no transcript falls back to
+  the claim with `"observed": "unavailable"`. The engine passes the id.
+- **validate-briefs resolves REQUIRED names.** A brief whose `REQUIRED skills:`
+  list (and its wrapped lines) names a `graph-engineering:` skill the plugin
+  does not ship, and the repo's `.claude/skills/` does not hold, is BLOCKED:
+  `<task>: tasks/<task>.md names <name>, which this plugin does not ship`.
+  Bare names are left to the receipt. Doctor's resolution moved into
+  `scripts/graph_control/skill_resolve.py`, shared by both.
+- **Every qa validates the findings file it writes**, single leg or lane, not
+  only a lane leaf (`agents/qa.md`, 10,617 to 10,689 bytes).
 
 ### Changed
+
+- **The sleep-loop guard covers every roster subagent** (all 11 with Bash,
+  bare or `graph-engineering:` spelling), not only implementers; a drift test
+  reads `agents/*.md`. Kill switch: `GRAPH_POLL_GUARD=off` under `env` in
+  Claude Code settings.
+- **Smaller prompts, same obligations.** `definition-of-done` keeps its 11
+  by 8 matrix, behind a 6,200-byte ceiling test; `implementer-simple` loads
+  `impact-map` on demand instead of preloading it; the qa standalone-runtime
+  step is an ordered list; the research leaf rules live only in
+  `agents/researcher.md`; a dated aside left `turborepo`; the profile
+  template's comments shrank 39% with every value unchanged (pinned by a
+  digest), so `/graph-init --upgrade` on an existing profile shows comment
+  changes only.
+
+  | file | bytes before | bytes after |
+  | --- | --- | --- |
+  | skills/process/definition-of-done/SKILL.md | 8,627 | 6,200 |
+  | agents/implementer-simple.md | 10,519 | 10,601 |
+  | skills/process/qa-verification/SKILL.md | 15,255 | 15,294 |
+  | skills/react/turborepo/SKILL.md | 11,271 | 11,161 |
+  | graphs/research.md | 7,202 | 7,047 |
+  | templates/graph-profile.yaml | 38,969 | 23,606 |
+  | docs/engine/run.md | 38,334 | 38,478 |
+
+  Per dispatch: implementer-simple saves 8,290 bytes (5,945 of `impact-map`
+  no longer preloaded, plus 2,427 of `definition-of-done`, less 82 for the
+  on-demand pointer); implementer, planner, reviewer and reviewer-lead save
+  2,427 each. The engine pays 144 more bytes per run for the two new commands.
 
 - **Planner, researcher and reviewer look for reuse inside the repo and plan
   edge cases.** The planner's impact question asks for similar code and the
@@ -26,6 +74,15 @@ commits.
   research lists similar code with file:line; the reviewer flags missed reuse,
   single-consumer extraction and missed planned edge cases. Pinned by
   `tests/agents/test_reuse_edge_prompts.py`.
+
+### Removed
+
+- **The `nats` skill and the `skills/messaging` group**, with the profile
+  template's nats routing rows. A consumer profile that still routes
+  `graph-engineering:nats` gets doctor's `routing-skill` warning: drop the row.
+- **`/graph-engineering:sdd-ready-queue`** (`workflows/sdd-ready-queue.js`),
+  `docs/sdd-workflows.md` and its tests. `/graph-ship` runs plans on its own
+  ready queue.
 
 ## [0.17.2] - 2026-10-10
 
