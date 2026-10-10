@@ -21,7 +21,7 @@ SLOT_RULE = "independent instances"
 NAMESPACE_RULE = "per-task namespace"
 TIERS = {"opus", "sonnet"}
 NEW_ROLES = {"reviewer-lead": "opus", "qa-lead": "sonnet", "researcher-spike": "sonnet"}
-LANES_EXAMPLE = {"xcodebuild": 1, "cluster": 1, "local_db": 1}
+LANES_EXAMPLE = {"xcodebuild": 1, "xctest": 2, "cluster": 1, "local_db": 1}
 # lockfile -> the command /graph-init proposes for `bootstrap`.
 BOOTSTRAP = {
     "pnpm-lock.yaml": "pnpm install --frozen-lockfile --offline",

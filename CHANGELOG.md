@@ -10,6 +10,125 @@ commits.
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-10-10
+
+Less wall-clock per bundle at the same quality bar, from the koach session
+retro 2026-10-09: QA lanes, qa-lead contracts, ready-set engine. The retro
+(two days, 146 subagents) found 36% of simulator qa time was lane queueing (a
+20 s `test-without-building` run waited 100 to 250 s behind a 17 minute
+compile), qa leaves hit the 250-turn cap with no report while their lead
+returned `FAIL INCOMPLETE`, rows a simulator can never observe were driven for
+30-45 minutes before ending `BLOCKED`, and full-suite repeats per fix finding
+cost 100-140 agent minutes. Same builds, rows, evidence rules and gates; only
+ordering, locks, repeats and idle time change.
+
+### Added
+
+- **Test-run lane.** A build lane now pairs with a test-run lane: compiles
+  (`build-for-testing`, `build`) hold `xcodebuild`, runs against an already
+  built product (`test-without-building`) hold `xctest`, each its own command.
+  `xctest` is profile-declarable in `lanes:` like any lane; a profile that
+  leaves it out gets the `xcodebuild` slot count on its own lock files, so old
+  profiles need no edit. Taught in `docs/engine/lanes.md`, `docs/engine/run.md`,
+  `agents/qa.md`, `agents/qa-lead.md`, `agents/implementer.md`, the
+  `qa-verification` and `ux-evidence` skills, `/graph-init`'s Lanes step and
+  the profile template.
+- **Elastic lane slots.** `lane-run.sh <lane> --slots N --elastic E
+  [--max-load L] [--min-free-gb G]` may grant up to E slots above N, only while
+  the 1-minute load average per core is below L (default 0.7) and available
+  memory is at least G GB (default 2), read at admission by the new
+  `scripts/lane_host.py` (Linux `MemAvailable`, macOS
+  `kern.memorystatus_level` times `hw.memsize`). An unreadable probe refuses the
+  extra slot, so the lane falls back to N. Off by default: without `--elastic`
+  nothing changes. A `lanes:` entry may be a mapping
+  `{slots, elastic, max_load, min_free_gb}` that maps onto those flags. The
+  acquire line gains ` (elastic: <load and memory read>)` for an extra slot.
+  The ceiling follows GNU make's `--max-load` and GNU parallel's `--load`
+  (per core here), the floor GNU parallel's `--memfree`.
+- **`graph-control.py qa-lanes <qa round dir> --lanes <ids> --round <N>
+  [--wait <s>]`.** The qa-lead's wait gate. Each qa round gets a fresh
+  directory, `.graph/<run>/qa/r<N>/`, so a fix round never reads an earlier
+  round's markers or appends to its reports. Each leaf writes `<lane>.done`
+  (round, verdict counts, report and findings paths) as its last act, or
+  `<lane>.checkpoint.json` (round, rows done, next row, at least one remaining
+  row, driver and fixture paths) when it stops at its turn budget. A marker of
+  another round is stale and never counts as finished; a checkpoint newer than
+  the `.done` means the lane is not done. Exit 0 when every marker is present,
+  of this round and valid (counts add up, the findings file passes
+  `findings`), 75 while a lane is pending, 1 on a malformed marker. `--wait`
+  blocks at most 270 s (the lead calls it with a 300 s Bash timeout), so the
+  lead never writes a sleep loop.
+- **Leaf templates** under `skills/process/qa-verification/templates/`:
+  `qa-findings.json`, `lane.done.json`, `lane.checkpoint.json`. Tests parse
+  each with the same validators the engine runs, so a leaf copying a template
+  writes a file the validator accepts.
+- **Profile key `qa.runtimes`** (default empty: the newest runtime only, full
+  matrix). An entry adds an older runtime at `full` or `smoke` depth.
+- **Profile key `gates.quick`.** One command string, the repo's fast pre-push
+  check (secrets scan, banned characters, generated-file drift, ordering
+  lints). `definition-of-done` and the implementer run it in the task worktree
+  before reporting `DONE`, so the class of failure that blocked 12 pushes in the
+  retro window is caught where it is cheap to fix. The template ships `""`
+  (none); `/graph-init` proposes it from an existing pre-commit or pre-push
+  hook, and `--upgrade` adds the empty key. `graph-control doctor` warns
+  (`gates-quick`) when it is not a string.
+- **Task timing rows in the ledger.** `dispatch`, `merged` and `gated` per task,
+  plus each task's ready lag and merge gap in `merge.md`, so dispatch latency is
+  a measured number per run instead of a transcript parse.
+- **Fallback wakeup (engine heartbeat).** A coordinator turn that would end with
+  only background work in flight schedules its own wakeup about 10 minutes out
+  and processes what finished when it wakes; three quiet wakeups mark the leaf
+  `stalled` and open a decision card. It never kills or messages a child. The
+  retro saw a 62-minute idle run that only the owner's "continue" ended.
+- **Implementer progress checkpoint.** At 85% of its turns the implementer
+  writes a checkpoint (base, commits, cases done and left, last test command
+  and result, next step) at `git rev-parse --git-path graph-checkpoint.md`:
+  inside the worktree's own git directory, so it is never an untracked file,
+  never committed, and never blocks the engine's unforced `git worktree remove`
+  after a `PARTIAL`.
+
+### Changed
+
+- **`--max-load5` and `--elastic` compose into one admission.** Both read the
+  host through `scripts/lane_host.py` (the load5 read moved there from
+  `lane_run.py`). `--max-load5` is a per-call quiet-host gate on every slot,
+  declared or elastic, checked before and after taking it; `--elastic` only
+  decides whether the lane may grow past its declared slots, so an elastic slot
+  needs both. An unreadable probe never grants more than the lane without its
+  flag: unreadable headroom refuses the extra slot, unreadable load5 skips the
+  load5 gate (before, a failed load read exited 73). Taught in
+  `docs/engine/lanes.md`.
+- **qa-lead waits on markers, never on its own turn ending**, and re-dispatches
+  a checkpointed lane from its `remaining_rows` instead of re-onboarding.
+- **Shards:** at most 20 rows per leaf; a bigger lane splits into
+  `<lane>-<k>` shards.
+- **Pre-classification:** before dispatch the lead moves rows a simulator or
+  headless browser cannot observe (screen-reader output, OS settings panes,
+  real push delivery, events with no local sink, runtimes not running) into
+  `.graph/<run>/qa/device-checklist.md`; they stay in `qa.md` as `BLOCKED`
+  with a `DEVICE-ONLY` note and still count in the verdict. Such a `BLOCKED`
+  is not a setup stop (`NEEDS_SETUP`): the engine lists the rows in the merge
+  exhibit's `## Device checks` for the owner.
+- **qa leaves:** `maxTurns` 250 to 400; report rows appended as each is
+  decided; a checkpoint at about 85% of the turn budget; a new driver smoked on
+  one locale and one color scheme before the matrix; at most 2 fix-reruns per
+  script; background processes stopped by recorded pid, never `pkill -f`.
+- **Ready-set dispatch is explicit.** A task dispatches the moment its last
+  dependency is `gated`; the engine never waits for a sibling, a plan level or a
+  batch. The per-merge gate still releases dependents.
+- **Resume carries state, not prose.** A writer stopped by its turn cap is
+  resumed with a block the engine builds from the worktree (`git log` since
+  base, `git status --short`, last test command and result, cases done and
+  left, the checkpoint), never "continue where you stopped". The same block opens
+  a `PARTIAL` remainder brief.
+- **Fix rounds test narrowly, then once in full.** The fix-round brief and the
+  implementer's new Fix rounds section: targeted tests on the files and classes
+  the findings name while fixing, then exactly one full suite at the end of the
+  round. The retro measured full-suite repeats per finding at 100-140 agent
+  minutes in two days.
+- **Retro agent turn cap 40 to 100,** and it writes `retro.md` as a draft within
+  its first 15 turns and refines it, so a capped retro still leaves a report.
+
 ## [0.16.3] - 2026-10-09
 
 Less wall-clock per landing at the same quality bar, from a consumer retro:

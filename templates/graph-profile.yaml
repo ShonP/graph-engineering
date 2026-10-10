@@ -147,14 +147,20 @@ bootstrap: []
 # may hold the lane at once. The engine wraps each command that uses a lane as
 #   scripts/lane-run.sh <lane> --slots <n> -- <command>
 # which holds the lock for the life of that process, so a killed agent frees
-# it. Undeclared lanes are not serialized.
+# it. Undeclared lanes are not serialized, except a test-run lane, which takes
+# its build lane's slot count when left out (docs/engine/lanes.md).
 # Slots = the independent instances the host can run at once (1 only if one).
 # Prefer a per-task namespace from GRAPH_RUN_ID (<run>-t<n>) over a lane.
 # It ships empty, e.g.:
-#   lanes: {xcodebuild: 1, cluster: 1, local_db: 1}
-#   xcodebuild  Xcode builds and tests (CPU, simulators, DerivedData)
+#   lanes: {xcodebuild: 1, xctest: 2, cluster: 1, local_db: 1}
+#   xcodebuild  Xcode compiles: build-for-testing, build, xcodegen + build
+#   xctest      test-without-building runs against an already built product
+#               (never compiles; left out = the xcodebuild slot count)
 #   cluster     the `infra.cluster` throwaway cluster (memory, disk)
 #   local_db    a `runtime` stack not isolated per GRAPH_RUN_ID (one database)
+# An entry may instead be a mapping that adds elastic slots, taken only while
+# load per core < max_load and available memory >= min_free_gb, e.g.:
+#   mapping form: {xcodebuild: {slots: 2, elastic: 2, max_load: 0.7, min_free_gb: 4}}
 lanes: {}
 
 # The free-disk floor `graph-control host-check` holds
@@ -164,6 +170,18 @@ lanes: {}
 # `lanes`, less (5 is plenty) for a `runtime.none` library or CLI.
 host:
   min_free_gb: 20
+
+# Which simulator or device runtimes qa covers (`qa-verification` step 1,
+# Coverage). Empty, the default: the full matrix (every locale and color
+# scheme the criteria name) on the newest runtime only. Each entry adds an
+# older runtime at a stated depth, `full` (the whole matrix) or `smoke` (one
+# locale, one scheme, the rows a brief marks smoke), e.g.:
+#   qa:
+#     runtimes: [{name: "iOS 18.6", depth: smoke}]
+# A brief can still ask for more; an older runtime nobody named is not run and
+# is not a BLOCKED row.
+qa:
+  runtimes: []
 
 # House rule: every API change ships a Bruno suite in the same PR, and qa runs
 # it against `runtime`. Bruno sets no convention for where a collection lives,
@@ -615,11 +633,19 @@ risk:
 #                  touch no risk row. Empty keeps every merge with the owner.
 # `agent-control` (built in, see `risk:`) always waits for the owner, even
 # under `--auto-merge`; listing it anywhere changes nothing.
+#   quick          the one entry that is a command, not an approver: the repo's
+#                  fast pre-push check (secrets scan, banned characters,
+#                  generated-file drift, ordering lints), run by every
+#                  implementer in its worktree before reporting DONE, so a
+#                  failure the push hook would catch is caught where it is
+#                  cheap to fix. One command string, run from the repo root;
+#                  a pipeline goes in a script it names. "" means none.
 gates:
   plan: owner   # also the design gate: the plan embeds the `design` node's spec
   merge: owner
   owner_classes: [destructive, credentials-and-access, spend, outbound-messaging]
   auto_classes: []
+  quick: ""     # e.g. "bash scripts/ci/quick-gate.sh"
 
 # How a merged run lands: `pr` opens a pull request; `push-main` pushes to the
 # default branch after the merge gate, for repos that trunk-deploy.

@@ -135,6 +135,11 @@ def _gates(profile: dict[str, Any]) -> list[Finding]:
             findings.append(Finding("warn", "gates-value", f"gates.{key} is {gates[key]!r}; the only value is owner, "
                                     f"so the {key} gate still stops for the owner",
                                     f"set gates.{key}: owner; merges open on their own only through gates.auto_classes"))
+    if not isinstance(gates.get("quick", ""), str):
+        findings.append(Finding("warn", "gates-quick", f"gates.quick is {gates['quick']!r}; it must be one command "
+                                "string, so implementers skip the quick gate",
+                                'set gates.quick to the fast pre-push check, e.g. "bash scripts/quick-gate.sh", '
+                                'or "" for none'))
     auto = gates.get("auto_classes")
     if CONTROL in (auto if isinstance(auto, list) else [auto]):
         findings.append(Finding("warn", "gates-control", f"gates.auto_classes lists `{CONTROL}`, which always waits "

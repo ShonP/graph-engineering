@@ -76,7 +76,8 @@ class SchemaV2Tests(unittest.TestCase):
 
     def test_gate_defaults_keep_the_owner_in_the_loop(self):
         self.assertEqual(self.profile["gates"], {"plan": "owner", "merge": "owner",
-                                                 "owner_classes": OWNER_CLASSES, "auto_classes": []})
+                                                 "owner_classes": OWNER_CLASSES, "auto_classes": [],
+                                                 "quick": ""})  # quick: a command, empty = none
         text = comment_before("gates:")
         self.assertIn("none", text)
         self.assertIn("full green", text)
