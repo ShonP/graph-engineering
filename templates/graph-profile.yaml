@@ -147,14 +147,20 @@ bootstrap: []
 # may hold the lane at once. The engine wraps each command that uses a lane as
 #   scripts/lane-run.sh <lane> --slots <n> -- <command>
 # which holds the lock for the life of that process, so a killed agent frees
-# it. Undeclared lanes are not serialized.
+# it. Undeclared lanes are not serialized, except a test-run lane, which takes
+# its build lane's slot count when left out (docs/engine/lanes.md).
 # Slots = the independent instances the host can run at once (1 only if one).
 # Prefer a per-task namespace from GRAPH_RUN_ID (<run>-t<n>) over a lane.
 # It ships empty, e.g.:
-#   lanes: {xcodebuild: 1, cluster: 1, local_db: 1}
-#   xcodebuild  Xcode builds and tests (CPU, simulators, DerivedData)
+#   lanes: {xcodebuild: 1, xctest: 2, cluster: 1, local_db: 1}
+#   xcodebuild  Xcode compiles: build-for-testing, build, xcodegen + build
+#   xctest      test-without-building runs against an already built product
+#               (never compiles; left out = the xcodebuild slot count)
 #   cluster     the `infra.cluster` throwaway cluster (memory, disk)
 #   local_db    a `runtime` stack not isolated per GRAPH_RUN_ID (one database)
+# An entry may instead be a mapping that adds elastic slots, taken only while
+# load per core < max_load and available memory >= min_free_gb, e.g.:
+#   mapping form: {xcodebuild: {slots: 2, elastic: 2, max_load: 0.7, min_free_gb: 4}}
 lanes: {}
 
 # The free-disk floor `graph-control host-check` holds
