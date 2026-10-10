@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "lane": "<lane>",
+  "rows_done": ["AC-1", "AC-2"],
+  "next_row": "AC-3",
+  "remaining_rows": ["AC-3", "AC-4"],
+  "drivers": [".graph/<run>/qa/<lane>/drive.sh"],
+  "fixtures": [".graph/<run>/qa/<lane>/seed-state.sql"]
+}

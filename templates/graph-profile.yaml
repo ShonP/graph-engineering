@@ -171,6 +171,18 @@ lanes: {}
 host:
   min_free_gb: 20
 
+# Which simulator or device runtimes qa covers (`qa-verification` step 1,
+# Coverage). Empty, the default: the full matrix (every locale and color
+# scheme the criteria name) on the newest runtime only. Each entry adds an
+# older runtime at a stated depth, `full` (the whole matrix) or `smoke` (one
+# locale, one scheme, the rows a brief marks smoke), e.g.:
+#   qa:
+#     runtimes: [{name: "iOS 18.6", depth: smoke}]
+# A brief can still ask for more; an older runtime nobody named is not run and
+# is not a BLOCKED row.
+qa:
+  runtimes: []
+
 # House rule: every API change ships a Bruno suite in the same PR, and qa runs
 # it against `runtime`. Bruno sets no convention for where a collection lives,
 # so this is the house one. See `api-contract`.

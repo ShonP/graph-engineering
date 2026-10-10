@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "verdict": "FAIL",
+  "reviewed": {"base": "<base sha>", "head": "<head sha>"},
+  "findings": [
+    {
+      "id": "F1",
+      "severity": "important",
+      "file": "src/settings/notifications_view.ext",
+      "line": 0,
+      "scenario": "AC-4: with notifications off, tapping Save shows the success toast but the toggle is on again after relaunch (evidence .graph/<run>/qa/<lane>/AC-4-after.png)",
+      "rule": "acceptance criterion AC-4",
+      "confidence": 0.9,
+      "route": "patch",
+      "needs_author_context": false,
+      "status": "open"
+    }
+  ]
+}
