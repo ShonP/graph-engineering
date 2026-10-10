@@ -31,6 +31,14 @@ def flat(text):
     return re.sub(r"\s+", " ", text)
 
 
+def playbook_bullet(text, label):
+    return flat(text.split(f"- **{label}**", 1)[1].split("\n- **", 1)[0])
+
+
+def leaf_bullet(label):
+    return playbook_bullet((ROOT / "agents" / "researcher.md").read_text(), label)
+
+
 class Tokens(unittest.TestCase):
     def assert_tokens(self, body, tokens):
         for token in tokens:
@@ -134,19 +142,28 @@ class ResearchGraphTests(Tokens):
                                        "Firewall", "brief only", "No `run.json`"))
 
     def test_claims_digest_to_disk(self):
-        self.assert_tokens(flat(self.text), (".graph/<run>/research/claims.jsonl",
-                                       "`{claim, source, pub_date, rung, confidence}`",
-                                       "every 5", "`>>`"))
+        self.assertIn(".graph/<run>/research/claims.jsonl", flat(self.text))
+        leaf = leaf_bullet("Claims to disk.")
+        self.assert_tokens(leaf, ("every 5", "`>>`"))
+        self.assertRegex(leaf, r'\{"claim": .*"source": .*"pub_date": .*"rung": .*"confidence": [^}]*\}')
 
-    def test_claims_contract_matches_the_researcher_leaf(self):
-        # A leaf reads this brief and agents/researcher.md; one file shared by every leaf needs one domain.
-        leaf = flat((ROOT / "agents" / "researcher.md").read_text())
-        claims = flat(self.table.split("**Claims to disk.**", 1)[1].split("\n- **", 1)[0])
-        for token in ("`confidence` high, medium or low", "every 5 items (sources read)"):
+    def test_claims_contract_lives_only_in_the_researcher_leaf(self):
+        leaf = leaf_bullet("Claims to disk.")
+        for token in ("`confidence` is high, medium or low", "every 5 items (sources read)"):
             with self.subTest(token=token):
-                self.assertIn(token, claims)
-                self.assertIn(token.replace("` high", "` is high"), leaf)
-        self.assertNotRegex(claims, r"0\.0|1\.0")
+                self.assertIn(token, leaf)
+        self.assertNotRegex(leaf, r"0\.0|1\.0")
+        for token in ("pub_date", "confidence", "every 5", "`>>`"):
+            with self.subTest(absent=token):
+                self.assertNotIn(token, self.head)
+
+    def test_leaf_side_points_at_the_researcher(self):
+        for label in ("Budget.", "Firewall.", "Claims to disk."):
+            with self.subTest(label=label):
+                self.assertIn("`agents/researcher.md`", playbook_bullet(self.table, label))
+        for leaf_rule in ("reports `PARTIAL`", "anchor"):
+            with self.subTest(absent=leaf_rule):
+                self.assertNotIn(leaf_rule, self.head)
 
     def test_fetch_blocklist(self):
         self.assert_tokens(self.head, ("login-walled", "WebFetch", "linkedin.com", "x.com"))

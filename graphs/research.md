@@ -26,16 +26,13 @@ writes the brief and the report itself; only the leaves are dispatched.
   agent type, only the brief varies (graph-ship step 3). No lead; leaves never
   have the Agent tool.
 - **Budget.** Each dispatch states a tool budget of 10-20 calls (10 narrow, 20
-  broad) and `maxTurns` (budget plus 5). A leaf out of budget reports `PARTIAL`
-  and is never extended.
+  broad) and `maxTurns` (budget plus 5), and never extends them; the leaf's
+  stop rule is in `agents/researcher.md`.
 - **Firewall.** The coordinator gives each leaf brief only:
-  `.graph/<run>/tasks/research-<k>.md`. No transcript, no other leaf's output,
-  so leaves do not anchor on each other.
+  `.graph/<run>/tasks/research-<k>.md`, with no transcript and no other leaf's
+  output; the leaf side is in `agents/researcher.md`.
 - **Claims to disk.** The coordinator joins `.graph/<run>/research/claims.jsonl`,
-  which every leaf appends to with `>>`, one line per claim,
-  `{claim, source, pub_date, rung, confidence}` (`rung` on the `prior-art`
-  ladder, `confidence` high, medium or low), every 5 items (sources read); the
-  file is shared, so no rewrites.
+  which leaves append to in the format `agents/researcher.md` sets.
 - **Fetch blocklist.** Leaves never WebFetch login-walled domains (linkedin.com,
   x.com, twitter.com, facebook.com, instagram.com, tiktok.com): they return a
   login page, not the content. A claim that only such a page holds goes to the
