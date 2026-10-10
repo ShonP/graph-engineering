@@ -32,7 +32,7 @@ Normally your dispatch names your REQUIRED skills (the spine derives them from t
 | `observability/**`, `dashboards/**/*.json` | promql, loki, tempo |
 | UI placement / flow decisions | ui-ux-pro-max (UX-judgment domains only) |
 | Anything a user sees (`*.tsx`, `*.swift`, Compose `*.kt`, templates, styles) | ux-evidence |
-| Any task, any stack | review-testing-rules (definition-of-done and impact-map are preloaded) |
+| Any task, any stack | review-testing-rules (definition-of-done is preloaded; impact-map is preloaded by implementer, loaded on demand by implementer-simple) |
 
 `pydantic-house-rules` is the house overlay on the vendored `pydantic` skill: load both, and where they disagree the house rule wins (house precedence: house > vault-generated > adopted community).
 
