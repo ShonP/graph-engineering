@@ -114,7 +114,7 @@ class ValidateBriefs(unittest.TestCase):
 
     def test_a_required_plugin_skill_the_plugin_does_not_ship_is_blocked(self):  # AC-BRIEF-UNKNOWN
         self.write("T1", "REQUIRED skills: graph-engineering:prior-art, graph-engineering:accessibility-review, "
-                         "superpowers:test-driven-development\nDispatch graph-engineering:implementer for it.\n")
+                         "superpowers:test-driven-development\n\nDispatch graph-engineering:implementer for it.\n")
         self.blocked(self.unknown("T1", "graph-engineering:accessibility-review"))
 
     def test_bare_names_are_never_checked(self):  # AC-BRIEF-BARE
@@ -134,14 +134,38 @@ class ValidateBriefs(unittest.TestCase):
         self.assertEqual(self.check()[0], 0)
 
     def test_punctuation_backticks_and_annotations_around_names(self):
-        self.write("T1", "REQUIRED: `graph-engineering:prior-art` (preloaded), graph-engineering:uv; "
+        self.write("T1", "REQUIRED skills: `graph-engineering:prior-art` (preloaded), graph-engineering:uv; "
                          "(graph-engineering:absent-skill).\n")
         self.blocked(self.unknown("T1", "graph-engineering:absent-skill"))
 
+    def test_prose_that_mentions_or_quotes_a_required_line_is_not_a_skills_list(self):
+        self.write("T1", "- AC: a brief line `REQUIRED skills: graph-engineering:absent-a` is BLOCKED.\n"
+                         "A `graph-engineering:implementer` name on a REQUIRED line is flagged.\n"
+                         "REQUIRED: graph-engineering:absent-b\n")
+        self.assertEqual(self.check(), (0, {"status": "PASS", "briefs": 2}))
+
+    def test_markdown_markup_before_the_label_still_marks_a_skills_list(self):
+        for label in ("**REQUIRED skills:**", "- **REQUIRED skills:**", "  * REQUIRED skills:"):
+            with self.subTest(label=label):
+                self.write("T1", f"{label} graph-engineering:absent-skill\n")
+                self.blocked(self.unknown("T1", "graph-engineering:absent-skill"))
+
+    def test_a_wrapped_skills_list_checks_its_continuation_lines(self):
+        self.write("T1", "REQUIRED skills: graph-engineering:uv, graph-engineering:backend-rules,\n"
+                         "graph-engineering:absent-skill, graph-engineering:prior-art.\n")
+        self.blocked(self.unknown("T1", "graph-engineering:absent-skill"))
+
+    def test_a_skills_list_ends_at_a_blank_line_a_list_item_or_a_heading(self):
+        for end in ("", "  ", "- next item", "* next item", "12. next item", "3) next item", "-", "## Why"):
+            with self.subTest(end=end):
+                self.write("T1", f"REQUIRED skills: graph-engineering:prior-art,\n{end}\n"
+                                 "graph-engineering:absent-skill is quoted after the list.\n")
+                self.assertEqual(self.check(), (0, {"status": "PASS", "briefs": 2}))
+
     def test_each_unknown_named_once_per_task_in_plan_order(self):
         self.write("T2", "REQUIRED skills: graph-engineering:absent-b\n")
-        self.write("T1", "REQUIRED skills: graph-engineering:absent-a, graph-engineering:absent-c\n"
-                         "REQUIRED again: graph-engineering:absent-a\n")
+        self.write("T1", "REQUIRED skills: graph-engineering:absent-a, graph-engineering:absent-c\n\n"
+                         "REQUIRED skills: graph-engineering:absent-a\n")
         self.blocked("; ".join([self.unknown("T1", "graph-engineering:absent-a"),
                                 self.unknown("T1", "graph-engineering:absent-c"),
                                 self.unknown("T2", "graph-engineering:absent-b")]))
