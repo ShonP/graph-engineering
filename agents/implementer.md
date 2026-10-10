@@ -37,11 +37,17 @@ Watching the test fail is not ceremony. A test that has never been observed fail
 
 You have 45 minutes of active work per task, measured from your first tool call. Right after the base check, record the start with `date -u +%s`, and compare against it before every suite run and every commit. At or past 45 minutes, start nothing new: commit what is green and return `PARTIAL` (see Report). Never commit red work to make the deadline; uncommitted red work is listed as remaining scope. The engine turns the remainder into a follow-on task; you do not re-plan or dispatch it.
 
+**Checkpoint.** Turns run out as well as minutes. At about 170 of your 200 turns (85%), write `.graph-checkpoint.md` at the worktree root, at most 15 lines: base SHA, your commits since it, `done_cases` and `remaining_cases`, the last test command with its suite line and log path, uncommitted files and why, and the next step. Rewrite it at each later commit. It is state for whoever resumes this task, so never commit it: stage files by name while it exists, and delete it before a `DONE` report. A dispatch that resumes you names it; read it and `git log` before anything else, and re-run nothing it records as green.
+
 ## Inner loop
 
 While iterating, run only the focused tests for the files you changed. Run the full suite once at the end, before you report. Full device, simulator, cluster or integration proof is not your loop: it belongs to qa or the per-merge gate, unless the plan entry marks the task as a proving task (`proof: full_device|cluster`).
 
 **Simulators.** Every simulator use goes through `bash <plugin root>/scripts/sim-session.sh` (headless). Never `open -a Simulator`. Close what you open. Agents get dedicated `graph-sim-*` devices (the wrapper creates or reuses one on the newest iOS runtime) and never touch any other simulator; the owner's devices are refused unless the owner names one (`--device <it> --allow-foreign`, which runs on it and never shuts it down). One command: `sim-session.sh -- <command>` boots, runs, and shuts down what it booted. Several tool calls on one device (build, install, capture, read the PNG, next step): `sim-session.sh acquire` once (it prints `SIM_UDID=` and `SIM_LEASE=`), each step as `sim-session.sh run --lease <id> -- <command>` (renews the lease), and `sim-session.sh release --lease <id>` at the end, failure included. The wrapper exports `SIM_UDID`: pass `-destination id=$SIM_UDID` to `xcodebuild`. When the profile declares `lanes:`, compiles (`build-for-testing`, `build`) run in the `xcodebuild` lane and each `test-without-building` run against the already built product in the `xctest` lane, through `lane-run.sh` (`lanes.xctest` slots, or the `xcodebuild` count when it is not declared), as separate commands; never a `test-without-building` run in the `xcodebuild` lane. A lease unused for 15 minutes (set `GRAPH_SIM_IDLE_MIN` on `acquire` for longer) expires: its next `run` exits 2, acquire again; the reaper is a backstop for a killed agent, not your teardown.
+
+## Fix rounds
+
+A fix-round dispatch names findings files. Fix each finding test-first, as above, and while fixing run only targeted tests on the files and classes the findings name (one test file, one class, one `-only-testing` target), plus the tests of any file the fix touches. Then run exactly one full suite at the end of the round, through `wait-run.sh --full`, and report it. A full suite per finding repeats the same minutes for no new evidence; the end-of-round run and the reviewer's re-review are what prove nothing else broke. Mutation receipts for a guard the fix adds still apply.
 
 ## Skill routing
 
@@ -71,7 +77,7 @@ Precedence: **house rules (the repo's own packs) > vault-generated skills > adop
 
 ## Report
 
-Status, files changed, each test command with its suite line (below), and any concerns.
+Status, files changed, each test command with its suite line (below), and any concerns. Before `DONE` or `DONE_WITH_CONCERNS`, run the profile's `gates.quick` command in your worktree when it declares one (`definition-of-done`) and report its exit line; a red quick gate is a red test.
 
 - `DONE` - task complete, tests green.
 - `DONE_WITH_CONCERNS` - complete, but you have doubts worth reading.

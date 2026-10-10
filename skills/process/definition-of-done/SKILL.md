@@ -51,7 +51,13 @@ any one table:
 Every row also carries the always-on duties: tests written first
 (`review-testing-rules`), the prior-art note (`prior-art`), and fresh
 verification evidence before any "done" claim
-(`superpowers:verification-before-completion`).
+(`superpowers:verification-before-completion`), and the repo's quick gate:
+when the profile declares `gates.quick`, run that command in the task's
+worktree before reporting `DONE` and put its exit line in the report. It holds
+the checks that otherwise fire only at push time (secrets scan, banned
+characters, generated-file drift, ordering lints); a red quick gate is fixed
+like a red test, never reported as done. An empty or absent `gates.quick`
+means the repo declares none: say so in one line.
 
 ## Rules
 

@@ -128,6 +128,8 @@ CASES = {
                                             {("error", "gates-risk")}),
     "plan gate set to auto": (swap("plan: owner", "plan: auto"), {("warn", "gates-value")}),
     "merge gate set to auto": (swap("merge: owner", "merge: auto"), {("warn", "gates-value")}),
+    "quick gate is a list": (swap("merge: owner", "merge: owner\n  quick: [make, check]"), {("warn", "gates-quick")}),
+    "quick gate is a number": (swap("merge: owner", "merge: owner\n  quick: 1"), {("warn", "gates-quick")}),
     "auto class lists agent-control": (swap("auto_classes: [none]", "auto_classes: [none, agent-control]"),
                                        {("warn", "gates-control")}),
     "risk table redefines agent-control": (swap(LIST_ROW, LIST_ROW + "  - {id: agent-control, paths: []}\n"),
@@ -165,6 +167,13 @@ class Checks(unittest.TestCase):
                 self.assertEqual(ids(findings), expected)
                 for finding in findings:
                     self.assertTrue(finding.message.strip() and finding.fix.strip(), finding)
+
+    def test_a_quick_gate_command_or_an_empty_one_is_silent(self):
+        for value in ('"bash scripts/quick-gate.sh"', '""'):
+            with self.subTest(value=value):
+                fixture = Fixture(self)
+                fixture.profile(CLEAN.replace("merge: owner", f"merge: owner\n  quick: {value}"))
+                self.assertEqual(diagnose(fixture.root, PLUGIN, quick=False), [])
 
     def test_a_mapping_risk_table_gets_the_message_depth_blocks_with(self):
         fixture = Fixture(self)

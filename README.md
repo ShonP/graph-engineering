@@ -149,8 +149,10 @@ A repo can opt risk classes into auto-merge on full green with
 `verify` green, no class in `gates.owner_classes`); the template ships `[]`, so
 the owner merges everything until the repo opts in. `agent-control` always
 waits for the owner, even under `--auto-merge`: that diff can rewrite the
-gates themselves. `gates.plan` and `gates.merge` take only `owner`. `integration: pr |
-push-main` picks how approved work lands.
+gates themselves. `gates.plan` and `gates.merge` take only `owner`. `gates.quick`
+is the one command among them: the repo's fast pre-push check, which every
+implementer runs in its worktree before reporting DONE (`""` for none).
+`integration: pr | push-main` picks how approved work lands.
 
 `graph-control status --line` prints a status line that costs no tokens and
 lists the live subagents per `<run8>:<node>`, with model and idle age; plain
@@ -227,7 +229,7 @@ rewrites any roster call to its role's tier. Never haiku, never fable, never
 `general-purpose`. Review never drops to a cheaper tier; the only move is up:
 fix round 3 escalates a small task from `implementer-simple` to `implementer`.
 `implementer` (200), `implementer-simple` (60), `qa` (400), `qa-lead` (150),
-`reviewer-lead` (120), `researcher-spike` (25) and `retro` (40) carry a
+`reviewer-lead` (120), `researcher-spike` (25) and `retro` (100) carry a
 frontmatter `maxTurns` cap. Children return at most 1,500 tokens plus artifact
 paths; the reviewer writes `findings.json` (schema v1 in `review-protocol`, a
 route on every finding) and ends with one `PASS|CHANGES-REQUESTED ... findings=<path>`
