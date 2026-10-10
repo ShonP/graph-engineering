@@ -2,7 +2,8 @@
 
 diagnose() reads the repo's .claude/graph-profile.yaml and .claude/graph-checks.json,
 the plugin's own manifest and the host's installed-plugin record. It never runs a
-configured command: the only process it starts is `git check-ignore`, and quick
+configured command (the evidence store checks only resolve its programs): the
+only process it starts is `git check-ignore`, and quick
 mode (the cached SessionStart check) starts none.
 """
 
@@ -15,6 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from . import evidence_store
 from .common import Invalid, load
 from .preflight import read_profile
 from .risk import CONTROL, BadPattern, nested, parse_rows
@@ -55,6 +57,7 @@ def diagnose(root: Path, plugin_root: Path, quick: bool) -> list[Finding]:
             if not quick:
                 findings += _runtime(profile) + _policy(profile) + _gates(profile)
                 findings += _routing(profile, root, plugin_root, str(manifest.get("name", "")))
+                findings += [Finding(*row) for row in evidence_store.check(profile, root)]
         findings += _checks(root, plugin_root, quick)
         if not quick:
             findings += _ignored(root)
