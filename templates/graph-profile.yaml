@@ -97,9 +97,10 @@ bootstrap: []
 # Slots = the independent instances the host can run at once. Prefer a
 # per-task namespace from GRAPH_RUN_ID over a lane. Ships empty, e.g.:
 #   lanes: {xcodebuild: 1, xctest: 2, cluster: 1, local_db: 1}
-# An undeclared lane is not serialized; a left-out xctest takes the xcodebuild
-# count. Lane meanings: commands/graph-init.md (Lanes); the elastic mapping
-# form: docs/engine/lanes.md.
+# An undeclared lane is not serialized. xctest holds test-without-building runs
+# and, left out, takes the xcodebuild count. An entry may add elastic slots, e.g.
+#   mapping form: {xcodebuild: {slots: 2, elastic: 2, max_load: 0.7, min_free_gb: 4}}
+# Lane meanings: commands/graph-init.md (Lanes); elastic slots: docs/engine/lanes.md.
 lanes: {}
 
 # The free-disk floor in GB that `graph-control host-check` holds
