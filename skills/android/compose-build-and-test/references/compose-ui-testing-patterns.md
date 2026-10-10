@@ -1,4 +1,4 @@
-<!-- Adapted from the `compose-ui-testing-patterns` Agent Skill in the koach repo. -->
+<!-- Adapted from `compose-ui-testing-patterns` in `chrisbanes/skills` @ `078d3e5` (Apache-2.0). -->
 
 # Compose: UI testing patterns
 

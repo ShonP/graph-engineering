@@ -1,3 +1,4 @@
+<!-- Adapted from `deferring-state-reads/references/three-phases.md` in `skydoves/compose-performance-skills` @ `1b32f81` (Apache-2.0). -->
 # Three Phases - Composition, Layout, Draw
 
 This reference expands the Workflow in `../SKILL.md` with the deeper mechanics: what each phase does, how invalidation propagates downward, the backwards-write rule, and a comprehensive modifier-phase cheat sheet.

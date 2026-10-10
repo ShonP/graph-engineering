@@ -1,4 +1,4 @@
-<!-- Adapted from the `compose-state-authoring` Agent Skill in the koach repo. -->
+<!-- Adapted from `compose-state-authoring` in `chrisbanes/skills` @ `078d3e5` (Apache-2.0). -->
 
 # Compose state authoring
 

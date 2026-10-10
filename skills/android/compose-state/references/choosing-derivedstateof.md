@@ -1,4 +1,4 @@
-<!-- Adapted from the `choosing-derivedstateof` Agent Skill in the koach repo. -->
+<!-- Adapted from `choosing-derivedstateof` in `skydoves/compose-performance-skills` @ `1b32f81` (Apache-2.0). -->
 
 # Choosing derivedStateOf - Filter Hot Inputs into Cold Outputs
 

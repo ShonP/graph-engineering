@@ -1,4 +1,4 @@
-<!-- Adapted from the `compose-state-holder-ui-split` Agent Skill in the koach repo. -->
+<!-- Adapted from `compose-state-holder-ui-split` in `chrisbanes/skills` @ `078d3e5` (Apache-2.0). -->
 
 # Compose: state holder/UI split
 

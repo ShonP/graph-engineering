@@ -1,3 +1,4 @@
+<!-- Adapted from `understanding-stability-inference/references/twelve-phase-algorithm.md` in `skydoves/compose-performance-skills` @ `1b32f81` (Apache-2.0). -->
 # Twelve-phase stability inference algorithm
 
 This file expands the SKILL.md decision tree into pseudocode that mirrors the structure of `Stability.kt` and `ClassStabilityTransformer.kt` in the Compose compiler. Read it after the SKILL.md when an unusual case demands deeper detail.

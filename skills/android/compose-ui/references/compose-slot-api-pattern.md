@@ -1,4 +1,4 @@
-<!-- Adapted from the `compose-slot-api-pattern` Agent Skill in the koach repo. -->
+<!-- Adapted from `compose-slot-api-pattern` in `chrisbanes/skills` @ `078d3e5` (Apache-2.0). -->
 
 # Compose: slot API pattern
 

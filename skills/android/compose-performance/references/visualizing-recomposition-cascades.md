@@ -1,4 +1,4 @@
-<!-- Adapted from the `visualizing-recomposition-cascades` Agent Skill in the koach repo. -->
+<!-- Adapted from `visualizing-recomposition-cascades` in `skydoves/compose-performance-skills` @ `1b32f81` (Apache-2.0). -->
 
 # Visualizing Recomposition Cascades - static blast radius and live heatmap inside the IDE
 

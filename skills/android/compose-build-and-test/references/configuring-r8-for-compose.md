@@ -1,4 +1,4 @@
-<!-- Adapted from the `configuring-r8-for-compose` Agent Skill in the koach repo. -->
+<!-- Adapted from `configuring-r8-for-compose` in `skydoves/compose-performance-skills` @ `1b32f81` (Apache-2.0). -->
 
 # Configuring R8 for Compose - Trust Consumer Rules, Avoid Blanket Keeps
 

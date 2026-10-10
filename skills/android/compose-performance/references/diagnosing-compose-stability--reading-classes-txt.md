@@ -1,3 +1,4 @@
+<!-- Adapted from `diagnosing-compose-stability/references/reading-classes-txt.md` in `skydoves/compose-performance-skills` @ `1b32f81` (Apache-2.0). -->
 # Reading `classes.txt` - Compose Compiler stability dump
 
 `classes.txt` is the per-class stability dump emitted by the Compose Compiler when `composeCompiler { reportsDestination = ... }` is set. Each line documents one class, its computed stability, and the per-field reasoning that produced that result. This file is the second stop after `composables.txt` whenever a non-skippable composable surfaces - it tells you **why** a parameter type was flagged unstable.

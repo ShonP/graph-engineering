@@ -1,4 +1,4 @@
-<!-- Adapted from the `kotlin-flow-state-event-modeling` Agent Skill in the koach repo. -->
+<!-- Adapted from `kotlin-flow-state-event-modeling` in `chrisbanes/skills` @ `078d3e5` (Apache-2.0). -->
 
 # Kotlin Flow: state and event modeling
 

@@ -1,4 +1,4 @@
-<!-- Adapted from the `testing-compose-in-release-mode` Agent Skill in the koach repo. -->
+<!-- Adapted from `testing-compose-in-release-mode` in `skydoves/compose-performance-skills` @ `1b32f81` (Apache-2.0). -->
 
 # Testing Compose in Release Mode - Debug Builds Lie About Performance
 

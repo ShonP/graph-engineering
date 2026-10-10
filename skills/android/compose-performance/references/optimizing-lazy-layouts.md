@@ -1,4 +1,4 @@
-<!-- Adapted from the `optimizing-lazy-layouts` Agent Skill in the koach repo. -->
+<!-- Adapted from `optimizing-lazy-layouts` in `skydoves/compose-performance-skills` @ `1b32f81` (Apache-2.0). -->
 
 # Optimizing Lazy Layouts - Keys, contentType, and animateItem()
 

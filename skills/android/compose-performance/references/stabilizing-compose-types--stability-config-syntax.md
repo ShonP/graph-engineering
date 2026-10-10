@@ -1,3 +1,4 @@
+<!-- Adapted from `stabilizing-compose-types/references/stability-config-syntax.md` in `skydoves/compose-performance-skills` @ `1b32f81` (Apache-2.0). -->
 # `stability_config.conf` - full grammar and worked examples
 
 `stabilityConfigurationFiles` (plural) is a Compose Compiler 1.5.5+ DSL knob that points the compiler at one or more plain-text files listing types it should treat as stable. It is the right tool for marking third-party or Java types stable without scattering annotations across modules the team does not own.

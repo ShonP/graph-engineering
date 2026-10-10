@@ -1,3 +1,4 @@
+<!-- Adapted from `understanding-stability-inference/references/bitmask-encoding.md` in `skydoves/compose-performance-skills` @ `1b32f81` (Apache-2.0). -->
 # Bitmask encoding for generic stability
 
 This file explains how the Compose compiler represents the stability of generic types as an Int bitmask, how the Known Stable Constructs registry uses that representation, how `@StabilityInferred(parameters = ...)` carries the bitmask across module boundaries, and how the runtime evaluates the `$stable: Int` field on the JVM (versus the mangled top-level property used on Kotlin/Native and Kotlin/JS).

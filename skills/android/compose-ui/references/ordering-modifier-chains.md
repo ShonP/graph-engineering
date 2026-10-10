@@ -1,4 +1,4 @@
-<!-- Adapted from the `ordering-modifier-chains` Agent Skill in the koach repo. -->
+<!-- Adapted from `ordering-modifier-chains` in `skydoves/compose-performance-skills` @ `1b32f81` (Apache-2.0). -->
 
 # Ordering Modifier Chains - Why `padding(8.dp).background(Red)` ≠ `background(Red).padding(8.dp)`
 

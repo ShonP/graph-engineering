@@ -1,4 +1,4 @@
-<!-- Adapted from the `kotlin-coroutines-structured-concurrency` Agent Skill in the koach repo. -->
+<!-- Adapted from `kotlin-coroutines-structured-concurrency` in `chrisbanes/skills` @ `078d3e5` (Apache-2.0). -->
 
 # Kotlin coroutines: structured concurrency
 

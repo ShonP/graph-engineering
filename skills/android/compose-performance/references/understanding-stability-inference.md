@@ -1,4 +1,4 @@
-<!-- Adapted from the `understanding-stability-inference` Agent Skill in the koach repo. -->
+<!-- Adapted from `understanding-stability-inference` in `skydoves/compose-performance-skills` @ `1b32f81` (Apache-2.0). -->
 
 # Understanding Stability Inference - read the compiler's mind
 

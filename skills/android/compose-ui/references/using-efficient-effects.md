@@ -1,4 +1,4 @@
-<!-- Adapted from the `using-efficient-effects` Agent Skill in the koach repo. -->
+<!-- Adapted from `using-efficient-effects` in `skydoves/compose-performance-skills` @ `1b32f81` (Apache-2.0). -->
 
 # Using Efficient Effects - pick the cheapest correct effect API
 

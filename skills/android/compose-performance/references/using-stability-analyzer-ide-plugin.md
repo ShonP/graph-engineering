@@ -1,4 +1,4 @@
-<!-- Adapted from the `using-stability-analyzer-ide-plugin` Agent Skill in the koach repo. -->
+<!-- Adapted from `using-stability-analyzer-ide-plugin` in `skydoves/compose-performance-skills` @ `1b32f81` (Apache-2.0). -->
 
 # Using the Stability Analyzer IDE Plugin - live in-editor stability feedback
 

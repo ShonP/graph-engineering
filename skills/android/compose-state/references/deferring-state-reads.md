@@ -1,4 +1,4 @@
-<!-- Adapted from the `deferring-state-reads` Agent Skill in the koach repo. -->
+<!-- Adapted from `deferring-state-reads` in `skydoves/compose-performance-skills` @ `1b32f81` (Apache-2.0). -->
 
 # Deferring State Reads - Move Hot Reads from Composition to Draw
 

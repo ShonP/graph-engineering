@@ -1,4 +1,4 @@
-<!-- Adapted from the `stabilizing-compose-types` Agent Skill in the koach repo. -->
+<!-- Adapted from `stabilizing-compose-types` in `skydoves/compose-performance-skills` @ `1b32f81` (Apache-2.0). -->
 
 # Stabilizing Compose Types - Three Tiers, In Order
 

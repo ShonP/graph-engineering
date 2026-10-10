@@ -1,3 +1,4 @@
+<!-- Adapted from `diagnosing-compose-stability/references/reading-composables-txt.md` in `skydoves/compose-performance-skills` @ `1b32f81` (Apache-2.0). -->
 # Reading `composables.txt` - Compose Compiler per-function dump
 
 `composables.txt` lists every `@Composable` function the compiler emitted code for, along with the flags that control recomposition behavior and the per-parameter stability resolution. This is the highest-signal artifact in the Compose Compiler Reports - when the developer asks "why does this recompose", the answer is usually one specific line in this file.
