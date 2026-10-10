@@ -200,7 +200,7 @@ lists). Read this before enabling it on a repo you did not write.
 |---|---|---|
 | after every `Edit` or `Write`, async | `lint.argv` from `graph-checks.json` on the file just touched, only for a listed extension | nothing is blocked. Findings arrive on the next turn |
 | before a `Bash` command that pushes, removes a remote, runs `rm` or `docker` | the destructive-command guard (a bash filter; python only on a match) | Claude Code asks the owner, showing the evidence it gathered (force push without a lease, remote removal, Docker volume delete, recursive `rm` of a protected path). It never denies, and it is silent in `bypassPermissions` mode |
-| before every `Bash` command | the sleep-loop guard (a bash filter; python only when the input contains the word `sleep`) | an implementer subagent's shell loop that runs `sleep` is denied and pointed at `hooks/scripts/wait-run.sh`; the main thread is never blocked, and it fails open. The owner turns it off with `GRAPH_POLL_GUARD=off` under `env` in Claude Code settings |
+| before every `Bash` command | the sleep-loop guard (a bash filter; python only when the input contains the word `sleep`) | a roster subagent's shell loop that runs `sleep` is denied and pointed at `hooks/scripts/wait-run.sh`; the main thread is never blocked, and it fails open. The owner turns it off with `GRAPH_POLL_GUARD=off` under `env` in Claude Code settings |
 | before an `Agent` call | the policy guard, only when the profile has a `policy:` block | `general-purpose` and `policy.never` models are denied; each role runs on its `policy.roles` tier; a `policy-override: <reason>` line in the prompt skips it and is logged |
 | after Claude stops, `asyncRewake` | `test.argv` from `graph-checks.json`, after an optional `precheck` | Claude is woken with the failure, at most once per prompt. A precheck failure or timeout reports "not verified" and does not wake it. An unchanged tree replays its stored verdict instead of rerunning; `GRAPH_CHECKS_NO_MEMO=1` turns that off |
 | at session start (`startup`, `clear`, `compact`) | the first 40 lines of `docs/HANDOFF.md`, when that file exists, the reply contract when the repo has a profile, and one line when a run's success measures are due (python starts only when `.graph/*/plan.json` exists); silent on resume, fork and `--agent` sessions | a warning line when `HANDOFF.md` is over 150 lines |
@@ -282,10 +282,7 @@ memory leave headroom (`docs/engine/lanes.md`). Slots count independent instance
 own namespace (from `GRAPH_RUN_ID`) uses one instead of a lane. A suite longer
 than one tool call runs through `hooks/scripts/wait-run.sh`, which blocks at
 most 270 s per call and never polls; `--full` counts full-suite runs per task.
-Have a finished plan and want it run by hand? `/graph-engineering:sdd-ready-queue`
-runs it on a ready queue (dry run first); see
-[docs/sdd-workflows.md](docs/sdd-workflows.md). Prefer `/graph-ship` when you
-want its gates. Nesting stops at depth 2: only `qa-lead` and `reviewer-lead` have the
+Nesting stops at depth 2: only `qa-lead` and `reviewer-lead` have the
 Agent tool, the engine dispatches them at depth 1, and leaves never nest.
 `/graph-init` proposes `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=2` and
 `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS=8` for the repo's settings. Opt-in, for a
@@ -334,7 +331,7 @@ routes no React or FastAPI skill.
 | `security` | security-review | `always.review` |
 | `privacy` | privacy-review, gdpr-consent, gdpr-erasure-retention | `always.review`, `**/{migrations,schemas}/**` |
 | `ux` | ux-journey, ui-ux-pro-max | `always.design` |
-| `process` | prior-art, review-protocol, ux-evidence, api-contract, definition-of-done, impact-map, product-spec, qa-verification, infra-verification, post-deploy-verification, retro | prior-art on `always.impl`, review-protocol on `always.review`, definition-of-done and impact-map preloaded in agent frontmatter (planner and both implementers; reviewer: definition-of-done) and deliberately not in `always`, ux-evidence on every UI-bearing row, api-contract on every API-surface row (`routers/`, `controllers/`, `handlers/`, OpenAPI specs, `*.bru`); product-spec preloaded by `planner`, qa-verification preloaded by `qa`; infra-verification on the GitOps rows; post-deploy-verification and retro named by the playbooks' `post-deploy` and `retro` nodes |
+| `process` | prior-art, review-protocol, ux-evidence, api-contract, definition-of-done, impact-map, product-spec, qa-verification, infra-verification, post-deploy-verification, retro | prior-art on `always.impl`, review-protocol on `always.review`, definition-of-done preloaded in agent frontmatter (planner, both implementers, both reviewers) and impact-map too (planner, implementer; implementer-simple loads it on demand), deliberately not in `always`, ux-evidence on every UI-bearing row, api-contract on every API-surface row (`routers/`, `controllers/`, `handlers/`, OpenAPI specs, `*.bru`); product-spec preloaded by `planner`, qa-verification preloaded by `qa`; infra-verification on the GitOps rows; post-deploy-verification and retro named by the playbooks' `post-deploy` and `retro` nodes |
 | `rules` | backend-rules, frontend-rules, architecture-resilience-rules, agent-workflow-rules, review-testing-rules | ride along on their stack's rows; `review-testing-rules` is on `always.impl` |
 
 **Provenance.** Some of these are written here from the vendor's own docs; some
