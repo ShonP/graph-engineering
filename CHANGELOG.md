@@ -10,8 +10,11 @@ commits.
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-10-11
+
 ### Added
 
+- **Reusable components rule** (`frontend-rules`, every UI stack): one component per visual pattern; a new look is a variant (optional style/art role, default unchanged), never a copy; missing variants extend the shared component; reviewers flag hand-built copies as Important. The `definition-of-done` UI row checks it.
 - **`CLAUDE.md`** at the repo root: the project goals (quality, token cost,
   wall time, owner attention, low friction, generality, maintainability) and
   the rules that follow from them.
