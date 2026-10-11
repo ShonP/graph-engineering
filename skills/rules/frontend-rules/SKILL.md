@@ -1,11 +1,25 @@
 ---
 name: frontend-rules
-description: Apply for React, frontend UI, Tailwind, forms, routing, i18n, frontend architecture, components, pages, client API code, or design-system work.
+description: Apply for any frontend UI work (React, Flutter, SwiftUI, Compose, game UI), Tailwind, forms, routing, i18n, frontend architecture, components, pages, client API code, or design-system work.
 ---
 
 # Frontend Rules
 
-Use for React + Tailwind frontend work.
+The first section applies to every UI stack. The rest is for React + Tailwind frontend work.
+
+## Reusable components (every UI stack)
+
+- One component per visual pattern. Before writing a widget, check the project's component library
+  (kit, design system, `components/`); if the pattern exists, use it.
+- A different look is a **variant of the same component**, never a copy: the component takes an optional
+  style/art parameter (a token, theme role, skin role or variant name) that defaults to today's look.
+  Seasonal or brand themes change those roles only, never component code.
+- A missing variant or slot is a gap in the shared component: extend the component (new optional
+  parameter, default unchanged) instead of hand-building the look at the call site.
+- Shared components hold no product or game names; product-specific look lives in the theme/skin.
+- Text-holding frames declare their content insets/padding in the theme, so swapped art never clips text.
+- Reviewers flag a hand-built copy of an existing component, or a second copy of a new pattern, as
+  Important.
 
 ## Defaults
 
