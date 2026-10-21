@@ -4,14 +4,19 @@
  "test":     {"argv": [...], "timeout_seconds": 1-600, default 600},
  "precheck": {"argv": [...], "timeout_seconds": 1-60,  default 10},
  "lint":     {"argv": [..., "{file}", ...], "extensions": [".py"],
-              "timeout_seconds": 1-120, default 60}}
+              "timeout_seconds": 1-120, default 60},
+ "checks":   [{"id": "[a-z0-9-]+", unique, "argv": [...], "mode": "blocking" | "advisory",
+               "expires": "YYYY-MM-DD", required for advisory, rejected for blocking,
+               "timeout_seconds": 1-600, default 600}, ...]}
 
 Every block is optional; unknown keys are rejected at every level so a typo
 fails loudly instead of silently disabling a check. Stdlib only.
 """
 from dataclasses import dataclass
+from datetime import date
 import json
 from pathlib import Path
+import re
 
 FILE = '{file}'
 # block -> (allowed keys, max timeout, default timeout)
@@ -20,6 +25,9 @@ BLOCKS = {
     'precheck': ({'argv', 'timeout_seconds'}, 60, 10),
     'lint': ({'argv', 'extensions', 'timeout_seconds'}, 120, 60),
 }
+GATE_KEYS = {'id', 'argv', 'mode', 'expires', 'timeout_seconds'}
+GATE_ID = re.compile(r'[a-z0-9-]+')
+DAY = re.compile(r'\d{4}-\d{2}-\d{2}')
 
 
 @dataclass(frozen=True)
@@ -30,10 +38,20 @@ class Check:
 
 
 @dataclass(frozen=True)
+class GateCheck:
+    id: str
+    argv: tuple[str, ...]
+    mode: str
+    expires: date | None
+    timeout: int
+
+
+@dataclass(frozen=True)
 class Config:
     test: Check | None = None
     precheck: Check | None = None
     lint: Check | None = None
+    checks: tuple[GateCheck, ...] = ()
 
 
 def _unknown(where: str, data: dict, allowed: set[str]) -> None:
@@ -59,16 +77,61 @@ def _extensions(value: object) -> tuple[str, ...]:
     return tuple(value)
 
 
+def _timeout(name: str, block: dict, most: int, default: int) -> int:
+    timeout = block.get('timeout_seconds', default)
+    if type(timeout) is not int or not 1 <= timeout <= most:
+        raise ValueError(f'{name}.timeout_seconds must be an integer from 1 to {most}')
+    return timeout
+
+
 def _check(name: str, block: object) -> Check:
     allowed, most, default = BLOCKS[name]
     if not isinstance(block, dict):
         raise ValueError(f'{name} must be an object')
     _unknown(name, block, allowed)
-    timeout = block.get('timeout_seconds', default)
-    if type(timeout) is not int or not 1 <= timeout <= most:
-        raise ValueError(f'{name}.timeout_seconds must be an integer from 1 to {most}')
+    timeout = _timeout(name, block, most, default)
     extensions = _extensions(block.get('extensions')) if name == 'lint' else ()
     return Check(_argv(name, block.get('argv')), timeout, extensions)
+
+
+def _expires(name: str, mode: str, value: object) -> date | None:
+    if mode == 'blocking':
+        if value is not None:
+            raise ValueError(f'{name} is blocking, so it takes no expires')
+        return None
+    if not isinstance(value, str) or not DAY.fullmatch(value):
+        raise ValueError(f'{name} is advisory, so expires must be a YYYY-MM-DD date')
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        raise ValueError(f'{name}.expires {value!r} is not a calendar date') from None
+
+
+def _gate_check(index: int, entry: object) -> GateCheck:
+    if not isinstance(entry, dict):
+        raise ValueError(f'checks[{index}] must be an object')
+    ident = entry.get('id')
+    if not isinstance(ident, str) or not GATE_ID.fullmatch(ident):
+        raise ValueError(f'checks[{index}].id must match [a-z0-9-]+')
+    name = f'check {ident}'
+    _unknown(name, entry, GATE_KEYS)
+    mode = entry.get('mode')
+    if mode not in ('blocking', 'advisory'):
+        raise ValueError(f'{name}.mode must be "blocking" or "advisory"')
+    return GateCheck(ident, _argv(name, entry.get('argv')), mode, _expires(name, mode, entry.get('expires')),
+                     _timeout(name, entry, 600, 600))
+
+
+def _gate_checks(entries: object) -> tuple[GateCheck, ...]:
+    if not isinstance(entries, list):
+        raise ValueError('checks must be an array')
+    checks = tuple(_gate_check(index, entry) for index, entry in enumerate(entries))
+    seen = set()
+    for check in checks:
+        if check.id in seen:
+            raise ValueError(f'duplicate check id {check.id!r}')
+        seen.add(check.id)
+    return checks
 
 
 def load(path: Path) -> Config:
@@ -79,5 +142,6 @@ def load(path: Path) -> Config:
         raise ValueError(f'not valid JSON ({exc})') from None
     if not isinstance(data, dict) or type(data.get('version')) is not int or data['version'] != 1:
         raise ValueError('"version": 1 is required')
-    _unknown('graph-checks.json', data, {'version', *BLOCKS})
-    return Config(**{name: _check(name, data[name]) for name in BLOCKS if name in data})
+    _unknown('graph-checks.json', data, {'version', 'checks', *BLOCKS})
+    blocks = {name: _check(name, data[name]) for name in BLOCKS if name in data}
+    return Config(**blocks, checks=_gate_checks(data.get('checks', [])))
