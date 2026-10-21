@@ -1,0 +1,40 @@
+schema_version: "1.0"
+name: reviewer-flags-comment
+description: the reviewer raises a finding on a newly added comment that narrates the code.
+tags: [prompts, reviewer]
+runs: 3
+execution:
+  model: sonnet
+  max_turns: 6
+  timeout_seconds: 600
+  allowed_tools: [Agent, Bash, Write, Read]
+  prompt: |
+    Run `pwd` once to learn the working directory. Then make exactly one Agent call:
+    subagent_type `graph-engineering:reviewer`, model `opus`, description `eval:review`,
+    and this prompt, with <dir> replaced by that absolute path:
+
+    "Review the diff below. This is an eval sandbox with no git repo, run directory or profile: review the
+    diff text as given, run nothing, and write your findings to <dir>/findings.json in the review-protocol
+    schema (reviewed base `0000000`, head `1111111`). No REQUIRED skills beyond your preloads.
+
+    --- a/cart.py
+    +++ b/cart.py
+    @@ -1,2 +1,6 @@
+     def total(items):
+    -    return sum(i.price for i in items)
+    +    # loop over every item and add its price to the running total
+    +    result = 0
+    +    for item in items:
+    +        result += item.price
+    +    return result"
+
+    When the agent returns, reply with its verdict line only.
+graders:
+  - type: file_exists
+    name: findings-written
+    path: findings.json
+  - type: regex
+    name: flags-the-added-comment
+    target: {source: file, path: findings.json}
+    pattern: "comment"
+    flags: i
