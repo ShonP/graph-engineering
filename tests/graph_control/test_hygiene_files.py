@@ -5,9 +5,10 @@ import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
+from unittest import mock
 
 from hygiene_fixture import commit_at, git, make_repo, stage
-from graph_control.hygiene import Context, iter_rules
+from graph_control.hygiene import Context, iter_rules, scope
 from graph_control.hygiene import files as media
 from graph_control.hygiene import home_paths
 from graph_control.hygiene.config import parse
@@ -106,6 +107,14 @@ class MediaSize(Repo):
     def test_empty_staged_set_has_no_findings(self):
         self.commit()
         self.assertEqual(findings(media, self.root), [])
+
+    def test_no_candidate_starts_no_attribute_lookup(self):
+        stage(self.root, "src/app.txt", "small\n")
+        files = tuple(staged(self.root))
+        ctx = Context(root=self.root, config=parse({}), mode="staged", now=NOW, files=files)
+        with mock.patch.object(scope.subprocess, "run", wraps=scope.subprocess.run) as spawn:
+            self.assertEqual(media.run(ctx), [])
+        self.assertEqual(spawn.call_count, 0)
 
 
 class MediaPaths(Repo):
