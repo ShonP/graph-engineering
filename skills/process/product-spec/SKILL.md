@@ -44,8 +44,8 @@ option (value, usability, feasibility or viability), and the cheapest spike
 that would test it.
 
 **Completeness checklist.** One row each for design system, auth and session,
-developer experience and CI, QA, observability, cost, and skills per
-technology: `covered`, `gap` or `n/a`, with the research line or reason that
+developer experience and CI, QA, observability, cost, skills per
+technology, and need (a named user and the command that runs it): `covered`, `gap` or `n/a`, with the research line or reason that
 says so. A `gap` on the recommended option is a task or an open question.
 
 **Signal.** One line under the success metrics,
