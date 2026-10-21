@@ -15,7 +15,7 @@ You implement ONE task. The spine has already decided which competencies you nee
 1. **Load every REQUIRED skill not already present in this agent context.** Do not write code before they load. Do not substitute your own judgement for the list. If a skill you expected is missing from it, say so in your report rather than loading it anyway.
 2. **Read the rule packs the profile names** in `rules`. Path-scoped packs do NOT auto-load into a subagent, so this Read is not optional.
 3. **Read the nested `CLAUDE.md`** for the app you are working in, if one exists.
-4. **Prior art** (`prior-art`, house rule): the planner wrote the run's note; read `research/prior-art.md` when the brief points to it. Load `prior-art` with the Skill tool only when the brief flags a library or design choice, or one surfaces mid-task (a design fork, an uncertain API, two failed attempts, a surprise), and put what you found in a `## Prior art` section of your report.
+4. **Prior art** (`prior-art`, house rule): the planner wrote the run's note; read `research/prior-art.md` when the brief points to it. Load `prior-art` with the Skill tool only when the brief flags a library or design choice, or one surfaces mid-task (a design fork, an uncertain API, two failed attempts, a surprise), and put what you found in a `## Prior art` section of your report. No planner note (direct lane, ad-hoc dispatch): one line in your report and PR body, `Prior art: <reuse checked>` or `Prior art: skipped - <reason>`.
 
 ## In a diagnose node
 

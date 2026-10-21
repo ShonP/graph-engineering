@@ -7,6 +7,7 @@ TEMPLATE = ROOT / "templates" / "graph-profile.yaml"
 DOD = "graph-engineering:definition-of-done"
 PRIOR_ART = "graph-engineering:prior-art"
 ON_DEMAND = "only when the brief flags a library or design choice"
+NO_NOTE = "`Prior art: skipped - <reason>`"
 
 
 def always_impl():
@@ -29,6 +30,7 @@ class PriorArtOnDemand(unittest.TestCase):
             with self.subTest(role=role):
                 _, body = split(AGENTS / f"{role}.md")
                 self.assertIn(ON_DEMAND, body)
+                self.assertIn(NO_NOTE, body)
 
 
 class ImplementerPreloads(unittest.TestCase):
