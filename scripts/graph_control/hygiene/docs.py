@@ -41,6 +41,7 @@ class Tree:
         self.root = root
         self.files = frozenset(git(root, "ls-files", "-z").split("\0")) - {""}
         self.dirs = frozenset(str(parent) for name in self.files for parent in PurePosixPath(name).parents)
+        self.names = frozenset(PurePosixPath(name).name for name in self.files)
         self.counts: dict[str, int | None] = {}
 
     def candidates(self, path: str) -> list[str]:
@@ -58,8 +59,8 @@ class Tree:
 
     def check(self, path: str, line: int | None) -> tuple[str, str] | None:
         if GLOB.search(path):
-            hit = matcher([path]).match
-            return None if any(hit(name) for name in self.files) else ("doc-path", "matches no tracked file")
+            hit, names = matcher([path]).match, self.files if "/" in path else self.names
+            return None if any(hit(name) for name in names) else ("doc-path", "matches no tracked file")
         found = self.candidates(path)
         if line is None:
             return None if found or path in self.dirs else ("doc-path", "does not exist in the tracked tree")

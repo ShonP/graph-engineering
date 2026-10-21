@@ -92,13 +92,15 @@ class Paths(Base):
 
     def test_bare_file_name_resolves_by_basename(self):
         self.profile()
-        stage(self.root, "docs/names.md", "Read `plan.md` and `real.py:10`, not `ghost.md` or `real.py:11`.\n")
+        stage(self.root, "docs/names.md", "Read `plan.md` and `real.py:10`, not `ghost.md` or `real.py:11`.\n"
+                                          "Any `*.py` file, but no `*.rb` file.\n")
         commit_at(self.root, "docs", 0, NOW)
         _, result = self.invoke("--tracked")
         messages = sorted(f["message"] for f in result["findings"])
-        self.assertEqual(len(messages), 2)
-        self.assertIn("ghost.md", messages[0])
-        self.assertIn("real.py:11", messages[1])
+        self.assertEqual(len(messages), 3)
+        self.assertIn("*.rb", messages[0])
+        self.assertIn("ghost.md", messages[1])
+        self.assertIn("real.py:11", messages[2])
 
     def test_line_cite_on_a_directory_or_missing_file_is_a_dead_path(self):
         self.profile()
