@@ -163,7 +163,8 @@ class DenyPath(GuardCommit):
                         'git rev-parse --git-dir && git commit -m x',
                         'git commit -m "document GIT_DIR=path handling"',
                         'git commit -m x && git --work-tree=/tmp/acme-widget status',
-                        'git commit -m x; export GIT_WORK_TREE=/tmp/acme-widget'):
+                        'git commit -m x; export GIT_WORK_TREE=/tmp/acme-widget',
+                        'export GIT_EDITOR=true; git commit -m x'):
             with self.subTest(command=command):
                 self.assertIn('assets/hero.bin: 600 KB > 500 KB', self.deny(command))
 
