@@ -225,6 +225,14 @@ class Scope(Temp):
         self.assertEqual(base(root, first), [row("c.txt", "A", "bravo")])
         self.assertEqual(tracked(root), [row("c.txt", "A", "bravo")])
 
+    def test_gitlink_is_not_listed(self):
+        root = make_repo(self.tmp)
+        stage(root, "a.txt", "alpha")
+        sha = commit_at(root, "first", 1, NOW)
+        git(root, "update-index", "--add", "--cacheinfo", f"160000,{sha},vendor/acme-widget")
+        self.assertEqual(staged(root), [])
+        self.assertEqual(tracked(root), [row("a.txt", "A", "alpha")])
+
     def test_base_accepts_a_rev_that_is_not_an_ancestor(self):
         root = make_repo(self.tmp)
         stage(root, "a.txt", "alpha")
@@ -351,6 +359,12 @@ class Cli(Temp):
         self.assertIn("hygiene.medai", out["reason"])
         self.assertNotIn("not a git repository", out["reason"])
 
+    def test_unparseable_profile_is_blocked(self):
+        write_profile(self.root, "hygiene: [unclosed\n")
+        code, out = self.invoke("--staged")
+        self.assertEqual((code, out["status"]), (1, "BLOCKED"))
+        self.assertIn("cannot be read", out["reason"])
+
     def test_three_profiles_through_the_cli(self):
         for text, expected in (("schema_version: 2\n", None), ("hygiene: {medai: {}}\n", "hygiene.medai"),
                                ('hygiene: {media: {max_kb: "x"}}\n', "hygiene.media.max_kb")):
@@ -376,6 +390,9 @@ class Cli(Temp):
         self.alpha.LEVELS[:] = ["info"]
         code, out = self.invoke("--run-end", "run-1", "--integration", "pr")
         self.assertEqual((code, out["run_end"], self.alpha.SEEN[-1].integration), (0, "CLEAN", "pr"))
+        write_profile(self.root, "integration: carrier-pigeon\n")
+        self.invoke("--run-end", "run-1")
+        self.assertEqual(self.alpha.SEEN[-1].integration, "pr")
 
     def test_context_per_mode_and_mode_filter(self):
         note = self.tmp / "body.md"
