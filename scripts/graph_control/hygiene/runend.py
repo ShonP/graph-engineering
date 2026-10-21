@@ -40,7 +40,7 @@ def _main_clean(ctx: Context) -> list[Finding]:
 def _worktrees(ctx: Context) -> list[Finding]:
     prefix, found = f"{ctx.run_id}-", []
     blocks = _git(ctx, "worktree", "list", "--porcelain").stdout.strip().split("\n\n")
-    for block in blocks[1:]:
+    for block in blocks:
         fields = dict(line.partition(" ")[::2] for line in block.splitlines())
         path, branch = fields.get("worktree", ""), fields.get("branch", "").removeprefix("refs/heads/")
         if not (branch.startswith(prefix) or Path(path).name.startswith(prefix)):

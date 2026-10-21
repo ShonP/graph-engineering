@@ -86,7 +86,7 @@ class RunEnd(unittest.TestCase):
         self.assertEqual(self.invoke()["run_end"], "CLEAN")
 
     def test_run_worktree_is_left(self):
-        path = self.worktree(f"{RUN}-T1", f"{RUN}-T1")
+        path = self.worktree("acme-task", f"{RUN}-T1")
         [finding] = self.invoke()["findings"]
         self.assertEqual((finding["level"], finding["id"], finding["path"]), ("error", "worktree-left", str(path)))
         self.assertIn(f"--prefix {RUN}-", finding["fix"])
@@ -134,7 +134,12 @@ class RunEnd(unittest.TestCase):
         git(self.root, "remote", "remove", "origin")
         [finding] = self.invoke(integration="push-main")["findings"]
         self.assertEqual((finding["level"], finding["id"]), ("info", "waiting-merge"))
-        self.assertIn("no origin", finding["message"])
+        self.assertTrue(finding["message"].endswith(": no origin"), finding["message"])
+
+    def test_origin_head_wins_over_main(self):
+        git(self.root, "update-ref", "refs/remotes/origin/release", f"{BRANCH}~1")
+        git(self.root, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/release")
+        self.assertEqual(self.ids(self.invoke(integration="push-main")), ["branch-unmerged"])
 
     def test_default_ref_falls_back_without_origin_head(self):
         git(self.root, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD")
