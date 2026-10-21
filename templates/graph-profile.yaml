@@ -334,8 +334,8 @@ routing:
     review: [graph-engineering:promql, graph-engineering:loki, graph-engineering:tempo]
     qa: [graph-engineering:promql, graph-engineering:loki, graph-engineering:tempo]
   always:
-    # definition-of-done and impact-map are preloaded in agent frontmatter, so not listed.
-    impl: [graph-engineering:prior-art, graph-engineering:review-testing-rules]
+    # Preloaded, so not listed: definition-of-done (writers, reviewers, planner); prior-art and impact-map (planner).
+    impl: [graph-engineering:review-testing-rules]
     review: [graph-engineering:review-protocol, graph-engineering:security-review, graph-engineering:privacy-review]
     design: [graph-engineering:ux-journey, graph-engineering:ui-ux-pro-max]
 

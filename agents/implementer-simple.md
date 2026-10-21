@@ -19,7 +19,7 @@ You exist for tasks the plan marked small: mechanical changes, renames, config t
 1. **Load every REQUIRED skill not already present in this agent context.** Do not write code before they load.
 2. **Read the rule packs the profile names** in `rules`. Path-scoped packs do NOT auto-load into a subagent.
 3. **Read the nested `CLAUDE.md`** for the app you are working in, if one exists.
-4. **Prior art** (`prior-art`, house rule): read the run's `research/prior-art.md` if one exists. If none does, run the small-task version yourself - reuse candidates first, then how others solve it, 2-4 searches - and put a `## Prior art` section in your report and PR body, or a one-line written skip with its reason. Re-fire mid-task on any trigger the skill names (a design fork, an uncertain API, two failed attempts, a surprise) and append what you found.
+4. **Prior art** (`prior-art`, house rule): the planner wrote the run's note; read `research/prior-art.md` when the brief points to it. Load `prior-art` with the Skill tool only when the brief flags a library or design choice, or one surfaces mid-task (a design fork, an uncertain API, two failed attempts, a surprise), and put what you found in a `## Prior art` section of your report.
 
 ## Then
 

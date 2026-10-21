@@ -21,7 +21,7 @@ TEMPLATE = ROOT / "templates" / "graph-profile.yaml"
 FALLBACK_DOC = ROOT / "docs" / "competency-routing.md"
 MANIFEST = ROOT / ".claude-plugin" / "plugin.json"
 TEMPLATE_BYTES = 30_000
-VALUES_SHA256 = "e72ec67860fd6dbf4c37287879711b1dcfd3bc7594603b74d48aedd43533a714"
+VALUES_SHA256 = "cc93c3435ec8833e4cc6b4dbb67252d1aa3e32fb1f3a691aa53c7cb7f2aa8a40"
 TITLE = "Dependency-derived rows (applied by /graph-init)"
 HAS_WCMATCH = importlib.util.find_spec("wcmatch") is not None
 
