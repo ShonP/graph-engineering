@@ -64,6 +64,7 @@ hygiene:
   comments:
     mode: any       # none: an added comment-only line is an error
     allow: []       # regexes a comment may match
+    cite: true      # a comment citing a URL (an issue, a spec) passes
   surfaces:         # the sweep: idle dirs under roots with few callers
     roots: []
     idleDays: 30

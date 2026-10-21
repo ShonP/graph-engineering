@@ -140,6 +140,7 @@ class Context:
 class Comments:
     mode: str = spec(_choice("any", "none"), "any")
     allow: tuple[str, ...] = spec(_strings, ())
+    cite: bool = spec(_boolean, True)
 
 
 @dataclass(frozen=True)

@@ -62,7 +62,7 @@ DEFAULTS = {
     "literals": [],
     "docs": {"roots": [], "ignore": [], "ephemeral": [], "ephemeralDays": 14},
     "context": {"budgets": [], "warn_pct": 80, "builtin": True},
-    "comments": {"mode": "any", "allow": []},
+    "comments": {"mode": "any", "allow": [], "cite": True},
     "surfaces": {"roots": [], "idleDays": 30, "minCallers": 1},
     "runEnd": {"mainClean": True, "worktrees": True, "branchMerged": True, "strayFiles": True},
     "measure": {"paths": []},
@@ -80,7 +80,7 @@ hygiene:
   literals: [{id: app-host, pattern: "api\\\\.example\\\\.test", owner: ["src/config/**"], allow: ["docs/**"]}]
   docs: {roots: [docs], ignore: ["docs/vendor/**"], ephemeral: ["docs/research/**"], ephemeralDays: 7}
   context: {budgets: [{id: rules, globs: [".claude/rules/*.md"], max_bytes: 9000}], warn_pct: 90, builtin: false}
-  comments: {mode: none, allow: ["^# noqa"]}
+  comments: {mode: none, allow: ["^# noqa"], cite: false}
   surfaces: {roots: [src], idleDays: 60, minCallers: 2}
   runEnd: {mainClean: false, worktrees: false, branchMerged: false, strayFiles: false}
   measure: {paths: ["bench/**"]}
@@ -95,7 +95,7 @@ SET = {
     "docs": {"roots": ["docs"], "ignore": ["docs/vendor/**"], "ephemeral": ["docs/research/**"], "ephemeralDays": 7},
     "context": {"budgets": [{"id": "rules", "globs": [".claude/rules/*.md"], "max_bytes": 9000}],
                 "warn_pct": 90, "builtin": False},
-    "comments": {"mode": "none", "allow": ["^# noqa"]},
+    "comments": {"mode": "none", "allow": ["^# noqa"], "cite": False},
     "surfaces": {"roots": ["src"], "idleDays": 60, "minCallers": 2},
     "runEnd": {"mainClean": False, "worktrees": False, "branchMerged": False, "strayFiles": False},
     "measure": {"paths": ["bench/**"]},
