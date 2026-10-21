@@ -328,7 +328,7 @@ Read-only plug-in commands; like every control, none executes project commands.
 | `doc-path` | error | `docs.roots`, `docs.ignore` (skips docs and cited tokens); only a backticked token whose first segment is a tracked top-level entry counts, and it resolves against the repo root or the citing doc's directory; under `--text`, a path deleted in HEAD's history also resolves |
 | `doc-line` | error | `docs.roots`, `docs.ignore` |
 | `doc-ephemeral` | warn (error past twice the age) | `docs.ephemeral`, `docs.ephemeralDays` (14) |
-| `context-budget` | warn (error over a profile cap) | `context.budgets`, `context.warn_pct` (80), `context.builtin` (warn only) |
+| `context-budget` | warn (error over a profile cap) | `context.budgets`, `context.warn_pct` (80), `context.builtin` (warn only); `--staged` and `--base` measure a budget only when one of its files is in the diff |
 | `literal-stray` | error | `literals` rows: `pattern`, `owner`, `allow`; `--staged` and `--base` read only added lines, `--tracked` whole files |
 | `hygiene-literal-regex` | error (doctor and every scan) | a `literals` row's `pattern` |
 | `hygiene-literal-nested` | warn (doctor) | a `literals` row's `pattern` |

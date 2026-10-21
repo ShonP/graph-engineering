@@ -9,6 +9,7 @@ import hygiene_fixture  # noqa: F401
 from graph_control.hygiene import Context, doctor_rows, iter_rules
 from graph_control.hygiene import context as rule
 from graph_control.hygiene.config import parse
+from graph_control.hygiene.scope import ScopeFile
 
 NOW = datetime(2026, 10, 21, 9, 0, tzinfo=timezone.utc)
 SCOPED = "---\npaths:\n  - \"src/**\"\n---\n"
@@ -39,7 +40,7 @@ class Contract(Base):
         self.assertIn("context", [module.ID for module in iter_rules()])
 
 
-class Builtin(Base):  # AC-CTX-DEFAULT
+class Builtin(Base):
     def test_total_over_cap_warns_naming_set_bytes_and_cap(self):
         self.write("CLAUDE.md", 25000)
         self.write(".claude/rules/a.md", 9000, SCOPED)
@@ -114,7 +115,7 @@ class Builtin(Base):  # AC-CTX-DEFAULT
         self.assertIn("13000", found[0].message)
 
 
-class Profile(Base):  # AC-CTX-PROFILE
+class Profile(Base):
     def test_at_warn_pct_warns_and_over_cap_errors(self):
         self.write("CLAUDE.md", 850)
         [warn] = self.findings({**CORE, "builtin": False})
@@ -143,6 +144,21 @@ class Profile(Base):  # AC-CTX-PROFILE
         self.assertEqual(finding.level, "error")
         self.assertIn("1100", finding.message)
         self.assertIn("prompts/deep/two.md", finding.message)
+
+    def test_diff_scopes_measure_a_budget_only_when_one_of_its_files_is_in_scope(self):
+        self.write("CLAUDE.md", 30000)
+        config = parse({"hygiene": {"context": CORE}})
+
+        def ids(mode, *paths):
+            files = tuple(ScopeFile(path, "M", 1, False) for path in paths)
+            return sorted((item.level, item.message.split(" is ")[0])
+                          for item in rule.run(Context(root=self.root, config=config, mode=mode, now=NOW, files=files)))
+
+        for mode in ("staged", "base"):
+            with self.subTest(mode=mode):
+                self.assertEqual(ids(mode, "src/a.ts", "src/b.py"), [])
+                self.assertEqual(ids(mode, "CLAUDE.md"), ids("tracked"))
+        self.assertIn(("error", "context budget core"), ids("staged", "CLAUDE.md"))
 
     def test_doctor_quick_returns_the_same_rows_without_a_process(self):
         self.write("CLAUDE.md", 1100)
