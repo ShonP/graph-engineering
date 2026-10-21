@@ -126,8 +126,10 @@ class Staged(Repo):
         self.add_all({"src/reset.css": "*,\n*::before,\n*::after {\n  box-sizing: border-box;\n}\n",
                       "src/lib.rs": "fn f(x: &mut i32) {\n    *x += 1;\n}\n",
                       "src/a.ts": "const total = price\n  * quantity;\n",
+                      "src/c.ts": "/* one line */\nconst n = 2\n  * 3;\n",
                       "src/run.sh": "#!/usr/bin/env bash\necho ok\n#!not line one\n"})
-        self.assertEqual(self.rows(profile=bare), [("error", "comment-added", "src/run.sh", 3)])
+        self.assertEqual(self.rows(profile=bare), [("error", "comment-added", "src/c.ts", 1),
+                                                   ("error", "comment-added", "src/run.sh", 3)])
 
     def test_star_line_inside_a_block_opened_before_the_diff_is_a_comment(self):
         stage(self.root, "src/b.ts", "/**\n * old\n */\nconst glob = \"src/**/*.ts\";\nconst n = 2\n")
