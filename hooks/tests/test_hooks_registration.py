@@ -10,6 +10,7 @@ names, the `if` and statusMessage rules, and the README facts a consumer needs
 (breaking change, version floors, opt-in file).
 """
 
+import fnmatch
 import json
 import re
 import unittest
@@ -54,9 +55,12 @@ class RegistrationContract(unittest.TestCase):
         ifs = ["Bash(git *)", "Bash(rm *)", "Bash(docker *)"]
         # The sleep-loop guard has no `if`: a permission rule matches a command
         # prefix and would miss `cd x && until ...`.
+        destructive = [handler("guard-destructive.sh", timeout=10, **{"if": i}) for i in ifs]
         self.assertEqual(
             groups[0]["hooks"],
-            [handler("guard-destructive.sh", timeout=10, **{"if": i}) for i in ifs]
+            destructive[:1]
+            + [handler("guard-commit.sh", timeout=15, **{"if": "Bash(git *)"})]
+            + destructive[1:]
             + [handler("guard-poll-loop.sh", timeout=5)]
             + [handler("guard-plugin-shell.sh", timeout=5)],
         )
@@ -68,6 +72,23 @@ class RegistrationContract(unittest.TestCase):
         description = json.loads((HOOKS_DIR / "hooks.json").read_text(encoding="utf-8"))["description"]
         self.assertIn("sleep-loop", description)
         self.assertIn("plugin-script shell", description)
+        self.assertIn("commit hygiene", description)
+
+    def test_commit_guard_if_reaches_compound_and_dash_c_commits(self):
+        rules = [
+            h["if"][len("Bash("):-1]
+            for g in load()["PreToolUse"]
+            for h in g["hooks"]
+            if h["command"].endswith("/guard-commit.sh")
+        ]
+        self.assertTrue(rules)
+        for command in ("npm test && git commit -m x", "git -C wt commit -m x",
+                        "echo $(git commit -m x)", "FOO=1 git commit -am x"):
+            with self.subTest(command=command):
+                subs = re.split(r"&&|\|\||[;|\n]", command)
+                subs += [a or b for a, b in re.findall(r"`([^`]*)`|\$\(([^()]*)\)", command)]
+                subs = [re.sub(r"^(?:[A-Za-z_]\w*=\S*\s+)*", "", s.strip()) for s in subs]
+                self.assertTrue(any(fnmatch.fnmatchcase(s, r) for s in subs for r in rules))
 
     def test_stop_rewakes_and_has_no_matcher(self):
         self.assertEqual(
@@ -170,6 +191,15 @@ class ReadmeContract(unittest.TestCase):
             r"system prune -a",
             r"--volumes",
             r"\.git",
+        ):
+            self.assertRegex(self.text, needle, "README lacks: " + needle)
+
+    def test_documents_the_commit_guard(self):
+        for needle in (
+            r"\| `PreToolUse`, `Bash` \| `scripts/guard-commit\.sh` \| sync, timeout 15, `if` `Bash\(git \*\)`",
+            r"## Commit hygiene guard",
+            r"hygiene --staged",
+            r"(?i)fails open",
         ):
             self.assertRegex(self.text, needle, "README lacks: " + needle)
 
