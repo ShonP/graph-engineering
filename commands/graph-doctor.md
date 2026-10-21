@@ -1,5 +1,5 @@
 ---
-description: Check this repo's graph-engineering setup and report what is broken with its fix - profile schema and removed keys, runtime, graph-checks.json, policy tiers, gate risk ids, routing skills, .graph ignore, the UX evidence store (commands resolve, media ignored), and whether this session runs the installed plugin version. Read-only.
+description: Check this repo's graph-engineering setup and report what is broken with its fix - profile schema and removed keys, runtime, graph-checks.json, policy tiers, gate risk ids, routing skills, .graph ignore, the UX evidence store (commands resolve, media ignored), hygiene findings, and whether this session runs the installed plugin version. Read-only.
 ---
 
 # /graph-doctor - is this repo's setup healthy
@@ -29,3 +29,15 @@ may run it at any time. The SessionStart hook runs the same helper with
 
 3. Apply no fix. Profile rewrites (`/graph-init`, `/graph-init --upgrade`) are
    the owner's to run; a restart is the owner's to do.
+
+## --sweep
+
+Only when the owner asks for a sweep. Report only: it never deletes.
+
+```bash
+uv run <plugin-root>/scripts/graph-control.py hygiene --root "$(git rev-parse --show-toplevel)" --sweep
+```
+
+Show the rows of the file the `sweep` finding names (idle directories under
+`hygiene.surfaces.roots` with few callers; callers is an upper bound) and its
+path. Apply nothing.
