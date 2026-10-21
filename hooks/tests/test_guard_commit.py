@@ -91,7 +91,7 @@ class GuardCommit(unittest.TestCase):
         payload = dict(common_fields(), hook_event_name='PreToolUse', tool_name='Bash',
                        permission_mode=mode, tool_input={'command': command}, cwd=str(cwd or self.repo))
         result = subprocess.run([BASH, str(GUARD)], input=json.dumps(payload), env=env or self.env,
-                                capture_output=True, text=True, timeout=30)
+                                cwd=self.repo, capture_output=True, text=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.stderr = result.stderr
         return result.stdout
