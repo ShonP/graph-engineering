@@ -312,7 +312,7 @@ Read-only plug-in commands; like every control, none executes project commands.
 |-|-|-|
 | `hygiene-invalid` | error (doctor) | any `hygiene.*` key; the message names it |
 | `media-size` | error | `media.max_kb` (500, added files only; every file under `--tracked`), `media.allow`, `media.enabled`; LFS files are exempt |
-| `media-design` | error | media under `<docsPath>/ux/**`; `media.allow`, `media.enabled` |
+| `media-design` | error | media under `<docsPath>/ux/**` and outside `uxEvidence.path`; `media.allow`, `media.enabled` |
 | `media-evidence` | error | media under `uxEvidence.path` once `uxEvidence.store.push` is set |
 | `media-deny` | error | `media.deny` |
 | `home-path` | warn | `paths.home` (warn, error, off) |
