@@ -69,12 +69,26 @@ class NewSkills(unittest.TestCase):
     def test_taste_points_at_the_maintained_upstream_plugin(self):
         _, body = split(TASTE / "SKILL.md")
         for needle in (
-            "/plugin marketplace add Leonxlnx/taste-skill",
+            '"repo": "Leonxlnx/taste-skill"',
+            '"taste-skill@taste-skill": true',
             "taste-skill:design-taste-frontend",
+            ".claude/settings.json",
         ):
             with self.subTest(needle=needle):
                 self.assertIn(needle, body)
         self.assertFalse((TASTE / "references").exists())
+
+    def test_taste_install_is_pinned_to_the_recorded_tag(self):
+        source = (TASTE / "SOURCE.md").read_text(encoding="utf-8")
+        tag = re.search(r"^- Tag: (v\d+\.\d+\.\d+)$", source, re.M)
+        self.assertIsNotNone(tag, "SOURCE.md must record the pinned tag")
+        self.assertRegex(source, r"(?m)^- Commit: [0-9a-f]{40}\b")
+        pin = f'"ref": "{tag.group(1)}"'
+        for path in (TASTE / "SKILL.md", ROOT / "README.md"):
+            with self.subTest(path=path.name):
+                text = path.read_text(encoding="utf-8")
+                self.assertIn(pin, text)
+                self.assertNotIn("/plugin marketplace add Leonxlnx/taste-skill", text)
 
 
 class Routing(unittest.TestCase):

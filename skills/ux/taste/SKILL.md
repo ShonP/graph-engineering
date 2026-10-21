@@ -1,22 +1,30 @@
 ---
 name: taste
-description: Use when choosing a visual direction, designing or reviewing how a screen or page looks, or when UI reads generic, templated or AI-made. Routes to the upstream Taste Skill plugin and holds the stack-neutral generic-tells check.
+description: Use when choosing a visual direction, designing, restyling or reviewing how a screen or page looks, or when UI reads generic, templated, sloppy or AI-made, on any UI stack.
 ---
 
 # Taste
 
 Taste Skill ([tasteskill.dev](https://www.tasteskill.dev/), `github.com/Leonxlnx/taste-skill`, MIT) is art direction for coding agents: it deals researched directions (composition, type, palette, imagery) from a library built on a study of 247 curated sites, bans the ornaments generators default to, checks the result in a real browser with Node 22 and Chrome, and fixes from its own screenshots. It is maintained upstream as a Claude Code plugin, so this plugin points at it rather than copying it.
 
+## Install (owner action, project scope)
+
+The repo owner adds this to the consumer repo's `.claude/settings.json`, pinned to the tag in `SOURCE.md`, and commits it so the whole team gets the same version:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "taste-skill": { "source": { "source": "github", "repo": "Leonxlnx/taste-skill", "ref": "v2.1.4" } }
+  },
+  "enabledPlugins": { "taste-skill@taste-skill": true }
+}
+```
+
+Agents never install or update it: it runs third-party scripts with Bash and network access, so a version change is reviewed by a person (`SOURCE.md`, "Refresh").
+
 ## Use the upstream skill
 
-One-time install in the consumer repo:
-
-```
-/plugin marketplace add Leonxlnx/taste-skill
-/plugin install taste-skill@taste-skill
-```
-
-Then invoke `taste-skill:design-taste-frontend` with the Skill tool when the task sets a new look, restyles a page or app screen, or a review says it reads generic. It has a page run and an app-screen run (`references/app-screens.md`); pick by whether people read the screen or work in it. Not in the skill listing: put the install lines in your report and apply the check below.
+Invoke `taste-skill:design-taste-frontend` with the Skill tool when the task sets a new look, restyles a page or app screen, or a review says it reads generic. It has a page run and an app-screen run (`references/app-screens.md`); pick by whether people read the screen or work in it. Not in the skill listing: name this skill's Install section in your report and apply the check below.
 
 ## Precedence
 

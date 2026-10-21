@@ -81,10 +81,21 @@ that could not run (`BLOCKED`) keeps the merge gate closed.
 User scope. Updates arrive with `/plugin update`.
 
 Optional, for UI work: the `taste` skill routes visual direction to the upstream
-Taste Skill plugin (MIT), installed with
-`/plugin marketplace add Leonxlnx/taste-skill` and
-`/plugin install taste-skill@taste-skill`. Without it, `taste` falls back to its
-own generic-tells check.
+Taste Skill plugin (MIT). The repo owner installs it at project scope, pinned to
+a reviewed tag, in the consumer repo's `.claude/settings.json`:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "taste-skill": { "source": { "source": "github", "repo": "Leonxlnx/taste-skill", "ref": "v2.1.4" } }
+  },
+  "enabledPlugins": { "taste-skill@taste-skill": true }
+}
+```
+
+Agents never install it. Without it, `taste` falls back to its own
+generic-tells check. The pin and its refresh steps live in
+`skills/ux/taste/SOURCE.md`.
 
 ## Develop
 
