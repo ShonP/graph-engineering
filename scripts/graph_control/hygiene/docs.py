@@ -107,9 +107,7 @@ def _folder(ctx: Context, doc: str) -> str | None:
 def _problem(tree: Tree, folder: str | None, path: str, line: int | None) -> tuple[str, str] | None:
     candidates = [path]
     if folder not in (None, "."):
-        joined = posixpath.normpath(posixpath.join(folder, path))
-        if not joined.startswith("../"):
-            candidates.append(joined)
+        candidates.append(posixpath.normpath(posixpath.join(folder, path)))
     problems = [tree.check(candidate, line) for candidate in candidates]
     if None in problems:
         return None
