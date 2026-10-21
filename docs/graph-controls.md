@@ -321,7 +321,7 @@ Read-only plug-in commands; like every control, none executes project commands.
 | `check-expired` | error (doctor) | an advisory `checks` entry past `expires` in `.claude/graph-checks.json` |
 | `check-expiring` | warn (doctor) | the same, within 7 days of `expires` |
 | `main-dirty` | error | `runEnd.mainClean` |
-| `worktree-left` | error | `runEnd.worktrees` |
+| `worktree-left` | error (warn for the run's integration worktree: branch `--branch`, or basename `<run-id>`) | `runEnd.worktrees` |
 | `stray-file` | error | `runEnd.strayFiles` |
 | `branch-unmerged` | error | `runEnd.branchMerged`, with integration `push-main` |
 | `waiting-merge` | info | `runEnd.branchMerged`, with integration `pr`, a missing branch or no origin |

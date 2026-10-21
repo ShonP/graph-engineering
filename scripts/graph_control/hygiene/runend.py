@@ -43,6 +43,10 @@ def _worktrees(ctx: Context) -> list[Finding]:
     for block in blocks:
         fields = dict(line.partition(" ")[::2] for line in block.splitlines())
         path, branch = fields.get("worktree", ""), fields.get("branch", "").removeprefix("refs/heads/")
+        if branch == _branch(ctx) or Path(path).name == ctx.run_id:
+            found.append(Finding("warn", "worktree-left", f"run integration worktree still present: {path}",
+                                 f"after landing, `git worktree remove {path}`", path))
+            continue
         if not (branch.startswith(prefix) or Path(path).name.startswith(prefix)):
             continue
         fix = ("git worktree prune" if "prunable" in fields else
