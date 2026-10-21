@@ -62,7 +62,9 @@ the whole run unless the plan splits it.
       `GRAPH_RUN_ID=<the run id from your dispatch>`. The profile's
       `${GRAPH_RUN_ID:?}` fails loudly instead of running as project `ge-`.
    2. Read the names in `runtime.env` from the environment you were started
-      with; never write their values anywhere.
+      with; never write their values anywhere. The stack runs on default
+      settings, with only the `runtime.env` names and no developer overrides
+      or local flags; a row that passes only with an override is `FAILED`.
    3. For a compose `up`, run the isolation check below; until it exits 0,
       refuse to start (`BLOCKED`, naming each line it prints).
    4. Check `runtime.port` is free: `lsof -nP -iTCP:<port> -sTCP:LISTEN`
