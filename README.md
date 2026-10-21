@@ -80,6 +80,23 @@ that could not run (`BLOCKED`) keeps the merge gate closed.
 
 User scope. Updates arrive with `/plugin update`.
 
+Optional, for UI work: the `taste` skill routes visual direction to the upstream
+Taste Skill plugin (MIT). The repo owner installs it at project scope, pinned to
+a reviewed tag, in the consumer repo's `.claude/settings.json`:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "taste-skill": { "source": { "source": "github", "repo": "Leonxlnx/taste-skill", "ref": "v2.1.4" } }
+  },
+  "enabledPlugins": { "taste-skill@taste-skill": true }
+}
+```
+
+Agents never install it. Without it, `taste` falls back to its own
+generic-tells check. The pin and its refresh steps live in
+`skills/ux/taste/SOURCE.md`.
+
 ## Develop
 
 ```
@@ -330,7 +347,7 @@ routes no React or FastAPI skill.
 | `observability` | promql, loki, tempo | `observability/**`, `**/dashboards/**/*.json`, `**/*rule*.{yaml,yml}` |
 | `security` | security-review | `always.review` |
 | `privacy` | privacy-review, gdpr-consent, gdpr-erasure-retention | `always.review`, `**/{migrations,schemas}/**` |
-| `ux` | ux-journey, ui-ux-pro-max | `always.design` |
+| `ux` | ux-journey, taste, web-interface-guidelines | `always.design`; web-interface-guidelines on the derived React row (impl and review), taste on its review |
 | `process` | prior-art, review-protocol, ux-evidence, api-contract, definition-of-done, impact-map, product-spec, qa-verification, infra-verification, post-deploy-verification, retro | review-protocol on `always.review`, definition-of-done preloaded in agent frontmatter (planner, both implementers, both reviewers), prior-art and impact-map preloaded by the planner and loaded on demand by implementers, deliberately not in `always`, ux-evidence on every UI-bearing row, api-contract on every API-surface row (`routers/`, `controllers/`, `handlers/`, OpenAPI specs, `*.bru`); product-spec preloaded by `planner`, qa-verification preloaded by `qa`; infra-verification on the GitOps rows; post-deploy-verification and retro named by the playbooks' `post-deploy` and `retro` nodes |
 | `rules` | backend-rules, frontend-rules, architecture-resilience-rules, agent-workflow-rules, review-testing-rules | ride along on their stack's rows; `review-testing-rules` is on `always.impl` |
 

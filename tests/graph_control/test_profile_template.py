@@ -21,7 +21,7 @@ TEMPLATE = ROOT / "templates" / "graph-profile.yaml"
 FALLBACK_DOC = ROOT / "docs" / "competency-routing.md"
 MANIFEST = ROOT / ".claude-plugin" / "plugin.json"
 TEMPLATE_BYTES = 30_000
-VALUES_SHA256 = "f495d3dd1d149498764f9c7683decdcbd74c2c9df69414bf606fb9be7b8c3682"
+VALUES_SHA256 = "dcf658a9518ce7b93cd18749dc8da2dc0160df18929366cd04353c990e3b36d4"
 TITLE = "Dependency-derived rows (applied by /graph-init)"
 HAS_WCMATCH = importlib.util.find_spec("wcmatch") is not None
 
@@ -48,7 +48,7 @@ PAI = ["building-pydantic-ai-agents", "agent-workflow-rules"]
 SUPA = ["supabase", "supabase-postgres-best-practices"]
 # (glob, impl, review, qa) for every row the brief names; `when` and `gap` are prose.
 DERIVED = [
-    (REACT, UI, UI, ["ux-evidence"]),
+    (REACT, [*UI, "web-interface-guidelines"], [*UI, "web-interface-guidelines", "taste"], ["ux-evidence"]),
     (REACT, ["tanstack-query-rules"], ["tanstack-query-rules"], []),
     (REACT, ["tanstack-router"], [], []),
     (REACT, ["tailwind"], ["tailwind"], []),

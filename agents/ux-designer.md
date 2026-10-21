@@ -27,7 +27,7 @@ Run `ux-journey` (preloaded) for the goal in your dispatch, at the size its **Sc
 
 ## Skill routing fallback
 
-`ux-journey` is preloaded. Load every additional skill your dispatch names; if it names none and `ui-ux-pro-max` is available (check the skill listing), load it for the UX-judgment domains - placement, flows, patterns - never its visual values.
+`ux-journey` is preloaded. Load every additional skill your dispatch names; if it names none, load `taste` for the visual direction and `web-interface-guidelines` for the interaction floor. The repo's design tokens win over any value either suggests.
 
 | Files the leg touches | Load, read-only for context |
 |---|---|
