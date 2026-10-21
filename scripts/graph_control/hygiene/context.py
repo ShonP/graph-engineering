@@ -64,7 +64,7 @@ def _near(size: int, cap: int, pct: int) -> bool:
 
 def _total(ident: str, sizes: list[tuple[str, int]], cap: int, pct: int, level: str, fix: str) -> list[Finding]:
     total = sum(size for _, size in sizes)
-    if not sizes or not _near(total, cap, pct):
+    if not _near(total, cap, pct):
         return []
     path, largest = max(sizes, key=lambda item: item[1])
     level = level if total > cap else "warn"
