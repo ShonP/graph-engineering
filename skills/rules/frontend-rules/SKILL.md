@@ -21,6 +21,12 @@ The first section applies to every UI stack. The rest is for React + Tailwind fr
 - Reviewers flag a hand-built copy of an existing component, or a second copy of a new pattern, as
   Important.
 
+## Edge states (every UI stack)
+
+- Every query renders a loading, empty and error state; the empty state offers the next action.
+- A submit control is disabled while its request is pending.
+- Missing is not zero: a null value renders a no-value placeholder, never `0`.
+
 ## Defaults
 
 - Mobile-first.

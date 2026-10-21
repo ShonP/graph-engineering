@@ -83,7 +83,7 @@ evaluation. Usable as "instruction files are cheap and probably help", not as
 
 ## Output - the prior-art note
 
-Every task carries one, however short. Small task: a `## Prior art` section in
+Every run carries one on its plan, however short. Small task: a `## Prior art` section in
 the plan or PR body. Feature run: `.graph/<run>/research/prior-art.md`,
 composed from the researcher reports. Content:
 
@@ -102,6 +102,6 @@ Skipped          : <reason>   (only when the skip rule applied)
 | --- | --- |
 | planner | goal node frames the research questions; plan node reads the reports, writes the note, and names the reuse decision before any build task |
 | researcher | executes ux / tech / competitor / impact / spike modes; the note cites its reports |
-| implementer | reads the run's note before code; runs the small-task version when there is none; re-fires on any mid-task trigger and appends to the note |
+| implementer | reads the run's note when the brief points to it; loads this skill only when the brief flags a library or design choice or a mid-task trigger fires, and reports what it found |
 | reviewer | plan or PR without a prior-art note or a written skip reason is Important; new code that re-implements an available, adequate library or skill is Important |
 | ux-designer | pattern research in `ux-journey` step 3 is this rule for UX; cite patterns, not pixels |

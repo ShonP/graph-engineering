@@ -10,6 +10,16 @@ commits.
 
 ## [Unreleased]
 
+### Added
+
+- **No-comments rule** in `definition-of-done`, the one skill every writer and reviewer preloads: names and structure explain the code; the exceptions are a non-obvious why citing something outside it and a comment a routed house skill requires (`helm` values, `ruff` rule sets), which wins. Reviewers flag each added comment that breaks it as a Nit, Important when it misleads. `backend-rules` drops its looser duplicate.
+- **`review.cadence`** profile key: `per-task` (default, unchanged) or `per-run`, which merges tasks on their tests and quick gate, then reviews the whole run diff once beside qa with one batched fix round in the run worktree, its review written to `findings.run.json`. New `graph-control review-files <run> --profile <p>` prints the findings files merge gate (b) and the retro fast path read under either cadence; `depth` validates the key and echoes it.
+- **Lifted rules**: `review-testing-rules` gains worktree per task (never commit on the default branch in the main checkout), official-CLI scaffolding, `.env.example` upkeep, deferred work filed before finishing, and the ~250 LOC split signal; `frontend-rules` gains UI edge states (loading/empty/error per query, submit disabled while pending, null is not zero).
+
+### Changed
+
+- **Token diet.** `retro` runs with `omitClaudeMd: true` like `researcher-spike` (it reads only the run directory); the engine's dispatch shape carries both their rule packs and project invariants. The template's `always.impl` drops `prior-art` (6,123 bytes per implementer dispatch): the planner keeps it preloaded and implementers load it only when the brief flags a library or design choice. `implementer` stops preloading `impact-map` (5,945 bytes) and loads it for mid-task triage; without a planner note an implementer writes one `Prior art:` line or a written skip. `definition-of-done` shrinks 6,322 -> 6,198 bytes and is back under its ceiling.
+
 ## [0.18.0] - 2026-10-11
 
 ### Added

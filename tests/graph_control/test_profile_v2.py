@@ -110,7 +110,7 @@ class SchemaV2Tests(unittest.TestCase):
         self.assertEqual(p["integration"], "pr")
         self.assertEqual(p["localLanes"], {})
         self.assertEqual(p["instructionPaths"], ["CLAUDE.md", "**/CLAUDE.md", "AGENTS.md", ".claude/**"])
-        self.assertEqual(p["review"], {"panel_lines": 2000, "seams": []})
+        self.assertEqual(p["review"], {"panel_lines": 2000, "seams": [], "cadence": "per-task"})
         self.assertEqual(p["ownerAccess"], "")
         self.assertEqual(p["ci"], {"parity": ""})
 

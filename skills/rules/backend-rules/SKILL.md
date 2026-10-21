@@ -9,7 +9,6 @@ Use for NestJS, FastAPI, service, worker, API, DB, and backend TypeScript/Python
 
 ## Defaults
 
-- Write self-descriptive code. No comments unless they clarify non-obvious domain decisions.
 - Remove unused values and variables.
 - Single object argument for TypeScript functions: `const fn = (args: { arg1: string; arg2: number }) => {}`.
 - Think reusability and modularity by default.

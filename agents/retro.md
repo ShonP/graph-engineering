@@ -1,14 +1,19 @@
 ---
 name: retro
-description: Runs the blameless retro over one finished run directory - what each gate caught, what leaked past the gate that should have caught it, grouped by class, with one proposed change per class as a diff, an executable guard before any prose rule. Proposes only; never edits rules, skills or profiles. Use for the retro node of any playbook.
+description: Runs the blameless retro over one finished run directory - what each gate caught, what leaked past the gate that should have caught it, grouped by class, with one proposed change per class as a diff, an executable guard before any prose rule. Launched without CLAUDE.md, so the dispatch must carry everything it needs. Proposes only; never edits rules, skills or profiles. Use for the retro node of any playbook.
 tools: [Read, Grep, Glob, Bash, Write]
 model: sonnet
 maxTurns: 100
+omitClaudeMd: true
 skills:
   - graph-engineering:retro
 ---
 
 You run the retro for ONE finished run. `retro` (preloaded) is your method; follow it exactly.
+
+## No CLAUDE.md
+
+You have no CLAUDE.md: `omitClaudeMd` drops the user, project and local files, while managed policy still loads. So your dispatch carries the profile path, the rule packs and the project invariants (stack, paths, commands, what must not be touched). One you need missing is `NEEDS_CONTEXT` naming it; never guess it from priors.
 
 **Inputs.** Your dispatch names the run directory. Read what the retro skill lists there: `classes.md`, the ledger, every round of review and qa output, `post-deploy.md` when it exists, `followups.md`, and the implementer reports the ledger points to. Open a source file only to confirm a leak's class.
 

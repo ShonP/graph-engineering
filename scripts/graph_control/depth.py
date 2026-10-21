@@ -33,6 +33,7 @@ from typing import Any
 from .common import Invalid, array, integer, require, strings
 from .identity import git
 from .plan import Plan
+from .review_files import cadence
 from .risk import BUDGET, Row, classify, control_row, load_rows, matcher, skipped_lines
 
 PROSE_NAMES = "README,CHANGELOG,CHANGES,HISTORY,NEWS,AUTHORS,CONTRIBUTORS,CONTRIBUTING,LICENSE,LICENCE,NOTICE,COPYING"
@@ -115,7 +116,9 @@ def _outside(paths: list[str], rows: tuple[Row, ...], plan: Any) -> list[str]:
 
 
 def decide(root: Path, base: str, profile: dict[str, Any], plan: Any = None, budget: float = BUDGET) -> dict[str, Any]:
-    panel_lines = integer(_mapping(profile.get("review"), "review").get("panel_lines", PANEL_LINES), 1)
+    review = _mapping(profile.get("review"), "review")
+    panel_lines = integer(review.get("panel_lines", PANEL_LINES), 1)
+    chosen = cadence(profile)
     rows = (*load_rows(profile), control_row(strings(profile.get("instructionPaths", []))))
     seams = _seams(profile)
     commit = _commit(root, base)
@@ -128,7 +131,8 @@ def decide(root: Path, base: str, profile: dict[str, Any], plan: Any = None, bud
 
     def result(depth: str, reasons: list[str]) -> dict[str, Any]:
         return {"depth": depth, "changed_lines": lines, "files": files, "risk_rows": risk_rows,
-                "reasons": reasons, "untracked_excluded": True, "regex_skipped_long_lines": skipped}
+                "reasons": reasons, "untracked_excluded": True, "regex_skipped_long_lines": skipped,
+                "cadence": chosen}
 
     reasons = [f"risk rows: {', '.join(risk_rows)}"] if risk_rows else []
     if outside:

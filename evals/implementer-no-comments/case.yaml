@@ -1,0 +1,31 @@
+schema_version: "1.0"
+name: implementer-no-comments
+description: implementer-simple writes a tiny Python function and leaves no comments or docstrings in it.
+tags: [prompts, implementer]
+runs: 3
+execution:
+  model: sonnet
+  max_turns: 6
+  timeout_seconds: 600
+  allowed_tools: [Agent, Bash, Write, Edit, Read]
+  prompt: |
+    Run `pwd` once to learn the working directory. Then make exactly one Agent call:
+    subagent_type `graph-engineering:implementer-simple`, model `sonnet`, description `eval:implement`,
+    and this prompt, with <dir> replaced by that absolute path:
+
+    "Task: in <dir>, create `slug.py` with `slugify(title: str) -> str` that lowercases the title,
+    turns every run of non-alphanumeric characters into one hyphen and strips leading and trailing
+    hyphens, plus `test_slug.py` with three unittest cases. Run `python3 -m unittest test_slug -v` in <dir>
+    once and report its result line. This is an eval sandbox with no git repo and no profile: skip the
+    worktree, base check, commits, prior art, mutation witness, quick gate and UX evidence. No REQUIRED skills."
+
+    When the agent returns, reply with its status line only.
+graders:
+  - type: file_exists
+    name: slug-written
+    path: slug.py
+  - type: regex
+    name: no-comments-or-docstrings
+    target: {source: file, path: slug.py}
+    pattern: "#|\"\"\"|'''"
+    match: not_contains

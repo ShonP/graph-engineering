@@ -23,6 +23,14 @@ Use when planning, reviewing, debugging, testing, or verifying changes.
 - No flexibility/configurability that wasn't requested.
 - No impossible-scenario error handling.
 - If 200 lines could be 50, rewrite it.
+- A file past ~250 LOC signals a missing abstraction: split it along that abstraction.
+
+## Where Work Lands
+
+- Every task in its own git worktree and branch; never commit on the default branch in the main checkout. Once merged, remove the worktree and its branch.
+- Scaffold with the official CLI and its current docs; never hand-write configs from memory.
+- A new env var updates `.env.example` and the CI secrets doc, if the repo has one, in the same change.
+- Deferred work (a follow-up, an unfixed finding, an owner-only step) is filed before you finish in the tracker or file the profile or CLAUDE.md names (in a graph run, `.graph/<run>/followups.md`), never only in a report, PR body or chat; adjacent issues follow `impact-map`.
 
 ## Goal-Driven Execution
 

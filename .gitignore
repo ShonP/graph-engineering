@@ -1,4 +1,5 @@
 .graph/
+evals/results/
 .worktrees/
 node_modules/
 .DS_Store
