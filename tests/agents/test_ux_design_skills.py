@@ -111,5 +111,50 @@ class Routing(unittest.TestCase):
                 self.assertIn(needle, body)
 
 
+MEDIA_DOCS = (
+    AGENTS / "ux-designer.md",
+    AGENTS / "planner.md",
+    UX / "ux-journey" / "SKILL.md",
+    UX / "ux-journey" / "references" / "render-media.md",
+)
+MEDIA_DIRS = ("`as-is/`", "`to-be/`")
+
+
+def fragments(text):
+    prose = re.sub(r"\n(?![\n|])\s*", " ", text)
+    return re.split(r"(?<=[.;])\s+|\n+", prose)
+
+
+class DesignMediaStaysOutOfGit(unittest.TestCase):
+    def test_no_doc_says_to_commit_the_media(self):
+        for path in MEDIA_DOCS:
+            text = path.read_text(encoding="utf-8")
+            with self.subTest(path=path.name):
+                self.assertNotIn("commits `experience.md`, `as-is/` and `to-be/`", text)
+                self.assertNotIn("committed PNG", text)
+                for part in fragments(text):
+                    if any(d in part for d in MEDIA_DIRS) and re.search(r"\bcommit", part):
+                        self.assertIn("never", part, part)
+
+    def test_each_doc_routes_media_to_the_store_or_the_run_dir(self):
+        for path in MEDIA_DOCS:
+            text = path.read_text(encoding="utf-8")
+            for needle in ("<store.push>", "uxEvidence.store", ".graph/<run>/design/",
+                           "<docsPath>/ux/<date>-<feature>/"):
+                with self.subTest(path=path.name, needle=needle):
+                    self.assertIn(needle, text)
+
+    def test_plan_gate_still_shows_the_images_inline(self):
+        text = (AGENTS / "planner.md").read_text(encoding="utf-8")
+        self.assertIn("images inline", text)
+        self.assertIn("commits `experience.md` only", text)
+
+    def test_prior_decisions_still_come_from_committed_specs(self):
+        _, body = split(UX / "ux-journey" / "SKILL.md")
+        step = body.split("2. **Ground it", 1)[1].split("3. **Pattern research", 1)[0]
+        self.assertIn("`<docsPath>/ux/`", step)
+        self.assertIn("`*/experience.md`", step)
+
+
 if __name__ == "__main__":
     unittest.main()
