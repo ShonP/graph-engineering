@@ -96,6 +96,14 @@ class Sweep(unittest.TestCase):
         rows, _ = self.rows(self.check())
         self.assertEqual(rows, [])
 
+    def test_a_sibling_sharing_a_prefix_ages_apart(self):
+        self.add(40, tools__old__a="x\n")
+        self.add(2, tools__older__a="tools/old\n")
+        self.assertEqual(self.rows(self.check())[0], [])
+        git(self.root, "rm", "-q", "tools/older/a")
+        self.add(2, tools__older__b="y\n")
+        self.assertEqual(self.rows(self.check())[0], ["| tools/old | 40 | 0 | 1 | delete |"])
+
     def test_a_root_glob_matching_a_file_is_skipped(self):
         self.add(90, tools__README___md="acme-widget notes\n")
         rows, small = self.rows(self.check())
