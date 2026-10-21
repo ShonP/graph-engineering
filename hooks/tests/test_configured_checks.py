@@ -377,7 +377,8 @@ class GateChecksSchema(unittest.TestCase):  # AC-GC-SHAPE
         def entry(**changes):
             return [{key: value for key, value in {**self.ADVISORY, **changes}.items() if value is not None}]
         invalid = {
-            'checks not an array': {'id': 'x'}, 'entry not an object': ['jscpd'],
+            'checks an object': {'id': 'x'}, 'checks null': None, 'checks a number': 3,
+            'entry not an object': ['jscpd'],
             'advisory without expires': entry(expires=None), 'expires on blocking': entry(mode='blocking'),
             'no mode': entry(mode=None), 'unknown mode': entry(mode='warn'),
             'bad date': entry(expires='2026-02-30'), 'compact date': entry(expires='20261101'),
