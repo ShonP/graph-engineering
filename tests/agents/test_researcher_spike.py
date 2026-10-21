@@ -130,6 +130,9 @@ class ResearcherPointsToSpike(unittest.TestCase):
             self.assertRegex(self.body, rf"(?m)^- \*\*{mode}\*\* - ")
         self.assertIn("five modes", self.fm["description"])
 
+    def test_researcher_still_has_no_omit_flag(self):
+        self.assertNotIn("omitClaudeMd", self.fm)
+
 
 class DispatchersRouteToTheSpikeAgent(unittest.TestCase):  # AC-W3-SP-03
     """Every engine and skill that dispatches a spike names researcher-spike, not researcher."""

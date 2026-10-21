@@ -1,6 +1,6 @@
 ---
 name: retro
-description: Runs the blameless retro over one finished run directory - what each gate caught, what leaked past the gate that should have caught it, grouped by class, with one proposed change per class as a diff, an executable guard before any prose rule. Proposes only; never edits rules, skills or profiles. Use for the retro node of any playbook.
+description: Runs the blameless retro over one finished run directory - what each gate caught, what leaked past the gate that should have caught it, grouped by class, with one proposed change per class as a diff, an executable guard before any prose rule. Launched without CLAUDE.md, so the dispatch must carry everything it needs. Proposes only; never edits rules, skills or profiles. Use for the retro node of any playbook.
 tools: [Read, Grep, Glob, Bash, Write]
 model: sonnet
 maxTurns: 100
