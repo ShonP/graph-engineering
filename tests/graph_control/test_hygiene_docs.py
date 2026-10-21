@@ -151,6 +151,15 @@ class Text(Base):
         self.assertNotIn(f"add {body}", result["findings"][0]["fix"])
         self.assertIn("hygiene.docs.ignore", result["findings"][0]["fix"])
 
+    def test_text_file_inside_the_repo_resolves_from_its_own_directory(self):
+        self.profile(roots="")
+        stage(self.root, "packages/foo/src/index.ts", "export {}\n")
+        commit_at(self.root, "base", 0, NOW)
+        body = self.root / "packages" / "foo" / "body.md"
+        body.write_text("Entry `src/index.ts`, dead `src/gone.ts`.\n", encoding="utf-8")
+        _, result = self.invoke("--text", str(body))
+        self.assertEqual([f["message"] for f in result["findings"]], ["`src/gone.ts` does not exist in the tracked tree"])
+
     def test_text_accepts_paths_the_history_deleted(self):
         self.profile(roots="")
         stage(self.root, "scripts/old.py", "old\n")

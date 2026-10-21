@@ -124,6 +124,8 @@ class Scope(Base):
         self.assertEqual([(item.path, item.line) for item in self.rule.run(ctx)], [("src/old.ts", 3)])
         self.assertEqual(self.findings(profile(ROW)), [("error", "literal-stray", "src/old.ts", 1),
                                                        ("error", "literal-stray", "src/old.ts", 3)])
+        stage(self.root, "src/old.ts", f"z\ny\nfetch('{HOST}')\n")
+        self.assertEqual(self.findings(profile(ROW), "staged"), [])
 
     def test_owner_status_comes_from_the_glob_not_the_scope(self):
         stage(self.root, "config/more.ts", f"{HOST}\n")
