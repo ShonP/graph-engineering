@@ -65,6 +65,11 @@ class DocsAge(unittest.TestCase):
         self.add("docs/plans/old.md", 400)
         self.assertEqual(self.found(), [])
 
+    def test_old_files_outside_the_globs_are_not_aged(self):
+        self.add("docs/specs/kept.md", 400)
+        self.add("README.md", 400)
+        self.assertEqual(self.found(), [])
+
     def test_ephemeral_days_defaults_to_fourteen(self):
         self.profile = write_profile(self.root, 'hygiene:\n  docs:\n    ephemeral: ["docs/plans/**"]\n')
         self.add("docs/plans/a.md", 14)
