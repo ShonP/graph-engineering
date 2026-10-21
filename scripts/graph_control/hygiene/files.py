@@ -27,12 +27,13 @@ def _hit(ctx: Context, item: ScopeFile, deny) -> Hit | None:
     path, remove = item.path, f"`git rm --cached -- {item.path}`"
     design = f"{(ctx.config.docs_path or DEFAULT_DOCS).strip('/')}/ux"
     evidence = ctx.config.ux_evidence
-    if _media(path) and _under(path, design):
-        return "media-design", f"{path} is design media under {design}/", \
-            f"{remove}; design media stays in .graph/<run>/design/"
-    if _media(path) and evidence.store and _under(path, evidence.path):
+    in_evidence = _media(path) and _under(path, evidence.path)
+    if in_evidence and evidence.store:
         return "media-evidence", f"{path} is UX evidence media under {evidence.path}", \
             f"push it with the `uxEvidence.store` push command, then {remove}"
+    if _media(path) and not in_evidence and _under(path, design):
+        return "media-design", f"{path} is design media under {design}/", \
+            f"{remove}; design media stays in .graph/<run>/design/"
     if deny.match(path):
         return "media-deny", f"{path} matches hygiene.media.deny", f"{remove}, or add it to `hygiene.media.allow`"
     limit, kb = ctx.config.media.max_kb, math.ceil(item.size / 1024)

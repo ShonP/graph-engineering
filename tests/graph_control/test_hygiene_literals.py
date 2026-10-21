@@ -7,11 +7,11 @@ import tempfile
 import unittest
 from datetime import datetime, timezone
 
-from hygiene_fixture import commit_at, make_repo, stage, write_profile
+from hygiene_fixture import commit_at, git, make_repo, stage, write_profile
 from graph_control import cli
 from graph_control.hygiene import Context, doctor_rows, iter_rules
 from graph_control.hygiene.config import parse
-from graph_control.hygiene.scope import staged, tracked
+from graph_control.hygiene.scope import base, staged, tracked
 
 NOW = datetime(2026, 1, 15, 12, 0, tzinfo=timezone.utc)
 HOST = "api.example.test"
@@ -111,6 +111,21 @@ class Scope(Base):
     def test_staged_sees_only_staged_files(self):
         stage(self.root, "src/new.ts", f"x\n{HOST}\n")
         self.assertEqual(self.findings(profile(ROW), "staged"), [("error", "literal-stray", "src/new.ts", 2)])
+
+    def test_diff_scopes_read_only_added_lines_and_tracked_reads_whole_files(self):
+        first = git(self.root, "rev-parse", "HEAD").strip()
+        stage(self.root, "src/old.ts", f"{HOST}\ny\n")
+        self.assertEqual(self.findings(profile(ROW), "staged"), [])
+        stage(self.root, "src/old.ts", f"{HOST}\ny\nfetch('{HOST}')\n")
+        self.assertEqual(self.findings(profile(ROW), "staged"), [("error", "literal-stray", "src/old.ts", 3)])
+        commit_at(self.root, "edit", 0, NOW)
+        ctx = Context(root=self.root, config=parse(profile(ROW)), mode="base", now=NOW,
+                      files=tuple(base(self.root, first)), base=first)
+        self.assertEqual([(item.path, item.line) for item in self.rule.run(ctx)], [("src/old.ts", 3)])
+        self.assertEqual(self.findings(profile(ROW)), [("error", "literal-stray", "src/old.ts", 1),
+                                                       ("error", "literal-stray", "src/old.ts", 3)])
+        stage(self.root, "src/old.ts", f"z\ny\nfetch('{HOST}')\n")
+        self.assertEqual(self.findings(profile(ROW), "staged"), [])
 
     def test_owner_status_comes_from_the_glob_not_the_scope(self):
         stage(self.root, "config/more.ts", f"{HOST}\n")

@@ -1,12 +1,13 @@
 """literals: a fact listed under hygiene.literals has one owner; its pattern in any other text file is a
 stray copy, reported by path, line and row id only, never the matched text. Owner and allow globs exempt
-a path whatever the scope, as do test paths. The pattern is compiled the way risk `re:` keywords are: a
+a path whatever the scope, as do test paths. --staged and --base read only the lines the diff adds;
+--tracked reads whole files. The pattern is compiled the way risk `re:` keywords are: a
 regex that does not compile or matches an empty line is an error, a nested quantifier warns, and lines
 over risk.LONG_LINE characters are not searched. Owner globs that match no file are not reported."""
 
 from . import Context, Finding, Row
 from .config import Literal
-from .scope import read_text
+from .scope import ScopeFile, added_lines, read_text
 from ..risk import LONG_LINE, REGEX, BadPattern, Row as Keywords, matcher, nested
 
 ID = "literals"
@@ -36,13 +37,19 @@ def _stray(item: Literal, path: str, number: int) -> Finding:
                    path, number)
 
 
+def _lines(ctx: Context, file: ScopeFile) -> list[tuple[int, str]]:
+    if ctx.mode == "tracked":
+        return list(enumerate((read_text(ctx.root, file) or "").split("\n"), 1))
+    return [] if file.binary else added_lines(ctx.root, file.path, None if ctx.mode == "staged" else ctx.base)
+
+
 def _scan(ctx: Context, item: Literal, keywords: Keywords) -> list[Finding]:
     [pattern] = keywords.regexes
     skip, exempt = matcher(SKIP), matcher((*item.owner, *item.allow))
     found = []
     for file in ctx.files:
-        text = None if skip.match(file.path) or exempt.match(file.path) else read_text(ctx.root, file)
-        for number, line in enumerate((text or "").split("\n"), 1):
+        lines = [] if skip.match(file.path) or exempt.match(file.path) else _lines(ctx, file)
+        for number, line in lines:
             if len(line) <= LONG_LINE and pattern.search(line):
                 found.append(_stray(item, file.path, number))
     return found

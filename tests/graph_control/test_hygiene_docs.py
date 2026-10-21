@@ -123,6 +123,20 @@ class Paths(Base):
         self.assertEqual([(f["id"], f["line"]) for f in result["findings"]],
                          [("doc-path", 1), ("doc-path", 1), ("doc-line", 2)])
 
+    def test_cites_resolve_against_the_citing_docs_directory_too(self):
+        self.profile(roots='"**/*.md"')
+        stage(self.root, "packages/foo/src/index.ts", "export {}\nexport {}\n")
+        stage(self.root, "packages/foo/README.md", "\n".join([
+            "Entry `./src/index.ts`, `src/index.ts:2` and root `src/a.ts`.",
+            "Dead `./src/gone.ts`.",
+            "Past the end `src/index.ts:9`.", ""]))
+        commit_at(self.root, "monorepo", 0, NOW)
+        _, result = self.invoke("--tracked")
+        self.assertEqual(finding_keys(result), [("error", "doc-line", "packages/foo/README.md", 3),
+                                                ("error", "doc-path", "packages/foo/README.md", 2)])
+        self.assertIn("packages/foo/src/index.ts has 2 lines",
+                      next(f["message"] for f in result["findings"] if f["id"] == "doc-line"))
+
 
 class Text(Base):
     def test_text_file_outside_the_repo_resolves_with_roots_empty(self):
@@ -134,6 +148,35 @@ class Text(Base):
         code, result = self.invoke("--text", str(body))
         self.assertEqual(code, 1)
         self.assertEqual(finding_keys(result), [("error", "doc-path", str(body), 2)])
+        self.assertNotIn(f"add {body}", result["findings"][0]["fix"])
+        self.assertIn("hygiene.docs.ignore", result["findings"][0]["fix"])
+
+    def test_text_file_inside_the_repo_resolves_from_its_own_directory(self):
+        self.profile(roots="")
+        stage(self.root, "packages/foo/src/index.ts", "export {}\n")
+        commit_at(self.root, "base", 0, NOW)
+        body = self.root / "packages" / "foo" / "body.md"
+        body.write_text("Entry `src/index.ts`, dead `src/gone.ts`.\n", encoding="utf-8")
+        _, result = self.invoke("--text", str(body))
+        self.assertEqual([f["message"] for f in result["findings"]], ["`src/gone.ts` does not exist in the tracked tree"])
+
+    def test_text_accepts_paths_the_history_deleted(self):
+        self.profile(roots="")
+        stage(self.root, "scripts/old.py", "old\n")
+        stage(self.root, "scripts/olddir/a.png", "a\n")
+        commit_at(self.root, "base", 1, NOW)
+        git(self.root, "rm", "-q", "-r", "--", "scripts/old.py", "scripts/olddir")
+        commit_at(self.root, "delete", 0, NOW)
+        body = self.tmp / "merge.md"
+        body.write_text("Deletes `scripts/old.py`, `scripts/old.py:1` and `scripts/olddir`.\n"
+                        "Dead `scripts/never.py`.\n", encoding="utf-8")
+        _, result = self.invoke("--text", str(body))
+        self.assertEqual(finding_keys(result), [("error", "doc-path", str(body), 2)])
+        stage(self.root, "docs/old.md", "Was `scripts/old.py`.\n")
+        commit_at(self.root, "doc", 0, NOW)
+        self.profile()
+        _, result = self.invoke("--tracked")
+        self.assertEqual(finding_keys(result), [("error", "doc-path", "docs/old.md", 1)])
 
 
 class Scope(Base):

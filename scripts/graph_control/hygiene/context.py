@@ -8,6 +8,7 @@ from . import Context, Finding, Row
 ID = "context"
 MODES = frozenset({"staged", "base", "tracked", "doctor"})
 QUICK = True
+DIFF_MODES = frozenset({"staged", "base"})
 FINDING = "context-budget"
 BUILTIN = "always-on"
 BUILTIN_TOTAL = 24000
@@ -72,8 +73,17 @@ def _total(ident: str, sizes: list[tuple[str, int]], cap: int, pct: int, level: 
                     f"{cap}-byte cap; largest file {path} ({largest} bytes)", fix, path)]
 
 
+def _in_scope(ctx: Context, sizes: list[tuple[str, int]]) -> bool:
+    if ctx.mode not in DIFF_MODES:
+        return True
+    changed = {item.path for item in ctx.files}
+    return any(path in changed for path, _ in sizes)
+
+
 def _builtin(ctx: Context) -> list[Finding]:
     sizes, pct = _sizes(ctx.root, _always_on(ctx.root)), ctx.config.context.warn_pct
+    if not _in_scope(ctx, sizes):
+        return []
     per_file = [Finding("warn", FINDING, f"context budget {BUILTIN} file {path} is {size} bytes, "
                         f"{_relation(size, BUILTIN_FILE)} the {BUILTIN_FILE}-byte per-file cap", BUILTIN_FIX, path)
                 for path, size in sizes if _near(size, BUILTIN_FILE, pct)]
@@ -85,8 +95,9 @@ def _profile(ctx: Context) -> list[Finding]:
     for budget in ctx.config.context.budgets:
         paths = sorted({path for glob in budget.globs for path in ctx.root.glob(glob)})
         fix = f"trim the files budget {budget.id} matches, or raise its max_bytes in hygiene.context.budgets"
-        found += _total(budget.id, _sizes(ctx.root, paths), budget.max_bytes, ctx.config.context.warn_pct,
-                        "error", fix)
+        sizes = _sizes(ctx.root, paths)
+        if _in_scope(ctx, sizes):
+            found += _total(budget.id, sizes, budget.max_bytes, ctx.config.context.warn_pct, "error", fix)
     return found
 
 

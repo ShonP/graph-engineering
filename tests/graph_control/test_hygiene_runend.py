@@ -91,6 +91,23 @@ class RunEnd(unittest.TestCase):
         self.assertEqual((finding["level"], finding["id"], finding["path"]), ("error", "worktree-left", str(path)))
         self.assertIn(f"--prefix {RUN}-", finding["fix"])
 
+    def test_integration_worktree_is_a_warning_until_landing(self):
+        path = self.tmp / "wt" / RUN
+        git(self.root, "worktree", "add", "-q", str(path), BRANCH)
+        result = self.invoke()
+        [finding] = result["findings"]
+        self.assertEqual((result["run_end"], finding["level"], finding["id"], finding["path"]),
+                         ("CLEAN", "warn", "worktree-left", str(path)))
+        self.assertIn(f"git worktree remove {path}", finding["fix"])
+        git(self.root, "worktree", "remove", str(path))
+        renamed = self.tmp / "wt" / "integration"
+        git(self.root, "worktree", "add", "-q", str(renamed), BRANCH)
+        self.assertEqual([(f["level"], f["path"]) for f in self.invoke()["findings"]], [("warn", str(renamed))])
+        git(self.root, "worktree", "remove", str(renamed))
+        detached = self.tmp / "wt2" / RUN
+        git(self.root, "worktree", "add", "-q", "--detach", str(detached), "main")
+        self.assertEqual([(f["level"], f["id"]) for f in self.invoke()["findings"]], [("warn", "worktree-left")])
+
     def test_run_worktree_matched_by_directory_name(self):
         self.worktree(f"{RUN}-T2")
         self.assertEqual(self.ids(self.invoke()), ["worktree-left"])

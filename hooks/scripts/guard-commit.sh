@@ -31,6 +31,7 @@ import sys
 PUNCT = {"&&", "||", ";", "|", "&", "(", ")", ";;", "|&"}
 VALUED = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--config-env"}
 PREFIX = "graph-engineering commit guard: "
+ELSEWHERE = re.compile(r"(?<![\w-])(GIT_DIR|GIT_WORK_TREE)=|(?<![\w-])--(git-dir|work-tree)\b")
 
 
 def segments(command):
@@ -47,6 +48,8 @@ def segments(command):
 
 
 def commit_dir(command, cwd):
+    if ELSEWHERE.search(command):
+        return None
     inner = [a or b for a, b in re.findall(r"`([^`]*)`|\$\(([^()]*)\)", command)]
     for part in [command] + inner:
         found = git_commit(part, cwd)
@@ -97,7 +100,11 @@ def main():
         return
     if directory is None:
         return
-    top = run(["git", "-C", directory, "rev-parse", "--show-toplevel"], 5)
+    try:
+        top = run(["git", "-C", directory, "rev-parse", "--show-toplevel"], 5)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        print(f"{PREFIX}hygiene did not run (error ({type(error).__name__})); commit allowed", file=sys.stderr)
+        return
     root = top.stdout.strip()
     if top.returncode != 0 or not os.path.isfile(os.path.join(root, ".claude", "graph-profile.yaml")):
         return

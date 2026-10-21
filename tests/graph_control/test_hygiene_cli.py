@@ -444,6 +444,44 @@ class Cli(Temp):
         self.assertEqual({argv[0] for argv in calls}, {"git"})
         self.assertFalse((self.root / "should-not-exist").exists())
 
+    def test_shipped_rules_start_only_git_in_every_mode(self):
+        calls = []
+        real_run, real_popen = subprocess.run, subprocess.Popen
+
+        def program(argv):
+            return argv if isinstance(argv, str) else str(argv[0])
+
+        def run(argv, *args, **kwargs):
+            calls.append(program(argv))
+            return real_run(argv, *args, **kwargs)
+
+        def popen(argv, *args, **kwargs):
+            calls.append(program(argv))
+            return real_popen(argv, *args, **kwargs)
+
+        note = self.tmp / "body.md"
+        note.write_text("See `a.txt` and `src/missing.py`.\n")
+        write_profile(self.root, "gates: {quick: \"touch should-not-exist\"}\nhygiene:\n"
+                      "  docs: {roots: [\"**/*.md\"], ephemeral: [\"notes/**\"]}\n"
+                      "  comments: {mode: none}\n  surfaces: {roots: [\"*\"]}\n"
+                      "  literals: [{id: app-host, pattern: \"api\\\\.example\\\\.test\", owner: [\"cfg/**\"]}]\n"
+                      "  context: {budgets: [{id: core, globs: [\"*.md\"], max_bytes: 10}]}\n")
+        stage(self.root, "README.md", "Start at `a.txt`.\n")
+        stage(self.root, "src/app.ts", "// note\nconst host = \"api.example.test\";\n")
+        shipped = SimpleNamespace(NAME=command.NAME, HELP=command.HELP, add_arguments=command.add_arguments,
+                                  run=lambda args: command.run(args, now=NOW))
+        self.modules = [shipped]
+        with mock.patch("subprocess.run", run), mock.patch("subprocess.Popen", popen):
+            for argv in (["--staged"], ["--base", self.first], ["--tracked"], ["--run-end", "run-1"],
+                         ["--sweep"], ["--text", str(note)]):
+                with self.subTest(argv=argv):
+                    self.assertIn(self.invoke(*argv)[0], (0, 1))
+            doctor_rows(yaml.safe_load((self.root / ".claude" / "graph-profile.yaml").read_text()),
+                        self.root, False)
+        self.assertGreater(len(calls), 6)
+        self.assertEqual(set(calls), {"git"})
+        self.assertFalse((self.root / "should-not-exist").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

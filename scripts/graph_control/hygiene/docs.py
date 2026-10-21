@@ -1,11 +1,14 @@
 """docs: backticked paths and path:line cites under a tracked top-level entry must resolve against git ls-files.
 
-The docs are the tracked files matching docs.roots minus docs.ignore, or the one --text file.
+A cite resolves from the repo root or from the citing doc's directory. The docs are the tracked files
+matching docs.roots minus docs.ignore, or the one --text file, where a path HEAD's history deleted resolves too.
 """
 
+import posixpath
 import re
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 
+from ..common import Invalid
 from ..risk import matcher
 from . import Context, Finding
 from .scope import git, read_text
@@ -34,12 +37,26 @@ def _cites(text: str) -> list[tuple[int, str, str, int | None]]:
     return cites
 
 
+def _parents(names: frozenset[str]) -> frozenset[str]:
+    return frozenset(str(parent) for name in names for parent in PurePosixPath(name).parents)
+
+
+def _deleted(root) -> frozenset[str]:
+    try:
+        names = git(root, "log", "--format=", "--name-only", "--diff-filter=D", "-z", "HEAD", "--")
+    except Invalid:
+        return frozenset()
+    gone = frozenset(name.strip("\n") for name in names.split("\0")) - {""}
+    return gone | _parents(gone)
+
+
 class Tree:
-    def __init__(self, root):
+    def __init__(self, root, history: bool = False):
         self.root = root
         self.files = frozenset(git(root, "ls-files", "-z").split("\0")) - {""}
-        self.dirs = frozenset(str(parent) for name in self.files for parent in PurePosixPath(name).parents)
+        self.dirs = _parents(self.files)
         self.tops = frozenset(name.split("/")[0] for name in self.files)
+        self.gone = _deleted(root) if history else frozenset()
         self.counts: dict[str, int | None] = {}
 
     def claims(self, path: str) -> bool:
@@ -54,6 +71,8 @@ class Tree:
         return self.counts[name]
 
     def check(self, path: str, line: int | None) -> tuple[str, str] | None:
+        if path in self.gone and path not in self.files:
+            return None
         if GLOB.search(path):
             hit = matcher([path]).match
             return None if any(hit(name) for name in self.files) else ("doc-path", "matches no tracked file")
@@ -76,17 +95,41 @@ def _docs(ctx: Context) -> list[tuple[str, str]]:
     return [(item.path, text) for item in docs if (text := read_text(ctx.root, item)) is not None]
 
 
+def _folder(ctx: Context, doc: str) -> str | None:
+    if ctx.mode != "text":
+        return PurePosixPath(doc).parent.as_posix()
+    try:
+        return Path(doc).resolve().parent.relative_to(Path(ctx.root).resolve()).as_posix()
+    except ValueError:
+        return None
+
+
+def _problem(tree: Tree, folder: str | None, path: str, line: int | None) -> tuple[str, str] | None:
+    candidates = [path]
+    if folder not in (None, "."):
+        candidates.append(posixpath.normpath(posixpath.join(folder, path)))
+    problems = [tree.check(candidate, line) for candidate in candidates]
+    if None in problems:
+        return None
+    return next((item for item in problems if item[0] == "doc-line"), problems[0])
+
+
+def _fix(ctx: Context, doc: str) -> str:
+    if ctx.mode == "text":
+        return f"correct the path in {doc}, or add the cited token to hygiene.docs.ignore"
+    return f"correct the path in {doc}, or add {doc} to hygiene.docs.ignore"
+
+
 def run(ctx: Context) -> list[Finding]:
     docs = _docs(ctx)
     if not docs:
         return []
-    tree, ignore = Tree(ctx.root), matcher(ctx.config.docs.ignore).match
+    tree, ignore = Tree(ctx.root, history=ctx.mode == "text"), matcher(ctx.config.docs.ignore).match
     findings = []
     for doc, text in docs:
+        folder = _folder(ctx, doc)
         for number, span, path, line in _cites(text):
-            problem = tree.check(path, line) if tree.claims(path) and not ignore(path) else None
+            problem = _problem(tree, folder, path, line) if tree.claims(path) and not ignore(path) else None
             if problem:
-                findings.append(Finding("error", problem[0], f"`{span}` {problem[1]}",
-                                        f"correct the path in {doc}, or add {doc} to hygiene.docs.ignore",
-                                        doc, number))
+                findings.append(Finding("error", problem[0], f"`{span}` {problem[1]}", _fix(ctx, doc), doc, number))
     return findings

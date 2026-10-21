@@ -217,6 +217,27 @@ class AllowPath(GuardCommit):
         self.assertEqual(self.run_guard(f'git -C {shlex.quote(str(bare))} commit -m x'), '')
         self.assertEqual(self.uv_calls(), [])
 
+    def test_commit_aimed_at_another_repo_starts_no_uv(self):
+        self.env['UV_MODE'] = 'mixed'
+        bare = self.make_repo('no-profile', profile=None)
+        self.stage('a.txt', b'a\n', repo=bare)
+        other = shlex.quote(str(bare))
+        for command in (f'git --git-dir={other}/.git --work-tree={other} commit -m x',
+                        f'git --git-dir {other}/.git commit -m x', f'git --work-tree {other} commit -m x',
+                        f'GIT_DIR={other}/.git git commit -m x', f'GIT_WORK_TREE={other} git commit -m x',
+                        f'export GIT_DIR={other}/.git; git commit -m x'):
+            with self.subTest(command=command):
+                self.assertEqual(self.run_guard(command), '')
+        self.assertEqual(self.uv_calls(), [])
+
+    def test_git_missing_from_path_fails_open_without_a_traceback(self):
+        no_git = self.root / 'no-git'
+        no_git.mkdir()
+        (no_git / 'uv').symlink_to(self.bin / 'uv')
+        env = dict(self.env, PATH=str(no_git))
+        self.assertEqual(self.run_guard('git commit -m x', env=env), '')
+        self.assertNotIn('Traceback', self.stderr)
+
     def test_no_uv_on_path_fails_open(self):
         only_git = self.root / 'only-git'
         only_git.mkdir()

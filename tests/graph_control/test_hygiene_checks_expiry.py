@@ -14,7 +14,7 @@ from graph_control.hygiene.config import parse
 NOW = datetime(2026, 10, 21, 9, 0, tzinfo=timezone.utc)
 
 
-class ChecksExpiry(unittest.TestCase):  # AC-GC-DOCTOR
+class ChecksExpiry(unittest.TestCase):
     def setUp(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)

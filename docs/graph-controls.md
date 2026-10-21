@@ -312,7 +312,7 @@ Read-only plug-in commands; like every control, none executes project commands.
 |-|-|-|
 | `hygiene-invalid` | error (doctor) | any `hygiene.*` key; the message names it |
 | `media-size` | error | `media.max_kb` (500, added files only; every file under `--tracked`), `media.allow`, `media.enabled`; LFS files are exempt |
-| `media-design` | error | media under `<docsPath>/ux/**`; `media.allow`, `media.enabled` |
+| `media-design` | error | media under `<docsPath>/ux/**` and outside `uxEvidence.path`; `media.allow`, `media.enabled` |
 | `media-evidence` | error | media under `uxEvidence.path` once `uxEvidence.store.push` is set |
 | `media-deny` | error | `media.deny` |
 | `home-path` | warn | `paths.home` (warn, error, off) |
@@ -321,15 +321,15 @@ Read-only plug-in commands; like every control, none executes project commands.
 | `check-expired` | error (doctor) | an advisory `checks` entry past `expires` in `.claude/graph-checks.json` |
 | `check-expiring` | warn (doctor) | the same, within 7 days of `expires` |
 | `main-dirty` | error | `runEnd.mainClean` |
-| `worktree-left` | error | `runEnd.worktrees` |
+| `worktree-left` | error (warn for the run's integration worktree: branch `--branch`, or basename `<run-id>`) | `runEnd.worktrees` |
 | `stray-file` | error | `runEnd.strayFiles` |
 | `branch-unmerged` | error | `runEnd.branchMerged`, with integration `push-main` |
 | `waiting-merge` | info | `runEnd.branchMerged`, with integration `pr`, a missing branch or no origin |
-| `doc-path` | error | `docs.roots`, `docs.ignore` (skips docs and cited tokens); only a backticked token whose first segment is a tracked top-level entry counts |
+| `doc-path` | error | `docs.roots`, `docs.ignore` (skips docs and cited tokens); only a backticked token whose first segment is a tracked top-level entry counts, and it resolves against the repo root or the citing doc's directory; under `--text`, a path deleted in HEAD's history also resolves |
 | `doc-line` | error | `docs.roots`, `docs.ignore` |
 | `doc-ephemeral` | warn (error past twice the age) | `docs.ephemeral`, `docs.ephemeralDays` (14) |
-| `context-budget` | warn (error over a profile cap) | `context.budgets`, `context.warn_pct` (80), `context.builtin` (warn only) |
-| `literal-stray` | error | `literals` rows: `pattern`, `owner`, `allow` |
+| `context-budget` | warn (error over a profile cap) | `context.budgets`, `context.warn_pct` (80), `context.builtin` (warn only); `--staged` and `--base` measure a budget only when one of its files is in the diff |
+| `literal-stray` | error | `literals` rows: `pattern`, `owner`, `allow`; `--staged` and `--base` read only added lines, `--tracked` whole files |
 | `hygiene-literal-regex` | error (doctor and every scan) | a `literals` row's `pattern` |
 | `hygiene-literal-nested` | warn (doctor) | a `literals` row's `pattern` |
 | `sweep` | info | `surfaces.roots`, `surfaces.idleDays` (30), `surfaces.minCallers` (1) |

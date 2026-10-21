@@ -153,6 +153,19 @@ class MediaPaths(Repo):
         stage(self.root, "docs/specs/ux/f/to-be/home.webp", b"\0" * KB)
         self.assertEqual(ids(media, self.root), [("error", "media-design", "docs/ux/f/to-be/home.webp")])
 
+    def test_default_evidence_path_inside_design_root_is_not_design_media(self):
+        stage(self.root, "docs/ux/changes/2026-10-21-f/before.png", b"\0" * (10 * KB))
+        stage(self.root, "docs/ux/2026-10-21-f/to-be/home.png", b"\0" * KB)
+        expected = [("error", "media-design", "docs/ux/2026-10-21-f/to-be/home.png")]
+        self.assertEqual(ids(media, self.root), expected)
+        self.assertEqual(ids(media, self.root, {"docsPath": "docs"}), expected)
+
+    def test_overlapping_evidence_path_with_a_store_is_evidence_media(self):
+        stage(self.root, "docs/ux/changes/2026-10-21-f/before.png", b"\0" * KB)
+        profile = {"uxEvidence": {"store": {"push": "acme-store push"}}}
+        self.assertEqual(ids(media, self.root, profile),
+                         [("error", "media-evidence", "docs/ux/changes/2026-10-21-f/before.png")])
+
     def test_allow_exempts_path_rules(self):
         self.stage_set()
         profile = {**STORE, "hygiene": {"media": {"deny": ["**/*.log"], "allow": ["docs/**", "build/**"]}}}
