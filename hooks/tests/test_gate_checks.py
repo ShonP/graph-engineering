@@ -66,6 +66,12 @@ class GateChecks(unittest.TestCase):  # AC-GC-RUN
         result = self.gate()
         self.assertEqual(result.returncode, 2)
         self.assertTrue(result.stdout.startswith('FAIL types not found'), result.stdout)
+        script = self.stub('locked.sh', 'exit 0')
+        Path(script).chmod(0o644)
+        self.configure({'id': 'types', 'argv': [script], 'mode': 'blocking'})
+        result = self.gate()
+        self.assertEqual(result.returncode, 2)
+        self.assertTrue(result.stdout.startswith(f'FAIL types could not start {script}'), result.stdout)
 
     def test_timeout_kills_the_group_and_fails(self):
         marker = self.root / 'marker'
