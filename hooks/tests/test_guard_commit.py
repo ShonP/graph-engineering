@@ -157,6 +157,16 @@ class DenyPath(GuardCommit):
             with self.subTest(command=command):
                 self.assertIn('assets/hero.bin', self.deny(command, cwd=self.other))
 
+    def test_redirect_words_outside_the_commit_prefix_still_deny(self):
+        self.stage('assets/hero.bin', b'\0' * 600 * 1024)
+        for command in ('git commit -m "Fail open on --git-dir commands"',
+                        'git rev-parse --git-dir && git commit -m x',
+                        'git commit -m "document GIT_DIR=path handling"',
+                        'git commit -m x && git --work-tree=/tmp/acme-widget status',
+                        'git commit -m x; export GIT_WORK_TREE=/tmp/acme-widget'):
+            with self.subTest(command=command):
+                self.assertIn('assets/hero.bin: 600 KB > 500 KB', self.deny(command))
+
     def test_bypass_permissions_still_denies(self):
         self.stage('assets/hero.bin', b'\0' * 600 * 1024)
         self.assertIn('assets/hero.bin', self.deny('git commit -m x', mode='bypassPermissions'))
