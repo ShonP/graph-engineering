@@ -143,8 +143,8 @@ routing:
   # derived:
   #   - when: package.json in <dir> depends on react (react-dom, next, ...)
   #     glob: "<dir>/**/*.{ts,tsx,js,jsx}"
-  #     impl: [graph-engineering:react-rules, graph-engineering:frontend-rules, graph-engineering:ux-evidence]
-  #     review: [graph-engineering:react-rules, graph-engineering:frontend-rules, graph-engineering:ux-evidence]
+  #     impl: [graph-engineering:react-rules, graph-engineering:frontend-rules, graph-engineering:ux-evidence, graph-engineering:web-interface-guidelines]
+  #     review: [graph-engineering:react-rules, graph-engineering:frontend-rules, graph-engineering:ux-evidence, graph-engineering:web-interface-guidelines, graph-engineering:taste]
   #     qa: [graph-engineering:ux-evidence]
   #   - when: the react package.json also depends on @tanstack/react-query
   #     glob: "<dir>/**/*.{ts,tsx,js,jsx}"
@@ -337,7 +337,7 @@ routing:
     # Preloaded, so not listed: definition-of-done (writers, reviewers, planner); prior-art and impact-map (planner).
     impl: [graph-engineering:review-testing-rules]
     review: [graph-engineering:review-protocol, graph-engineering:security-review, graph-engineering:privacy-review]
-    design: [graph-engineering:ux-journey, graph-engineering:ui-ux-pro-max]
+    design: [graph-engineering:ux-journey, graph-engineering:taste, graph-engineering:web-interface-guidelines]
 
 # Role -> a .claude/agents name the engine dispatches instead of the plugin's. Empty: full roster.
 localAgents: {}

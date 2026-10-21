@@ -30,7 +30,7 @@ Normally your dispatch names your REQUIRED skills (the spine derives them from t
 | `*.bru`, `bruno.json` | bruno, api-contract |
 | Server-side API surface (`routers/`, `controllers/`, `endpoints/`, server-language `routes/` / `handlers/`, NestJS `*.controller.ts`, Next.js `app/api/**/route.ts`, OpenAPI/AsyncAPI spec - never frontend `src/routes/`) | bruno, schemathesis, api-contract |
 | `observability/**`, `dashboards/**/*.json` | promql, loki, tempo |
-| UI placement / flow decisions | ui-ux-pro-max (UX-judgment domains only) |
+| Web UI (`*.tsx`, `*.jsx`, `*.vue`, `*.svelte`, `*.html`, `*.css`) | web-interface-guidelines (+ taste when the task sets or changes how a screen looks) |
 | Anything a user sees (`*.tsx`, `*.swift`, Compose `*.kt`, templates, styles) | ux-evidence |
 | Any task, any stack | review-testing-rules (definition-of-done is preloaded; impact-map and prior-art load on demand) |
 
@@ -61,7 +61,7 @@ Normally your dispatch names your REQUIRED skills (the spine derives them from t
 | `*.bru`, `bruno.json` | bruno, api-contract |
 | Server-side API surface (`routers/`, `controllers/`, `endpoints/`, server-language `routes/` / `handlers/`, NestJS `*.controller.ts`, Next.js `app/api/**/route.ts`, OpenAPI/AsyncAPI spec - never frontend `src/routes/`) | bruno, schemathesis, api-contract |
 | `observability/**`, `dashboards/**/*.json` | promql, loki, tempo |
-| UI placement / flow decisions | ui-ux-pro-max (UX-judgment domains only) |
+| Web UI (`*.tsx`, `*.jsx`, `*.vue`, `*.svelte`, `*.html`, `*.css`) | web-interface-guidelines (+ taste when the task sets or changes how a screen looks) |
 | Anything a user sees (`*.tsx`, `*.swift`, Compose `*.kt`, templates, styles) | ux-evidence |
 | Any task, any stack | review-testing-rules |
 
@@ -75,6 +75,7 @@ Your dispatch names the conditional stack lenses (the spine derives them from th
 | Diff touches | Load |
 |---|---|
 | TS/JS in a package that depends on react | react-rules, frontend-rules (+ tanstack-query-rules when it depends on @tanstack/react-query) |
+| Web UI (`*.tsx`, `*.jsx`, `*.vue`, `*.svelte`, `*.html`, `*.css`) | web-interface-guidelines, taste |
 | `*.swift` importing SwiftUI | swiftui-pro |
 | `*.kt` / `*.kts` | kotlin-control-flow (+ compose-performance, compose-state when the Gradle module uses Jetpack Compose) |
 | SQL / migrations / schemas | supabase-postgres-best-practices (+ gdpr-erasure-retention, gdpr-consent for migrations touching personal data) |
