@@ -27,9 +27,9 @@ def git(root: Path, *args: str, stdin: str | None = None) -> str:
 
 
 def commit(root: Path, rev: str) -> str:
-    result = subprocess.run(["git", "-C", str(root), "rev-parse", "--verify", "--quiet", f"{rev}^{{commit}}"],
-                            capture_output=True, text=True)
-    if rev.startswith("-") or result.returncode:
+    result = subprocess.run(["git", "-C", str(root), "rev-parse", "--verify", "--quiet", "--end-of-options",
+                             f"{rev}^{{commit}}"], capture_output=True, text=True)
+    if result.returncode:
         raise Invalid(f"unknown revision: {rev}")
     return result.stdout.strip()
 
@@ -75,7 +75,7 @@ def tracked(root: Path) -> list[ScopeFile]:
 
 
 def read_text(root: Path, item: ScopeFile) -> str | None:
-    if item.binary or not item.readable:
+    if item.binary:
         return None
     try:
         return (root / item.path).read_text(encoding="utf-8")

@@ -50,7 +50,7 @@ def _profile(args: Namespace) -> dict:
 
 def _toplevel(root: Path) -> Path:
     result = subprocess.run(["git", "-C", str(root), "rev-parse", "--show-toplevel"], capture_output=True, text=True)
-    require(root.is_dir() and result.returncode == 0, f"not a git repository: {root}")
+    require(result.returncode == 0, f"not a git repository: {root}")
     return Path(result.stdout.strip())
 
 

@@ -153,6 +153,7 @@ class Errors(unittest.TestCase):
                  ({"privateNames": True}, "hygiene.privateNames"),
                  ({"comments": {"mode": "some"}}, "hygiene.comments.mode"),
                  ({"comments": {"allow": [3]}}, "hygiene.comments.allow"),
+                 ({"comments": {"allow": "^x"}}, "hygiene.comments.allow"),
                  ({"context": {"warn_pct": 101}}, "hygiene.context.warn_pct"),
                  ({"context": {"budgets": [{"id": "a", "globs": ["x"], "max_bytes": -1}]}},
                   "hygiene.context.budgets[0].max_bytes"),
@@ -244,6 +245,17 @@ class Scope(Temp):
         stage(root, "main.txt", "main")
         commit_at(root, "main", 1, NOW)
         self.assertEqual(base(root, side), [row("main.txt", "A", "main")])
+
+    def test_unrelated_history_is_invalid(self):
+        root = make_repo(self.tmp)
+        stage(root, "a.txt", "alpha")
+        commit_at(root, "first", 2, NOW)
+        git(root, "checkout", "-q", "--orphan", "island")
+        stage(root, "b.txt", "bravo")
+        island = commit_at(root, "island", 1, NOW)
+        git(root, "checkout", "-q", "-f", "main")
+        with self.assertRaisesRegex(Invalid, "git diff failed"):
+            base(root, island)
 
     def test_unknown_rev_is_invalid(self):
         root = make_repo(self.tmp)
