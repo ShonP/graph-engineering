@@ -88,7 +88,7 @@ class Builtin(Base):  # AC-CTX-DEFAULT
         self.assertEqual(finding.path, ".claude/rules/g.md")
 
     def test_unclosed_frontmatter_counts_as_unconditional(self):
-        self.write(".claude/rules/j.md", 9000, "---\npaths:\n  - src\n")
+        self.write(".claude/rules/j.md", 9000, "---\npaths: src\n# ")
         [finding] = self.findings()
         self.assertEqual(finding.path, ".claude/rules/j.md")
 
