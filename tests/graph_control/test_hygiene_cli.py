@@ -158,7 +158,7 @@ class Errors(unittest.TestCase):
                  ({"context": {"budgets": [{"id": "a", "globs": ["x"], "max_bytes": -1}]}},
                   "hygiene.context.budgets[0].max_bytes"),
                  ({"literals": [{"id": "a", "owner": ["x"]}]}, "hygiene.literals[0].pattern"),
-                 ({"literals": {"id": "a"}}, "hygiene.literals"),
+                 ({"literals": {}}, "hygiene.literals"),
                  ({"runEnd": {"worktrees": None}}, "hygiene.runEnd.worktrees"),
                  ("on", "hygiene")]
         for hygiene, key in cases:
