@@ -127,6 +127,13 @@ class DocsAge(unittest.TestCase):
         self.add("docs/plans/with space é.md", 20)
         self.assertEqual(self.found(), [("docs/plans/with space é.md", "warn", "doc-ephemeral")])
 
+    def test_glob_characters_in_a_name_are_literal(self):
+        self.add("docs/plans/old.md", 40)
+        git(self.root, "rm", "-q", "docs/plans/old.md")
+        commit_at(self.root, "drop", 30, NOW)
+        self.add("docs/plans/[o]ld.md", 5)
+        self.assertEqual(self.found(), [])
+
     def test_rename_ages_from_the_rename(self):
         self.add("docs/plans/before.md", 40)
         git(self.root, "mv", "docs/plans/before.md", "docs/plans/after.md")
