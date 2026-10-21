@@ -5,14 +5,14 @@ The designer picks per decision, not per run: one run can show a placement as
 a live-app capture and its new flow as a clickable page. Write the choice and
 the one-line reason in the spec, next to each render.
 
-## The floor: every render ships a committed PNG
+## The floor: every render ships a PNG
 
 Whatever the medium, each changed screen ends up as a PNG under `to-be/`,
 beside `as-is/`, at the viewport sizes the profile's platforms need. That
-file is what the plan gate embeds, what git keeps, and what qa compares the
-built screen against. An interactive medium is shown **in addition to** it,
-never instead: a link can expire, a canvas can be edited after approval, a
-PNG in the PR cannot.
+file is what the plan gate embeds and what qa compares the built screen
+against. An interactive medium is shown **in addition to** it, never
+instead: a link can expire, a canvas can be edited after approval, a PNG
+cannot.
 
 ## The media
 
@@ -59,7 +59,7 @@ Choose only among what is available; the best-suited available medium wins.
 
 A step whose medium is not available falls to the next available one that
 answers the same question, and the spec says so. Never block a design on a
-medium: the committed PNG floor is always reachable.
+medium: the PNG floor is always reachable.
 
 ## Where things go
 
@@ -68,7 +68,8 @@ the committer never has to guess:
 
 | Path | What | Ends up |
 |---|---|---|
-| `experience.md`, `as-is/`, `to-be/` | the spec, captures, to-be PNGs, and an HTML mock's source when the plan approves it as the reference | committed to `<docsPath>/ux/<date>-<feature>/` by the first UI task |
+| `experience.md` | the spec, plus an HTML mock's source when the plan approves it as the reference | committed to `<docsPath>/ux/<date>-<feature>/` by the first UI task |
+| `as-is/`, `to-be/` | captures and to-be PNGs | never committed: pushed with `<store.push>` by the first UI task when `uxEvidence.store` is set, else kept in `.graph/<run>/design/` |
 | `stories/` | draft Storybook stories | moved next to their component as product code by the UI task |
 | `artifact/` | the HTML of a published artifact page | never committed; the spec links the artifact |
 | `explore/` | explore-mode variants | never committed |

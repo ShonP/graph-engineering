@@ -1,5 +1,5 @@
 {
-  "description": "graph-engineering: async lint on edit, destructive-command, sleep-loop, plugin-script shell and agent-policy guards, test on stop, simulator reaper on stop, handoff on session start",
+  "description": "graph-engineering: async lint on edit, destructive-command, commit hygiene, sleep-loop, plugin-script shell and agent-policy guards, test on stop, simulator reaper on stop, handoff on session start",
   "hooks": {
     "PostToolUse": [
       {
@@ -25,6 +25,13 @@
             "args": [],
             "if": "Bash(git *)",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/guard-commit.sh",
+            "args": [],
+            "if": "Bash(git *)",
+            "timeout": 15
           },
           {
             "type": "command",

@@ -11,7 +11,8 @@ import unittest
 HOOKS = Path(__file__).resolve().parents[1] / 'scripts'
 TEMPLATE = Path(__file__).resolve().parents[2] / 'templates' / 'graph-checks.json'
 sys.path.insert(0, str(HOOKS))
-from checks_config import load  # noqa: E402
+from checks_config import Check, Config, GateCheck, load  # noqa: E402
+from datetime import date  # noqa: E402
 
 class ConfiguredChecks(unittest.TestCase):
     def setUp(self):
@@ -354,6 +355,58 @@ class Schema(unittest.TestCase):  # AC-W1-CFG-01
         config = load(TEMPLATE)
         self.assertTrue(config.test and config.precheck and config.lint)
         self.assertIn('{file}', config.lint.argv)
+        self.assertEqual(config.checks, ())
+
+
+class GateChecksSchema(unittest.TestCase):
+    load = Schema.load
+    ADVISORY = {'id': 'dup-code', 'argv': ['jscpd', '.'], 'mode': 'advisory', 'expires': '2026-11-01'}
+
+    def checks(self, *entries):
+        return self.load({'version': 1, 'checks': list(entries)}).checks
+
+    def test_entries_load_with_defaults(self):
+        blocking = {'id': 'types', 'argv': ['mypy', '.'], 'mode': 'blocking'}
+        loaded = self.checks(self.ADVISORY, {**blocking, 'timeout_seconds': 1})
+        self.assertEqual(loaded, (GateCheck('dup-code', ('jscpd', '.'), 'advisory', date(2026, 11, 1), 600),
+                                  GateCheck('types', ('mypy', '.'), 'blocking', None, 1)))
+        self.assertEqual(self.checks(), ())
+        self.assertEqual(self.checks({**self.ADVISORY, 'timeout_seconds': 600})[0].timeout, 600)
+
+    def test_rejects_invalid_entries(self):
+        def entry(**changes):
+            return [{key: value for key, value in {**self.ADVISORY, **changes}.items() if value is not None}]
+        invalid = {
+            'checks an object': {'id': 'x'}, 'checks null': None, 'checks a number': 3,
+            'entry not an object': ['jscpd'],
+            'advisory without expires': entry(expires=None), 'expires on blocking': entry(mode='blocking'),
+            'no mode': entry(mode=None), 'unknown mode': entry(mode='warn'),
+            'bad date': entry(expires='2026-02-30'), 'compact date': entry(expires='20261101'),
+            'date not a string': entry(expires=20261101), 'unknown key': entry(shell=True),
+            '{file} in argv': entry(argv=['jscpd', '{file}']), 'empty argv': entry(argv=[]),
+            'no argv': entry(argv=None), 'no id': entry(id=None),
+            'id with upper case': entry(id='Dup'), 'id not a string': entry(id=7), 'empty id': entry(id=''),
+            'id with a newline': entry(id='dup\n'), 'timeout 0': entry(timeout_seconds=0),
+            'timeout 601': entry(timeout_seconds=601), 'bool timeout': entry(timeout_seconds=True),
+        }
+        for reason, checks in invalid.items():
+            with self.subTest(reason), self.assertRaises(ValueError) as caught:
+                self.load({'version': 1, 'checks': checks})
+            self.assertNotIn('\n', str(caught.exception))
+
+    def test_messages_name_the_check(self):
+        cases = ({key: value for key, value in self.ADVISORY.items() if key != 'expires'},
+                 {**self.ADVISORY, 'mode': 'blocking'}, {**self.ADVISORY, 'expires': 'soon'})
+        for entry in cases:
+            with self.subTest(entry), self.assertRaisesRegex(ValueError, 'dup-code'):
+                self.checks(entry)
+        with self.assertRaisesRegex(ValueError, 'duplicate check id .dup-code.'):
+            self.checks(self.ADVISORY, {**self.ADVISORY, 'expires': '2026-12-01'})
+
+    def test_existing_configs_load_unchanged(self):
+        self.assertEqual(load(TEMPLATE).checks, ())
+        config = self.load({'version': 1, 'test': {'argv': ['make']}})
+        self.assertEqual(config, Config(test=Check(('make',), 600)))
 
 if __name__ == '__main__':
     unittest.main()

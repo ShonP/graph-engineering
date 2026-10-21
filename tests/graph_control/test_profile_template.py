@@ -4,24 +4,34 @@ The template must be right for any repo (TS, Python, Swift, Kotlin, Go, infra):
 framework skills come only from the dependency-derived block that /graph-init
 applies, never from a static row that fires on a bare file extension.
 """
+import argparse
 import hashlib
 import importlib.util
 import json
 import re
 import unittest
+from dataclasses import fields, is_dataclass
 from pathlib import Path
 
 import yaml
 
 import helpers  # noqa: F401  (puts scripts/ on sys.path)
+from graph_control.commands import hygiene as hygiene_command
+from graph_control.hygiene.config import Hygiene, parse
 from graph_control.preflight import UniqueLoader
 
 ROOT = Path(__file__).resolve().parents[2]
 TEMPLATE = ROOT / "templates" / "graph-profile.yaml"
 FALLBACK_DOC = ROOT / "docs" / "competency-routing.md"
 MANIFEST = ROOT / ".claude-plugin" / "plugin.json"
+CONTROLS_DOC = ROOT / "docs" / "graph-controls.md"
+HYGIENE_IDS = ("hygiene-invalid", "media-size", "media-design", "media-evidence", "media-deny", "home-path",
+               "private-names-unconfigured", "private-name", "check-expired", "check-expiring", "main-dirty",
+               "worktree-left", "stray-file", "branch-unmerged", "waiting-merge", "doc-path", "doc-line",
+               "doc-ephemeral", "context-budget", "literal-stray", "hygiene-literal-regex", "hygiene-literal-nested",
+               "sweep", "sweep-no-roots", "comment-added")
 TEMPLATE_BYTES = 30_000
-VALUES_SHA256 = "dcf658a9518ce7b93cd18749dc8da2dc0160df18929366cd04353c990e3b36d4"
+VALUES_SHA256 = "76979683dca6f44a31f4634b0adee2494135ff31a3f56169bcc184bc40d663b4"
 TITLE = "Dependency-derived rows (applied by /graph-init)"
 HAS_WCMATCH = importlib.util.find_spec("wcmatch") is not None
 
@@ -173,6 +183,27 @@ class TemplateTests(unittest.TestCase):
         digest = hashlib.sha256(canonical.encode()).hexdigest()
         self.assertEqual(digest, VALUES_SHA256,
                          f"a template value or derived row changed; if deliberate, set VALUES_SHA256 = {digest!r}")
+
+    def test_hygiene_block_holds_every_key_at_its_default(self):
+        block = self.profile["hygiene"]
+        written, defaults = parse({"hygiene": block}), parse({})
+        for item in fields(Hygiene):
+            with self.subTest(key=item.name):
+                self.assertIn(item.name, block)
+                self.assertEqual(getattr(written, item.name), getattr(defaults, item.name))
+                section = getattr(defaults, item.name)
+                if is_dataclass(section):
+                    self.assertEqual(sorted(block[item.name]), sorted(sub.name for sub in fields(section)))
+
+    def test_controls_doc_lists_the_hygiene_flags_and_finding_ids(self):
+        parser = argparse.ArgumentParser()
+        hygiene_command.add_arguments(parser)
+        flags = [flag for action in parser._actions for flag in action.option_strings if flag.startswith("--")]
+        doc = CONTROLS_DOC.read_text()
+        section = doc[doc.index("- `hygiene --root"):]
+        self.assertEqual([flag for flag in flags if flag not in section], ["--help"])
+        rows = set(re.findall(r"^\| `([a-z-]+)` \| (?:error|warn|info)", section, re.MULTILINE))
+        self.assertEqual(sorted(set(HYGIENE_IDS) - rows), [])
 
     def test_every_manifest_skill_directory_exists(self):
         dirs = json.loads(MANIFEST.read_text())["skills"]

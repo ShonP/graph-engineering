@@ -19,9 +19,12 @@ name-to-Upper camel join (`NameKit`). A longer lowercase word that merely
 starts or ends with the name (`equivalent` for `equiv`) does not count.
 A hit prints the path (and line), never the name.
 With no list configured (public CI) it prints a `SKIP` line and exits 0, which
-run-all-tests reports as partial rather than passed.
-  python3 scripts/check-private-names.py [repo]
+run-all-tests reports as partial rather than passed; with --require it prints a
+`FAIL` line and exits 1 instead.
+  python3 scripts/check-private-names.py [--require] [repo]
 Exit 1 on any hit, 0 otherwise.
+scan(repo, rels, entries) returns the hits in a given file list as (rel, line),
+line None for a path hit, so another checker reuses this matcher.
 """
 
 from __future__ import annotations
@@ -81,25 +84,15 @@ def names(text: str, pattern: re.Pattern) -> bool:
     return False
 
 
-def main(argv):
-    repo = Path(argv[1] if len(argv) > 1 else ".").resolve()
-    entries, source = load()
-    if not entries:
-        print(f"SKIP {TAG}: no list configured (set GRAPH_PRIVATE_NAMES or create {source})")
-        return 0
-    files = subprocess.run(
-        ["git", "-C", str(repo), "ls-files", "-z"], check=True, capture_output=True
-    ).stdout.decode().split("\0")
-    files = [f for f in files if f]
+def scan(repo: Path, rels, entries) -> list[tuple[str, int | None]]:
     patterns = [(re.compile(re.escape(name), re.I), globs) for name, globs in entries]
-    hits = 0
-    for rel in files:
+    hits = []
+    for rel in rels:
         active = [p for p, globs in patterns if not any(fnmatch.fnmatch(rel, g) for g in globs)]
         if not active:
             continue
         if any(names(rel, p) for p in active):
-            print(f"FAIL {rel}: path names a private consumer")
-            hits += 1
+            hits.append((rel, None))
         path = repo / rel
         if not path.is_file():
             continue
@@ -108,10 +101,31 @@ def main(argv):
             continue
         for number, line in enumerate(data.decode("utf-8", "replace").splitlines(), 1):
             if any(names(line, p) for p in active):
-                print(f"FAIL {rel}:{number}: names a private consumer")
-                hits += 1
+                hits.append((rel, number))
+    return hits
+
+
+def main(argv):
+    require = "--require" in argv[1:]
+    args = [arg for arg in argv[1:] if arg != "--require"]
+    repo = Path(args[0] if args else ".").resolve()
+    entries, source = load()
+    if not entries:
+        word = "FAIL" if require else "SKIP"
+        print(f"{word} {TAG}: no list configured (set GRAPH_PRIVATE_NAMES or create {source})")
+        return 1 if require else 0
+    files = subprocess.run(
+        ["git", "-C", str(repo), "ls-files", "-z"], check=True, capture_output=True
+    ).stdout.decode().split("\0")
+    files = [f for f in files if f]
+    hits = scan(repo, files, entries)
+    for rel, number in hits:
+        if number is None:
+            print(f"FAIL {rel}: path names a private consumer")
+        else:
+            print(f"FAIL {rel}:{number}: names a private consumer")
     if hits:
-        print(f"{TAG}: {hits} hit(s) name a private consumer (list: {source})")
+        print(f"{TAG}: {len(hits)} hit(s) name a private consumer (list: {source})")
         return 1
     print(f"ok {TAG}: {len(entries)} name(s), {len(files)} tracked file(s), list: {source}")
     return 0

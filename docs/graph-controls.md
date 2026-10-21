@@ -5,7 +5,7 @@ Use `uv run scripts/graph-control.py …` from the plugin checkout. The PEP 723 
 Successful commands return JSON `{"status":"PASS",…}` and exit 0. Invalid, missing, stale or incomplete evidence returns `{"status":"BLOCKED","reason":"…"}` and exit 1. Parser errors use argparse's exit 2. There is no N/A/skip route for required checks. Every check declared in the run is required; keep optional diagnostics outside this gate manifest.
 
 ```
-uv run scripts/graph-control.py validate-plan /absolute/run/plan.json
+uv run scripts/graph-control.py validate-plan /absolute/run/plan.json [--profile /absolute/repo/.claude/graph-profile.yaml --root /absolute/repo]
 uv run scripts/graph-control.py snapshot /absolute/candidate --repo backend
 uv run scripts/graph-control.py fingerprint /absolute/run/run.json
 uv run scripts/graph-control.py preflight /absolute/run/run.json --profile /absolute/profile.yaml --graph /absolute/run/graph.md
@@ -35,7 +35,7 @@ uv run scripts/graph-control.py skills-check --required graph-engineering:bruno,
 
 ## Plan schema (versions 1 and 2)
 
-`schema_version` is 1 or 2; any other value is rejected. Version 2 is version 1 plus the optional success signals and task budget keys below. Every field in this example is required in both versions; the only optional task keys are `estimate_min`, `path_cap_reason` and `proof`, version 2 only, with the rules under [Task budget](#task-budget-version-2). Unknown/duplicate keys and duplicate IDs are rejected. Arrays below may be empty unless the example/comment says otherwise.
+`schema_version` is 1 or 2; any other value is rejected. Version 2 is version 1 plus the optional success signals, task budget and need and measure keys below. Every field in this example is required in both versions; the only optional task keys are `estimate_min`, `path_cap_reason` and `proof` ([Task budget](#task-budget-version-2)) and `need` and `measure` ([Need and measure](#need-and-measure-version-2)), version 2 only. Unknown/duplicate keys and duplicate IDs are rejected. Arrays below may be empty unless the example/comment says otherwise.
 
 ```json
 {
@@ -117,6 +117,25 @@ A version 2 task may add three optional keys (shown alone below, merged into the
 - `proof`: exactly `focused`, `full_device` or `cluster`. A `full_device` or `cluster` task proves on real devices or a cluster and builds nothing, so its `produces` must be empty; building and proving are separate tasks.
 - `path_cap_reason` and `proof` are valid only beside `estimate_min`; the path cap binds only a task that carries `estimate_min`.
 - An explicit `null` for any of the three is rejected (omit the key instead), and a version 1 plan carrying any of them is rejected. Every rejection starts with `task <id>:` and names the limit.
+
+### Need and measure (version 2)
+
+A version 2 task may also carry `need`, for a task that creates a new surface, and `measure`, for one that swaps a provider, model or runtime dependency. Both are optional, so older plans validate unchanged.
+
+```json
+{
+  "schema_version": 2,
+  "tasks": [
+    {"id": "FE3", "need": {"user": "example-user", "trigger": "weekly export takes 40 min by hand", "run": ["bash", "tools/export/run.sh"]},
+     "measure": {"command": ["bash", "tools/export/bench.sh"], "baseline": "p50 120 ms"}}
+  ]
+}
+```
+
+- `need`: `user` (who it is for) and `trigger` (the measured signal asking for it) are nonempty text; `run` is the argv that runs the surface, a nonempty list of nonempty strings.
+- `measure`: `command` is the measuring argv, same rule as `run`; `baseline` is the nonempty text it read before the change.
+- Every subkey is required. Rejections, in this order, as `task <id>: <key> ...`: `must not be null; omit the key instead`, `requires schema_version 2`, `must be an object`, `has unknown fields [...]`, `is missing fields [...]`, then `<key>.<sub> must be nonempty text` or `<key>.<sub> must be a nonempty argv of nonempty strings`.
+- `validate-plan <plan> --profile <profile.yaml> --root <repo>` also enforces the keys against the profile's `hygiene:` block; the two flags go together (`validate-plan takes --profile and --root together` otherwise), and without them only the shape is checked. A writable path's static prefix (the text before the first `*?[{`), cut to its directory, and each ancestor of it, is a new surface when it matches a `hygiene.surfaces.roots` glob and holds no tracked file at `HEAD` of `--root`: that task needs `need` (`task <id>: creates new surface <dir> without need`). So `tools/**` names no new surface, while `tools/export/**` and `tools/export/run.sh` both name `tools/export`. A writable path that matches a `hygiene.measure.paths` glob as written needs `measure` (`task <id>: changes <path> without measure`). Every problem in the plan is joined by `; ` in one BLOCKED reason. A root without a HEAD commit is BLOCKED `not a git repository with a HEAD commit: <root>`; an unreadable or invalid profile is BLOCKED with the profile's error.
 
 ## Run schema (version 1)
 
@@ -270,11 +289,11 @@ The Stop hook (`hooks/scripts/configured_check.py test`) memoizes the verdict of
 
 `graph-control check <root> --reuse` reads `<root>/.claude/graph-checks.json`, where `<root>` is the directory holding that config (the Git worktree root, or a monorepo package with its own), computes the same key and returns `{"status":"PASS","verdict":"pass|fail|timeout","observed_at":"...","exit_code":0}`. It never executes anything. A tree with no stored verdict returns BLOCKED `no memo for the current tree`; a missing config, a config with no test block or a malformed `test.argv`, a root outside any Git worktree, and a set `GRAPH_CHECKS_NO_MEMO` are BLOCKED with the reason. `--reuse` is required: graph-control never runs project commands, so replay is the only mode. The memo is a speed cache, not merge evidence: the merge gate still proves checks with receipts (`record-receipt`, `verify`).
 
-## doctor, status, depth, review-files, findings, waves, ready, validate-briefs, digest, render, host-check, skills-check, qa-lanes
+## doctor, status, depth, review-files, findings, waves, ready, validate-briefs, digest, render, host-check, skills-check, qa-lanes, hygiene
 
 Read-only plug-in commands; like every control, none executes project commands.
 
-- `doctor --root <repo> [--quick]` inspects the repo's Graph Engineering setup and returns findings.
+- `doctor --root <repo> [--quick]` inspects the repo's Graph Engineering setup and returns findings. It adds the doctor rows of every hygiene rule found at runtime (with `--quick`, only rules marked `QUICK`, which start no process) and error `hygiene-invalid` when the `hygiene:` block does not parse.
 - `status [--line] [--root <repo>] [--session <id>]` reports run status; `--line` is the one-line form for a status line. Stdlib only, so it also runs as `python3 -m graph_control.status` with `PYTHONPATH=<plugin>/scripts`, without uv or PyYAML. The session is `--session`, else, with `--line`, the `transcript_path` or `session_id` of the JSON the host pipes to a `statusLine` command (pipe it through: `printf '%s' "$input" | ... --line`), else the newest session of the root. A named session that is not found prints nothing rather than another session's agents. The full form (no `--line`) adds DONE since the last look and NEXT, read from each run's `plan.json`, `run.json` and `receipts.json`; it never opens `ledger.md`.
 - `depth --root <candidate> --base <rev> --profile <profile.yaml> [--plan <plan.json>]` picks the review depth for a diff and returns `{depth: lint|single|panel, changed_lines, files, risk_rows, reasons, untracked_excluded, regex_skipped_long_lines, cadence}`; `cadence` is the profile's `review.cadence` (`per-task` default, or `per-run`), and any other value is BLOCKED. `risk:` is a list of `{id, paths, keywords}` rows, the template's shape; any other shape (a mapping keyed by id, bare ids) is BLOCKED with the message `doctor` reports as `risk-shape`. A row matches on a path glob or on a keyword found, spelled exactly (case-sensitive), in an added line of a file that is not prose (the `lint` file types below); a keyword starting with `re:` is a Python regex instead, and an invalid one is BLOCKED with the message `doctor` reports as `risk-keyword`. A `re:` pattern must have no nested quantifiers (doctor warns `risk-nested` on shapes like `(a+)+`), runs per added line, skips lines over 4,096 characters (counted in `regex_skipped_long_lines`), and matching past 5 s is BLOCKED naming the row. A row with neither is a placeholder and matches nothing, except `outside-the-run`: with `--plan`, it matches when a changed path is in no task's `writable_paths` (repo-relative globs). One row is built in and reserved, `agent-control`: `**/.claude/**`, `**/CLAUDE.md`, `**/AGENTS.md`, `**/.mcp.json`, `.github/**` and the profile's `instructionPaths`, so a diff to the agent's own checks, hooks, permissions, gates or prompts is never class `none` and never `lint`; a profile row with that id is BLOCKED. `lint` is prose by file type only (`*.md`, `*.markdown`, `*.rst`, `*.adoc`, and README, CHANGELOG, LICENSE and similar named files, bare or `.txt`), never by directory: `docs/conf.py`, `requirements.txt` and `CMakeLists.txt` are code, and MDX is not prose.
 - `review-files <run dir> --profile <profile.yaml> [--plan <plan.json>]` returns `{cadence, legs, latest, rounds, missing}`: the review findings files merge gate (b) and the retro fast path read. `per-task` gives one `findings.<task>.json` per plan task; `per-run` gives only `findings.run.json`, so absent per-task files never block it. `missing` lists `latest` paths not on disk; pass `latest` to `findings --counts`, which is BLOCKED on any of them.
@@ -287,6 +306,35 @@ Read-only plug-in commands; like every control, none executes project commands.
 - `host-check --root <repo> [--min-free-gb <n>] [--profile <profile.yaml>]` returns host findings before a run fans out: free disk against the floor (`--min-free-gb` for one call, else the profile's `host.min_free_gb`, else 20; a negative or non-integer profile value is BLOCKED), load average against the core count, `core.bare` of the root's Git config, how many commits the checkout is behind the upstream default branch (local refs only, never a fetch), and docker reachability, checked only when the profile's `runtime` mentions docker or compose. Only free disk below the floor is BLOCKED; every other finding is advisory and the command still returns PASS.
 - `skills-check --required <names> --loaded <names> [--agent-id <id>]` compares the REQUIRED skills a dispatch named with the child's `skills_loaded:` line (comma-separated; the `skills_loaded:` prefix, backticks and `(annotations)` are dropped and names lowercased). A qualified `plugin:skill` is proven only by the identical name, a bare one only by the identical bare name; routing names plugin skills qualified (`doctor` warns `routing-bare`). Exit 0 is PASS `{required, missing: []}`; exit 1 prints `{"status":"SKILLS_MISSING","missing":[...]}`; exit 2 is BLOCKED on a name outside `[a-z0-9][a-z0-9_-]*(:[a-z0-9][a-z0-9_-]*)?` or an id outside `[A-Za-z0-9_-]{1,64}`. With `--agent-id` it reads only that child's transcript, `$CLAUDE_CONFIG_DIR/projects/*/*/subagents/agent-<id>.jsonl` (default `~/.claude`): a required name is proven only when claimed and observed (a Skill call that did not error, a `<command-name>` preload tag, or a Read of `.claude/skills/<name>/SKILL.md`). PASS adds `"observed": "transcript"`; SKILLS_MISSING adds `unobserved`, the claimed names the transcript does not show. No transcript falls back to the claim and adds `"observed": "unavailable"` (fail open).
 - `qa-lanes <qa round dir> --lanes <ids> --round <N> [--wait <s>]` is the qa-lead's wait gate, run on the round's directory `.graph/<run>/qa/r<N>/`: for each lane or shard id it reads `<id>.done` (the leaf's last act: `round`, `rows`, `verified`, `failed`, `blocked`, `report`, `findings`; counts must add up, the report must exist and the findings file must pass `findings`) and `<id>.checkpoint.json` (`round`, `rows_done`, `next_row`, `remaining_rows`, `drivers`, `fixtures`; at least one remaining row, and `next_row` is the first). A marker whose `round` is not N is stale: the lane counts as `running` and is listed under `stale`. When both are this round's, the newer wins: a checkpoint newer than the `.done` makes the lane `checkpointed`. Exit 0 is PASS with every lane's counts; exit 75 is PENDING with `running`, `stale` and `checkpointed` lanes; exit 1 is BLOCKED on a malformed file. `--wait` (0 to 270 s) blocks while any lane is still `running`. Templates: `skills/process/qa-verification/templates/`.
+- `hygiene --root <repo> [--profile <profile.yaml>] (--staged | --base <rev> | --tracked | --run-end <run-id> | --sweep | --text <file>) [--branch <branch>] [--integration pr|push-main] [--only <id>]...` runs the hygiene rules over one scope, with the profile's `hygiene:` block (template: `templates/graph-profile.yaml`; no profile means the defaults). Exactly one scope: `--staged` is the index against HEAD (the commit guard); `--base <rev>` is files added or changed since the merge base with `<rev>` (the repo gate, so legacy content stays green until swept); `--tracked` is every tracked file (a full sweep by hand); `--run-end <run-id>` checks the main checkout after a run, on `--branch` (default `graph/<run-id>`) and `--integration` (default the profile's `integration`, else `pr`), and adds `run_end: CLEAN` or `DIRTY (<n>)`; `--sweep` is the report-only surface sweep `/graph-doctor --sweep` runs; `--text <file>` checks one file, such as a PR body. Deletions are never listed and a rename counts as an add. `--only <id>` (repeatable) runs only that rule module; an unknown id is BLOCKED and lists the known ones. Output: `{"status": "PASS"|"FAIL", "findings": [{level, id, message, fix, path, line}]}`. Exit 0 is PASS; exit 1 is FAIL (any error finding) or BLOCKED (an unreadable or invalid profile, checked first, a root outside git, an unknown `<rev>`, a missing `--text` file); two scope flags are exit 2. Git only: it starts `git` and nothing else, never a configured command; a check that needs a project tool belongs in `.claude/graph-checks.json`. Messages name the path and line, never a matched private name or literal. Finding ids, their default level and the key that controls each:
+
+| Finding | Default level | Controlled by |
+|-|-|-|
+| `hygiene-invalid` | error (doctor) | any `hygiene.*` key; the message names it |
+| `media-size` | error | `media.max_kb` (500, added files only; every file under `--tracked`), `media.allow`, `media.enabled`; LFS files are exempt |
+| `media-design` | error | media under `<docsPath>/ux/**` and outside `uxEvidence.path`; `media.allow`, `media.enabled` |
+| `media-evidence` | error | media under `uxEvidence.path` once `uxEvidence.store.push` is set |
+| `media-deny` | error | `media.deny` |
+| `home-path` | warn | `paths.home` (warn, error, off) |
+| `private-names-unconfigured` | warn | `privateNames` (warn, error, off); set `GRAPH_PRIVATE_NAMES` or the XDG list |
+| `private-name` | error | the private-names list and its `allow=` globs; `privateNames: off` silences it |
+| `check-expired` | error (doctor) | an advisory `checks` entry past `expires` in `.claude/graph-checks.json` |
+| `check-expiring` | warn (doctor) | the same, within 7 days of `expires` |
+| `main-dirty` | error | `runEnd.mainClean` |
+| `worktree-left` | error (warn for the run's integration worktree: branch `--branch`, or basename `<run-id>`) | `runEnd.worktrees` |
+| `stray-file` | error | `runEnd.strayFiles` |
+| `branch-unmerged` | error | `runEnd.branchMerged`, with integration `push-main` |
+| `waiting-merge` | info | `runEnd.branchMerged`, with integration `pr`, a missing branch or no origin |
+| `doc-path` | error | `docs.roots`, `docs.ignore` (skips docs and cited tokens); only a backticked token whose first segment is a tracked top-level entry counts, and it resolves against the repo root or the citing doc's directory; under `--text`, a path deleted in HEAD's history also resolves |
+| `doc-line` | error | `docs.roots`, `docs.ignore` |
+| `doc-ephemeral` | warn (error past twice the age) | `docs.ephemeral`, `docs.ephemeralDays` (14) |
+| `context-budget` | warn (error over a profile cap) | `context.budgets`, `context.warn_pct` (80), `context.builtin` (warn only); `--staged` and `--base` measure a budget only when one of its files is in the diff |
+| `literal-stray` | error | `literals` rows: `pattern`, `owner`, `allow`; `--staged` and `--base` read only added lines, `--tracked` whole files |
+| `hygiene-literal-regex` | error (doctor and every scan) | a `literals` row's `pattern` |
+| `hygiene-literal-nested` | warn (doctor) | a `literals` row's `pattern` |
+| `sweep` | info | `surfaces.roots`, `surfaces.idleDays` (30), `surfaces.minCallers` (1) |
+| `sweep-no-roots` | info | `surfaces.roots` empty |
+| `comment-added` | error | `comments.mode` (`any` off, `none` on), `comments.allow`, `comments.cite` (true: a line citing a URL passes) |
 
 ## Regression suite
 

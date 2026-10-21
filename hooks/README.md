@@ -11,6 +11,7 @@ hook: agents call it by path to wait on a long suite (see wait-run below).
 | --- | --- | --- | --- |
 | `PostToolUse`, `Edit\|Write` | `scripts/lint-touched-file.sh` | `async`, timeout 130 | Runs the configured lint on the file Claude just wrote and hands findings back on the next turn. Exit `0` always: it informs, it never blocks |
 | `PreToolUse`, `Bash` | `scripts/guard-destructive.sh` | sync, timeout 10, three handlers gated by `if` | Asks before a destructive command, with evidence. Never denies. Silent in `bypassPermissions` mode |
+| `PreToolUse`, `Bash` | `scripts/guard-commit.sh` | sync, timeout 15, `if` `Bash(git *)` | Denies a `git commit` whose staged files carry an error-level hygiene finding (large or design media). Fails open |
 | `PreToolUse`, `Bash` | `scripts/guard-poll-loop.sh` | sync, timeout 5, no `if` | Denies a shell loop that sleeps, for every roster subagent, and points it at `wait-run.sh`. Fails open. `GRAPH_POLL_GUARD=off` disables it |
 | `PreToolUse`, `Agent\|Task` | `scripts/guard-agent.sh` | sync, timeout 15 | Enforces the profile's `policy:` block on subagent calls |
 | `Stop`, no matcher | `scripts/test-before-stop.sh` | `asyncRewake`, timeout 620 | Runs the configured test after the turn ends and wakes Claude only when it fails. On an unchanged tree it replays the stored verdict instead (`<git common dir>/graph-engineering/checks-state.json`); any nonempty `GRAPH_CHECKS_NO_MEMO` turns that off |
@@ -132,6 +133,29 @@ three never spawns the script, and a git command that never says `push` or
 best-effort (Claude Code runs the hook when it cannot parse the command), the
 script re-checks the command itself. For a hard stop, put the fixed string in
 `permissions.deny`; a hook is the wrong tool for an absolute rule.
+
+## Commit hygiene guard
+
+`guard-commit.sh` runs `graph-control hygiene --staged` before a `git commit` and
+denies the commit when a staged file has an error-level finding, such as
+`media-size` or `media-design`. The reason names up to three findings as the
+path, the message and the fix. Warn-level findings never deny.
+
+- Fast path: a bash `case` exits unless the input says both `git` and `commit`, then
+  it exits unless the project has `.claude/graph-profile.yaml` and `uv` is on `PATH`.
+- It re-parses the command to find the repo: `git -C <dir> commit`, a `cd <dir> &&`
+  before it, a commit inside `$(...)`, else the input's `cwd`. A repo without its own
+  profile is not checked, nor is a commit redirected by its own `--git-dir` or
+  `--work-tree` before `commit`, a `GIT_DIR=` or `GIT_WORK_TREE=` prefix, or an
+  earlier `export` of either. `-a` and `-am` still check the staged files only.
+- It fails open: a missing interpreter or `uv`, a `BLOCKED` result, a crash or a
+  timeout allows the commit, and the last three print one line on stderr. The host's
+  15 s timeout is fail-open by construction.
+- The deny applies in `bypassPermissions` mode too: a hygiene error is never a prompt.
+
+To get past a denial, fix the finding (`git rm --cached -- <path>`), or set the
+hygiene key it names in the profile, such as `hygiene.media.allow` or
+`hygiene.media.enabled: false`.
 
 ## Sleep-loop guard
 

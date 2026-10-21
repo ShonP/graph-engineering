@@ -6,6 +6,7 @@ from typing import Any
 
 from .common import array, boolean, choice, obj, require, strings, text, unique, version
 from .plan_budget import KEYS as BUDGET_KEYS, budget_fields, check_budget
+from .plan_need import KEYS as NEED_KEYS, Measure, Need, need_fields
 
 NUMBER = r"-?[0-9]+(?:\.[0-9]+)?"
 CONDITION = re.compile(rf"value (<=|>=|==|<|>) (?:({NUMBER})|baseline \* ({NUMBER})(?: \+ ({NUMBER}))?)")
@@ -92,10 +93,12 @@ class Task:
     estimate_min: int | None = None
     path_cap_reason: str | None = None
     proof: str | None = None
+    need: Need | None = None
+    measure: Measure | None = None
 
     @classmethod
     def parse(cls, value: Any, schema: int) -> "Task":
-        row = obj(value, "id depends_on produces consumes writable_paths case_ids stateful", " ".join(BUDGET_KEYS))
+        row = obj(value, "id depends_on produces consumes writable_paths case_ids stateful", " ".join(BUDGET_KEYS + NEED_KEYS))
         paths = strings(row["writable_paths"], empty=False)
         for path in paths:
             require(not path.startswith("/") and ".." not in path.split("/"),
@@ -104,7 +107,7 @@ class Task:
                    tuple(Contract.parse(item) for item in array(row["produces"])),
                    tuple(Contract.parse(item) for item in array(row["consumes"])),
                    paths, strings(row["case_ids"], empty=False), boolean(row["stateful"]),
-                   **budget_fields(row))
+                   **budget_fields(row), **need_fields(row, schema))
         check_budget(task, schema)
         return task
 
@@ -191,12 +194,13 @@ class Plan:
                                 f"unordered writable paths overlap: {task.id}:{left}, {other.id}:{right}")
 
 
+def static_prefix(path: str) -> str:
+    return re.split(r"[*?\[{]", path, maxsplit=1)[0]
+
+
 def overlaps(left: str, right: str) -> bool:
     """Conservative static-prefix check; ambiguous globs need ordered ownership."""
-    def prefix(path: str) -> str:
-        return re.split(r"[*?\[{]", path, maxsplit=1)[0].rstrip("/")
-
-    a, b = prefix(left), prefix(right)
+    a, b = static_prefix(left).rstrip("/"), static_prefix(right).rstrip("/")
     return (not a or not b or a == b or a.startswith(b + "/") or b.startswith(a + "/")
             or (bool(re.search(r"[*?\[{]", left)) and b.startswith(a))
             or (bool(re.search(r"[*?\[{]", right)) and a.startswith(b)))

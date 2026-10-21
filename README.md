@@ -132,7 +132,11 @@ one entry per line. It matches case-insensitively over tracked file paths and
 text, at word edges and identifier seams (`NameKit`, `name_sdk`, `myName`), never
 inside a longer lowercase word, and `<name> allow=<glob>,...` exempts a path
 such as the manifest's author field.
-With no list it prints `SKIP`, so public CI reads `partial`.
+With no list it prints `SKIP`, so public CI reads `partial`; `--require` makes a
+missing list fail instead. The same matcher runs as the `private-names` hygiene
+rule at the commit guard, the repo gate and doctor, reporting path and line but
+never the name; a missing list there is a warning, or what
+`hygiene.privateNames` sets (`error`, `off`).
 
 ## Use
 
@@ -230,6 +234,10 @@ lists). Read this before enabling it on a repo you did not write.
 To turn the hooks off, disable the plugin with `claude plugin disable
 graph-engineering`, or every hook in a scope with `"disableAllHooks": true` in
 that scope's settings file (hooks reference, "Disable or remove hooks").
+
+Before an agent's `git commit` in a repo with a profile, the commit guard runs
+`graph-control hygiene` on the staged files and denies an error finding; rules,
+finding ids and keys: [`docs/graph-controls.md`](docs/graph-controls.md).
 
 The `graph-checks.json` contract, version floors and the rationale for each
 handler: [`hooks/README.md`](hooks/README.md).

@@ -18,11 +18,12 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import uuid
 from pathlib import Path
 from unittest import mock
 
 import helpers  # noqa: F401  (puts scripts/ on sys.path)
-from graph_control import cli
+from graph_control import cli, hygiene
 from graph_control.commands import iter_commands
 from graph_control.common import Invalid
 from graph_control.depth import decide
@@ -37,6 +38,7 @@ MAP_ROW = '  db-schema: {paths: ["migrations/**"]}\n'
 MEDIA = ("png", "jpg", "jpeg", "gif", "webp", "mp4", "webm", "mov")
 IGNORED_MEDIA = ".graph/\n" + "".join(f"docs/ux/changes/**/*.{ext}\n" for ext in MEDIA)
 STORE = 'uxEvidence:\n  path: "docs/ux/changes"\n  store: {push: "git evidence push", pull: "git evidence pull", link: ""}\n'
+HYGIENE = "hygiene:\n  media: {max_kb: 900, allow: [assets/**]}\n  paths: {home: error}\n  privateNames: off\n"
 QUICK = {"no-profile", "profile-invalid", "schema-version", "stale-key", "checks-missing",
          "version-mismatch", "cannot-determine"}
 
@@ -79,7 +81,7 @@ class Fixture:
         (self.root / ".claude" / "skills" / "house-style").mkdir(parents=True)
         (self.config / "plugins").mkdir(parents=True)
         env = {"CLAUDE_CONFIG_DIR": str(self.config), "GIT_CONFIG_GLOBAL": os.devnull,
-               "GIT_CONFIG_NOSYSTEM": "1", "XDG_CONFIG_HOME": str(base / "xdg")}
+               "GIT_CONFIG_NOSYSTEM": "1", "XDG_CONFIG_HOME": str(base / "xdg"), "GRAPH_PRIVATE_NAMES": "acme-widget"}
         case.enterContext(mock.patch.dict(os.environ, env))
         subprocess.run(["git", "init", "-q", str(self.root)], check=True)
         (self.root / ".gitignore").write_text(".graph/\n")
@@ -138,6 +140,12 @@ CASES = {
     "merge gate set to auto": (swap("merge: owner", "merge: auto"), {("warn", "gates-value")}),
     "quick gate is a list": (swap("merge: owner", "merge: owner\n  quick: [make, check]"), {("warn", "gates-quick")}),
     "quick gate is a number": (swap("merge: owner", "merge: owner\n  quick: 1"), {("warn", "gates-quick")}),
+    "hygiene block names an unknown key": (lambda f: f.profile(CLEAN + "hygiene:\n  medai: {}\n"),
+                                           {("error", "hygiene-invalid")}),
+    "hygiene key has the wrong type": (lambda f: f.profile(CLEAN + "hygiene:\n  media: {max_kb: x}\n"),
+                                       {("error", "hygiene-invalid")}),
+    "hygiene block valid": (lambda f: f.profile(CLEAN + HYGIENE), set()),
+    "hygiene block empty": (lambda f: f.profile(CLEAN + "hygiene:\n"), set()),
     "auto class lists agent-control": (swap("auto_classes: [none]", "auto_classes: [none, agent-control]"),
                                        {("warn", "gates-control")}),
     "risk table redefines agent-control": (swap(LIST_ROW, LIST_ROW + "  - {id: agent-control, paths: []}\n"),
@@ -362,12 +370,88 @@ class Quick(unittest.TestCase):  # AC-W2-DR-02
             self.assertEqual(ids(diagnose(fixture.root, PLUGIN, quick=True)), {("info", "no-profile")})
 
 
+def run_cli(argv):
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        code = cli.main(argv)
+    return code, json.loads(out.getvalue())
+
+
+STUB_QUICK = '''ID = "stub-quick"
+MODES = frozenset({"doctor"})
+QUICK = True
+
+def run(ctx):
+    return []
+
+def doctor(ctx):
+    return [("warn", "stub-quick-row", "stub quick row", "fix it")]
+'''
+STUB_SLOW = '''import subprocess
+ID = "stub-slow"
+MODES = frozenset({"doctor"})
+QUICK = False
+
+def run(ctx):
+    return []
+
+def doctor(ctx):
+    subprocess.run(["git", "--version"], capture_output=True, check=False)
+    return [("info", "stub-slow-row", "stub slow row", "fix it")]
+'''
+
+
+class Hygiene(unittest.TestCase):
+    def stub_rules(self) -> None:
+        name = "stub_doctor_rules_" + uuid.uuid4().hex[:8]
+        folder = Path(self.enterContext(tempfile.TemporaryDirectory())) / name
+        folder.mkdir()
+        for filename, body in {"__init__.py": "", "quick.py": STUB_QUICK, "slow.py": STUB_SLOW}.items():
+            (folder / filename).write_text(body)
+        self.enterContext(mock.patch.object(sys, "path", [str(folder.parent), *sys.path]))
+        real = hygiene.iter_rules
+        self.enterContext(mock.patch.object(hygiene, "iter_rules", lambda package: real(name)))
+
+    def test_invalid_block_message_names_the_key(self):
+        fixture = Fixture(self)
+        fixture.profile(CLEAN + "hygiene:\n  medai: {}\n")
+        [finding] = diagnose(fixture.root, PLUGIN, quick=False)
+        self.assertEqual((finding.level, finding.id), ("error", "hygiene-invalid"))
+        self.assertIn("hygiene.medai", finding.message)
+        self.assertIn("hygiene:", finding.fix)
+
+    def test_unreadable_profile_gets_no_hygiene_finding(self):
+        fixture = Fixture(self)
+        fixture.profile("hygiene: {medai: {}\n")
+        self.assertEqual(ids(diagnose(fixture.root, PLUGIN, quick=False)), {("error", "profile-invalid")})
+
+    def test_full_mode_reports_every_stub_row(self):
+        fixture = Fixture(self)
+        self.stub_rules()
+        code, data = run_cli(["doctor", "--root", str(fixture.root)])
+        self.assertEqual(code, 0)
+        self.assertEqual([(f["level"], f["id"]) for f in data["findings"]],
+                         [("warn", "stub-quick-row"), ("info", "stub-slow-row")])
+
+    def test_quick_mode_reports_only_quick_rules_and_starts_no_process(self):
+        fixture = Fixture(self)
+        self.stub_rules()
+        with mock.patch("subprocess.run") as spawn, mock.patch("subprocess.Popen") as popen:
+            code, data = run_cli(["doctor", "--root", str(fixture.root), "--quick"])
+        self.assertEqual((spawn.call_count, popen.call_count), (0, 0))
+        self.assertEqual(code, 0)
+        self.assertEqual([(f["level"], f["id"]) for f in data["findings"]], [("warn", "stub-quick-row")])
+
+    def test_invalid_block_is_reported_in_quick_mode(self):
+        fixture = Fixture(self)
+        fixture.profile(CLEAN + "hygiene:\n  medai: {}\n")
+        with mock.patch("subprocess.run", side_effect=AssertionError("quick mode spawned a process")):
+            self.assertEqual(ids(diagnose(fixture.root, PLUGIN, quick=True)), {("error", "hygiene-invalid")})
+
+
 class Command(unittest.TestCase):
     def run_cli(self, argv):
-        out = io.StringIO()
-        with contextlib.redirect_stdout(out):
-            code = cli.main(argv)
-        return code, json.loads(out.getvalue())
+        return run_cli(argv)
 
     def test_registered_and_prints_findings_json(self):
         self.assertIn("doctor", [module.NAME for module in iter_commands()])
