@@ -122,7 +122,7 @@ MEDIA_DIRS = ("`as-is/`", "`to-be/`")
 
 def fragments(text):
     prose = re.sub(r"\n(?![\n|])\s*", " ", text)
-    return re.split(r"(?<=[.;])\s+|\n+|\|", prose)
+    return re.split(r"(?<=[.;])\s+|\n+", prose)
 
 
 class DesignMediaStaysOutOfGit(unittest.TestCase):
