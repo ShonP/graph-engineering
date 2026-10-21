@@ -329,7 +329,7 @@ Read-only plug-in commands; like every control, none executes project commands.
 | `doc-line` | error | `docs.roots`, `docs.ignore` |
 | `doc-ephemeral` | warn (error past twice the age) | `docs.ephemeral`, `docs.ephemeralDays` (14) |
 | `context-budget` | warn (error over a profile cap) | `context.budgets`, `context.warn_pct` (80), `context.builtin` (warn only) |
-| `literal-stray` | error | `literals` rows: `pattern`, `owner`, `allow` |
+| `literal-stray` | error | `literals` rows: `pattern`, `owner`, `allow`; `--staged` and `--base` read only added lines, `--tracked` whole files |
 | `hygiene-literal-regex` | error (doctor and every scan) | a `literals` row's `pattern` |
 | `hygiene-literal-nested` | warn (doctor) | a `literals` row's `pattern` |
 | `sweep` | info | `surfaces.roots`, `surfaces.idleDays` (30), `surfaces.minCallers` (1) |

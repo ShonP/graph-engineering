@@ -1,6 +1,7 @@
 """Which files a hygiene run looks at, listed from git objects without reading their content."""
 
 import os
+import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -8,6 +9,7 @@ from pathlib import Path
 from ..common import Invalid
 
 GITLINK = "160000"
+HUNK = re.compile(r"^@@ -\S+ \+(\d+)")
 
 
 @dataclass(frozen=True)
@@ -72,6 +74,21 @@ def base(root: Path, rev: str) -> list[ScopeFile]:
 
 def tracked(root: Path) -> list[ScopeFile]:
     return _listing(root, "--cached", _empty_tree(root))
+
+
+def added_lines(root: Path, path: str, base_rev: str | None) -> list[tuple[int, str]]:
+    revs = (f"{base_rev}...HEAD",) if base_rev else ("--cached",)
+    patch = git(root, "diff", "-U0", "--no-color", "--no-ext-diff", "--no-textconv", *revs, "--",
+                f":(literal){path}")
+    lines, number = [], None
+    for raw in patch.split("\n"):
+        hunk = HUNK.match(raw)
+        if hunk:
+            number = int(hunk.group(1))
+        elif number is not None and raw.startswith("+"):
+            lines.append((number, raw[1:]))
+            number += 1
+    return lines
 
 
 def read_text(root: Path, item: ScopeFile) -> str | None:
