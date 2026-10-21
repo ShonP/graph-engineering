@@ -1,13 +1,13 @@
 ---
 name: definition-of-done
-description: Use when planning, implementing or reviewing any task - maps each change type (API endpoint, DB schema, infra/k8s, background job, UI, config/flag, dependency bump, AI agent/prompt) to the artifacts its PR must carry beyond the code - tests, contract suite, migration, rendered-manifest diff, observability, docs, rollout and rollback.
+description: Use when planning, implementing or reviewing any task, to know what its PR carries beyond the code for its change type (API, DB, infra, job, UI, config, dependency, prompt).
 ---
 
 # Definition of done
 
 Done means the code works **and** the change can be operated: someone can see it misbehave, roll it back and understand it later.
 
-Sources, synthesized: Google [code review](https://google.github.io/eng-practices/review/reviewer/looking-for.html), [SRE launches](https://sre.google/resources/book-update/reliable-product-launches-at-scale/), [DORA](https://dora.dev/capabilities/), Fowler [ParallelChange](https://martinfowler.com/bliki/ParallelChange.html), and the house rules the cells name.
+Sources: Google code review and SRE launch guides, DORA, Fowler's ParallelChange, the house rules the cells name.
 
 ## Use
 
@@ -34,9 +34,10 @@ Sources, synthesized: Google [code review](https://google.github.io/eng-practice
 | **AI agent / prompt** | eval set or golden cases, before and after, numbers in the PR | *if* exposed over an API: `api-contract` | - | - | token, cost, latency per call; guardrail/refusal counter | prompt change note | prompt/model version pinned; previous one flag away |
 | **Host blast radius** (heavy builds, images, caches, local clusters) | free disk checked (`df`) before heavy work, refusing below a stated floor | - | - | - | image and cache sizes bounded and reported | - | long commands in the background; cleanup of its images, volumes and worktrees |
 
-Every row also carries tests first (`review-testing-rules`), the `prior-art` note, fresh verification before any "done" claim (`superpowers:verification-before-completion`), and the quick gate: when the profile declares `gates.quick`, run it in the worktree before reporting `DONE`, report its exit line, and fix a red one like a red test. None declared: say so in one line.
+Every row also carries tests first (`review-testing-rules`), the run's `prior-art` note (on the plan), fresh verification before any "done" claim (`superpowers:verification-before-completion`), and the quick gate: when the profile declares `gates.quick`, run it in the worktree before reporting `DONE`, report its exit line, and fix a red one like a red test. None declared: say so in one line.
+
+**No code comments.** Names and structure explain the code. The only exception is a non-obvious why citing something outside it: an upstream issue URL, a platform bug, an external constraint. Never narrate, restate code, add section banners, TODO prose or docstrings repeating the signature. Reviewers flag each added comment that breaks this: a Nit, Important when it misleads.
 
 ## Anti-patterns
 
-- Dropping or renaming a column in the deploy that stops reading it: old pods mid-rollout read a missing column.
 - A dashboard link as the observability artifact: nobody is paged. Ship an alert with an owner.
