@@ -95,7 +95,7 @@ def main():
         directory = commit_dir(payload["tool_input"]["command"], payload.get("cwd") or os.getcwd())
     except (ValueError, KeyError, TypeError, AttributeError):
         return
-    if directory is None or not os.path.isdir(directory):
+    if directory is None:
         return
     top = run(["git", "-C", directory, "rev-parse", "--show-toplevel"], 5)
     root = top.stdout.strip()

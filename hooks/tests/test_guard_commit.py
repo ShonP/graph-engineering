@@ -32,6 +32,7 @@ case "$UV_MODE" in
   blocked) printf '{"reason": "profile cannot be read", "status": "BLOCKED"}\\n'; exit 1 ;;
   crash) echo 'Traceback (most recent call last)' >&2; exit 1 ;;
   garbage) echo 'not json'; exit 0 ;;
+  mixed) printf '{"findings": [{"fix": "fix-w", "id": "home-path", "level": "warn", "message": "warn-w", "path": "w.md"}, {"fix": "fix-a", "id": "media-size", "level": "error", "message": "too big", "path": "a.bin"}], "status": "FAIL"}\\n'; exit 1 ;;
   warn) printf '{"findings": [{"fix": "f", "id": "home-path", "level": "warn", "line": 1, "message": "m", "path": "n.md"}], "status": "PASS"}\\n' ;;
 esac
 '''
@@ -122,7 +123,8 @@ class DenyPath(GuardCommit):
         for command, cwd in self.spellings():
             with self.subTest(command=command):
                 reason = self.deny(command, cwd=cwd)
-                self.assertIn('assets/hero.bin: 600 KB > 500 KB', reason)
+                self.assertEqual(reason.count('assets/hero.bin: 600 KB > 500 KB'), 1, reason)
+                self.assertNotIn('assets/hero.bin: assets/hero.bin', reason)
                 self.assertIn('git rm --cached -- assets/hero.bin', reason)
         self.git(self.repo, 'rm', '-q', '--cached', '--', 'assets/hero.bin')
         for command, cwd in self.spellings():
@@ -174,10 +176,26 @@ class AllowPath(GuardCommit):
     def test_non_commit_commands_start_no_uv(self):
         self.stage('assets/hero.bin', b'\0' * 600 * 1024)
         for command in ('git status', 'git log --grep commit', 'echo git commit', 'npm test',
-                        'git diff -- commit.txt'):
+                        'git diff -- commit.txt', 'grep -r commit .git'):
             with self.subTest(command=command):
                 self.assertEqual(self.run_guard(command), '')
         self.assertEqual(self.uv_calls(), [])
+
+    def test_fast_path_starts_no_interpreter(self):
+        marker = self.root / 'ran-python'
+        trap = self.root / 'python-trap'
+        trap.write_text(f'#!/bin/sh\ntouch {shlex.quote(str(marker))}\nexit 1\n')
+        trap.chmod(0o755)
+        self.env['GE_PYTHON'] = str(trap)
+        for command in ('git status', 'npm test && git push'):
+            with self.subTest(command=command):
+                self.assertEqual(self.run_guard(command), '')
+        self.assertFalse(marker.exists())
+
+    def test_reason_lists_errors_only_with_path_message_and_fix(self):
+        self.env['UV_MODE'] = 'mixed'
+        reason = self.deny('git commit -m x')
+        self.assertEqual(reason, 'graph-engineering commit guard: a.bin: too big - fix-a')
 
     def test_stub_is_reached_for_a_commit(self):
         self.assertEqual(self.run_guard('git commit -am x'), '')
@@ -186,7 +204,9 @@ class AllowPath(GuardCommit):
         self.assertIn('--staged', self.uv_calls()[0])
 
     def test_no_project_profile_starts_no_uv(self):
-        (self.repo / '.claude' / 'graph-profile.yaml').unlink()
+        self.env['CLAUDE_PROJECT_DIR'] = str(self.other)
+        self.assertEqual(self.run_guard('git commit -m x'), '')
+        del self.env['CLAUDE_PROJECT_DIR']
         self.assertEqual(self.run_guard('git commit -m x'), '')
         self.assertEqual(self.uv_calls(), [])
 
@@ -202,6 +222,7 @@ class AllowPath(GuardCommit):
         (only_git / 'git').symlink_to(shutil.which('git'))
         env = dict(self.env, PATH=str(only_git))
         self.assertEqual(self.run_guard('git commit -m x', env=env), '')
+        self.assertEqual(self.stderr, '')
         self.assertEqual(self.uv_calls(), [])
 
     def test_hygiene_errors_fail_open_and_say_so(self):
