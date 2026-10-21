@@ -46,7 +46,7 @@ def _compiled(patterns: tuple[str, ...]) -> list[re.Pattern[str]]:
     try:
         return [re.compile(pattern) for pattern in patterns]
     except re.error as error:
-        raise Invalid(f"profile key hygiene.comments.allow holds an invalid regex {error.pattern!r}: {error}") from error
+        raise Invalid(f"profile key hygiene.comments.allow holds an invalid regex {error.pattern!r}") from error
 
 
 def run(ctx: Context) -> list[Finding]:
@@ -57,7 +57,7 @@ def run(ctx: Context) -> list[Finding]:
     found = []
     for item in ctx.files:
         markers = MARKERS.get(PurePosixPath(item.path).suffix[1:].lower())
-        if not markers or item.binary:
+        if not markers:
             continue
         for number, line in _added(ctx, item.path):
             text = line.strip()
