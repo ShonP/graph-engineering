@@ -5,7 +5,7 @@ Use `uv run scripts/graph-control.py …` from the plugin checkout. The PEP 723 
 Successful commands return JSON `{"status":"PASS",…}` and exit 0. Invalid, missing, stale or incomplete evidence returns `{"status":"BLOCKED","reason":"…"}` and exit 1. Parser errors use argparse's exit 2. There is no N/A/skip route for required checks. Every check declared in the run is required; keep optional diagnostics outside this gate manifest.
 
 ```
-uv run scripts/graph-control.py validate-plan /absolute/run/plan.json
+uv run scripts/graph-control.py validate-plan /absolute/run/plan.json [--profile /absolute/repo/.claude/graph-profile.yaml --root /absolute/repo]
 uv run scripts/graph-control.py snapshot /absolute/candidate --repo backend
 uv run scripts/graph-control.py fingerprint /absolute/run/run.json
 uv run scripts/graph-control.py preflight /absolute/run/run.json --profile /absolute/profile.yaml --graph /absolute/run/graph.md
@@ -35,7 +35,7 @@ uv run scripts/graph-control.py skills-check --required graph-engineering:bruno,
 
 ## Plan schema (versions 1 and 2)
 
-`schema_version` is 1 or 2; any other value is rejected. Version 2 is version 1 plus the optional success signals and task budget keys below. Every field in this example is required in both versions; the only optional task keys are `estimate_min`, `path_cap_reason` and `proof`, version 2 only, with the rules under [Task budget](#task-budget-version-2). Unknown/duplicate keys and duplicate IDs are rejected. Arrays below may be empty unless the example/comment says otherwise.
+`schema_version` is 1 or 2; any other value is rejected. Version 2 is version 1 plus the optional success signals, task budget and need and measure keys below. Every field in this example is required in both versions; the only optional task keys are `estimate_min`, `path_cap_reason` and `proof` ([Task budget](#task-budget-version-2)) and `need` and `measure` ([Need and measure](#need-and-measure-version-2)), version 2 only. Unknown/duplicate keys and duplicate IDs are rejected. Arrays below may be empty unless the example/comment says otherwise.
 
 ```json
 {
@@ -117,6 +117,25 @@ A version 2 task may add three optional keys (shown alone below, merged into the
 - `proof`: exactly `focused`, `full_device` or `cluster`. A `full_device` or `cluster` task proves on real devices or a cluster and builds nothing, so its `produces` must be empty; building and proving are separate tasks.
 - `path_cap_reason` and `proof` are valid only beside `estimate_min`; the path cap binds only a task that carries `estimate_min`.
 - An explicit `null` for any of the three is rejected (omit the key instead), and a version 1 plan carrying any of them is rejected. Every rejection starts with `task <id>:` and names the limit.
+
+### Need and measure (version 2)
+
+A version 2 task may also carry `need`, for a task that creates a new surface, and `measure`, for one that swaps a provider, model or runtime dependency. Both are optional, so older plans validate unchanged.
+
+```json
+{
+  "schema_version": 2,
+  "tasks": [
+    {"id": "FE3", "need": {"user": "example-user", "trigger": "weekly export takes 40 min by hand", "run": ["bash", "tools/export/run.sh"]},
+     "measure": {"command": ["bash", "tools/export/bench.sh"], "baseline": "p50 120 ms"}}
+  ]
+}
+```
+
+- `need`: `user` (who it is for) and `trigger` (the measured signal asking for it) are nonempty text; `run` is the argv that runs the surface, a nonempty list of nonempty strings.
+- `measure`: `command` is the measuring argv, same rule as `run`; `baseline` is the nonempty text it read before the change.
+- Every subkey is required. Rejections, in this order, as `task <id>: <key> ...`: `must not be null; omit the key instead`, `requires schema_version 2`, `must be an object`, `has unknown fields [...]`, `is missing fields [...]`, then `<key>.<sub> must be nonempty text` or `<key>.<sub> must be a nonempty argv of nonempty strings`.
+- `validate-plan <plan> --profile <profile.yaml> --root <repo>` also enforces the keys against the profile's `hygiene:` block; the two flags go together (`validate-plan takes --profile and --root together` otherwise), and without them only the shape is checked. A writable path's static prefix (the text before the first `*?[{`), cut to its directory, and each ancestor of it, is a new surface when it matches a `hygiene.surfaces.roots` glob and holds no tracked file at `HEAD` of `--root`: that task needs `need` (`task <id>: creates new surface <dir> without need`). So `tools/**` names no new surface, while `tools/export/**` and `tools/export/run.sh` both name `tools/export`. A writable path that matches a `hygiene.measure.paths` glob as written needs `measure` (`task <id>: changes <path> without measure`). Every problem in the plan is joined by `; ` in one BLOCKED reason. A root without a HEAD commit is BLOCKED `not a git repository with a HEAD commit: <root>`; an unreadable or invalid profile is BLOCKED with the profile's error.
 
 ## Run schema (version 1)
 
@@ -298,7 +317,7 @@ Read-only plug-in commands; like every control, none executes project commands.
 | `media-deny` | error | `media.deny` |
 | `home-path` | warn | `paths.home` (warn, error, off) |
 | `private-names-unconfigured` | warn | `privateNames` (warn, error, off); set `GRAPH_PRIVATE_NAMES` or the XDG list |
-| `private-name` | error | the private-names list and its `allow=` globs |
+| `private-name` | error | the private-names list and its `allow=` globs; `privateNames: off` silences it |
 | `check-expired` | error (doctor) | an advisory `checks` entry past `expires` in `.claude/graph-checks.json` |
 | `check-expiring` | warn (doctor) | the same, within 7 days of `expires` |
 | `main-dirty` | error | `runEnd.mainClean` |
@@ -306,16 +325,16 @@ Read-only plug-in commands; like every control, none executes project commands.
 | `stray-file` | error | `runEnd.strayFiles` |
 | `branch-unmerged` | error | `runEnd.branchMerged`, with integration `push-main` |
 | `waiting-merge` | info | `runEnd.branchMerged`, with integration `pr`, a missing branch or no origin |
-| `doc-path` | error | `docs.roots`, `docs.ignore` |
+| `doc-path` | error | `docs.roots`, `docs.ignore` (skips docs and cited tokens); only a backticked token whose first segment is a tracked top-level entry counts |
 | `doc-line` | error | `docs.roots`, `docs.ignore` |
 | `doc-ephemeral` | warn (error past twice the age) | `docs.ephemeral`, `docs.ephemeralDays` (14) |
 | `context-budget` | warn (error over a profile cap) | `context.budgets`, `context.warn_pct` (80), `context.builtin` (warn only) |
 | `literal-stray` | error | `literals` rows: `pattern`, `owner`, `allow` |
-| `hygiene-literal-regex` | error (doctor) | a `literals` row's `pattern` |
+| `hygiene-literal-regex` | error (doctor and every scan) | a `literals` row's `pattern` |
 | `hygiene-literal-nested` | warn (doctor) | a `literals` row's `pattern` |
 | `sweep` | info | `surfaces.roots`, `surfaces.idleDays` (30), `surfaces.minCallers` (1) |
 | `sweep-no-roots` | info | `surfaces.roots` empty |
-| `comment-added` | error | `comments.mode` (`any` off, `none` on), `comments.allow` |
+| `comment-added` | error | `comments.mode` (`any` off, `none` on), `comments.allow`, `comments.cite` (true: a line citing a URL passes) |
 
 ## Regression suite
 

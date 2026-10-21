@@ -198,5 +198,21 @@ class PrivateNames(unittest.TestCase):
         self.assertEqual(self.run_check().returncode, 0)
 
 
+class ReadmeGenericity(unittest.TestCase):
+    def test_paragraph_names_every_place_the_check_runs(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        start = readme.index("**Genericity:**")
+        paragraph = " ".join(readme[start:readme.index("\n## ", start)].split())
+        for needle in ("`private-names` hygiene rule", "commit guard", "repo gate", "doctor", "`--require`",
+                       "`hygiene.privateNames`"):
+            self.assertIn(needle, paragraph)
+
+    def test_hooks_section_points_at_the_hygiene_command(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        start = readme.index("## Hooks")
+        section = " ".join(readme[start:readme.index("\n## ", start + 1)].split())
+        self.assertRegex(section, r"commit guard runs `graph-control hygiene`[^;]*;[^\[]*\[[^\]]*\]\(docs/graph-controls\.md\)")
+
+
 if __name__ == "__main__":
     unittest.main()
