@@ -179,6 +179,7 @@ class AllowPath(GuardCommit):
                         'git diff -- commit.txt', 'grep -r commit .git'):
             with self.subTest(command=command):
                 self.assertEqual(self.run_guard(command), '')
+                self.assertEqual(self.stderr, '')
         self.assertEqual(self.uv_calls(), [])
 
     def test_fast_path_starts_no_interpreter(self):
@@ -187,7 +188,7 @@ class AllowPath(GuardCommit):
         trap.write_text(f'#!/bin/sh\ntouch {shlex.quote(str(marker))}\nexit 1\n')
         trap.chmod(0o755)
         self.env['GE_PYTHON'] = str(trap)
-        for command in ('git status', 'npm test && git push'):
+        for command in ('git status', 'npm test && git push', 'npm run commit'):
             with self.subTest(command=command):
                 self.assertEqual(self.run_guard(command), '')
         self.assertFalse(marker.exists())
@@ -241,6 +242,7 @@ class AllowPath(GuardCommit):
         for command in ('git commit -m "x', 'git -C /nonexistent/acme-widget commit -m x'):
             with self.subTest(command=command):
                 self.assertEqual(self.run_guard(command), '')
+                self.assertEqual(self.stderr, '')
         self.assertEqual(self.uv_calls(), [])
 
 
