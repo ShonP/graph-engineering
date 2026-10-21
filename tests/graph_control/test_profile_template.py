@@ -31,7 +31,7 @@ HYGIENE_IDS = ("hygiene-invalid", "media-size", "media-design", "media-evidence"
                "doc-ephemeral", "context-budget", "literal-stray", "hygiene-literal-regex", "hygiene-literal-nested",
                "sweep", "sweep-no-roots", "comment-added")
 TEMPLATE_BYTES = 30_000
-VALUES_SHA256 = "9d16f1216362c90fd238a2b2a3dead448405adc9c44938515d0f6362172a9643"
+VALUES_SHA256 = "76979683dca6f44a31f4634b0adee2494135ff31a3f56169bcc184bc40d663b4"
 TITLE = "Dependency-derived rows (applied by /graph-init)"
 HAS_WCMATCH = importlib.util.find_spec("wcmatch") is not None
 
