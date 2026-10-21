@@ -145,8 +145,9 @@ path, the message and the fix. Warn-level findings never deny.
   it exits unless the project has `.claude/graph-profile.yaml` and `uv` is on `PATH`.
 - It re-parses the command to find the repo: `git -C <dir> commit`, a `cd <dir> &&`
   before it, a commit inside `$(...)`, else the input's `cwd`. A repo without its own
-  profile is not checked, nor is a command naming `--git-dir`, `--work-tree`,
-  `GIT_DIR=` or `GIT_WORK_TREE=`. `-a` and `-am` still check the staged files only.
+  profile is not checked, nor is a commit redirected by its own `--git-dir` or
+  `--work-tree` before `commit`, a `GIT_DIR=` or `GIT_WORK_TREE=` prefix, or an
+  earlier `export` of either. `-a` and `-am` still check the staged files only.
 - It fails open: a missing interpreter or `uv`, a `BLOCKED` result, a crash or a
   timeout allows the commit, and the last three print one line on stderr. The host's
   15 s timeout is fail-open by construction.

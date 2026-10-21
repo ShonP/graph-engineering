@@ -31,7 +31,8 @@ import sys
 PUNCT = {"&&", "||", ";", "|", "&", "(", ")", ";;", "|&"}
 VALUED = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--config-env"}
 PREFIX = "graph-engineering commit guard: "
-ELSEWHERE = re.compile(r"(?<![\w-])(GIT_DIR|GIT_WORK_TREE)=|(?<![\w-])--(git-dir|work-tree)\b")
+REDIRECT_ENV = ("GIT_DIR=", "GIT_WORK_TREE=")
+REDIRECT_OPTIONS = ("--git-dir", "--work-tree")
 
 
 def segments(command):
@@ -48,8 +49,6 @@ def segments(command):
 
 
 def commit_dir(command, cwd):
-    if ELSEWHERE.search(command):
-        return None
     inner = [a or b for a, b in re.findall(r"`([^`]*)`|\$\(([^()]*)\)", command)]
     for part in [command] + inner:
         found = git_commit(part, cwd)
@@ -58,10 +57,20 @@ def commit_dir(command, cwd):
     return None
 
 
+def redirects_option(word):
+    return word in REDIRECT_OPTIONS or word.startswith(tuple(f"{o}=" for o in REDIRECT_OPTIONS))
+
+
 def git_commit(command, cwd):
+    exported = False
     for words in segments(command):
+        redirected = exported
         while words and "=" in words[0] and not words[0].startswith(("-", "=")):
+            redirected = redirected or words[0].startswith(REDIRECT_ENV)
             words = words[1:]
+        if words and words[0] == "export":
+            exported = exported or any(w.startswith(REDIRECT_ENV) for w in words[1:])
+            continue
         if len(words) > 1 and words[0] == "cd":
             cwd = os.path.join(cwd, os.path.expanduser(words[1]))
             continue
@@ -69,10 +78,11 @@ def git_commit(command, cwd):
             continue
         target, rest = cwd, words[1:]
         while rest and rest[0].startswith("-"):
+            redirected = redirected or redirects_option(rest[0])
             if rest[0] == "-C" and len(rest) > 1:
                 target = os.path.join(target, os.path.expanduser(rest[1]))
             rest = rest[2:] if rest[0] in VALUED else rest[1:]
-        if rest and rest[0] == "commit":
+        if rest and rest[0] == "commit" and not redirected:
             return target
     return None
 
