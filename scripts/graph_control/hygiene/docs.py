@@ -1,4 +1,7 @@
-"""docs: backticked repo paths and path:line cites in docs, or in one --text file, must resolve against git ls-files."""
+"""docs: backticked paths and path:line cites under a tracked top-level entry must resolve against git ls-files.
+
+The docs are the tracked files matching docs.roots minus docs.ignore, or the one --text file.
+"""
 
 import re
 from pathlib import PurePosixPath
@@ -14,9 +17,6 @@ SPAN = re.compile(r"`([^`\n]+)`")
 TOKEN = re.compile(r"(?P<path>[\w./@*?{},\[\]+-]+)(?::(?P<start>\d+)(?:-(?P<end>\d+))?)?")
 GLOB = re.compile(r"[*?\[{]")
 FENCE = "```"
-EXTENSIONS = frozenset({"md", "mdx", "py", "sh", "ts", "tsx", "js", "jsx", "mjs", "cjs", "json", "yaml", "yml",
-                        "toml", "txt", "swift", "kt", "kts", "go", "rs", "java", "rb", "sql", "html", "css", "xml",
-                        "lock", "cfg", "ini", "plist", "gradle", "png", "jpg", "svg", "gif", "webp", "mp4"})
 
 
 def _cites(text: str) -> list[tuple[int, str, str, int | None]]:
@@ -27,12 +27,10 @@ def _cites(text: str) -> list[tuple[int, str, str, int | None]]:
             continue
         for span in [] if fenced else SPAN.findall(line):
             match = TOKEN.fullmatch(span)
-            if not match or span.startswith(("-", "/")) or "{{" in span:
+            if not match or "{{" in span:
                 continue
-            path = match["path"].removeprefix("./").rstrip("/")
-            if "/" in match["path"] or PurePosixPath(path).suffix[1:] in EXTENSIONS:
-                last = match["end"] or match["start"]
-                cites.append((number, span, path, int(last) if last else None))
+            last = match["end"] or match["start"]
+            cites.append((number, span, match["path"].removeprefix("./").rstrip("/"), int(last) if last else None))
     return cites
 
 
@@ -41,13 +39,11 @@ class Tree:
         self.root = root
         self.files = frozenset(git(root, "ls-files", "-z").split("\0")) - {""}
         self.dirs = frozenset(str(parent) for name in self.files for parent in PurePosixPath(name).parents)
-        self.names = frozenset(PurePosixPath(name).name for name in self.files)
+        self.tops = frozenset(name.split("/")[0] for name in self.files)
         self.counts: dict[str, int | None] = {}
 
-    def candidates(self, path: str) -> list[str]:
-        if "/" in path:
-            return [path] if path in self.files else []
-        return [name for name in self.files if PurePosixPath(name).name == path]
+    def claims(self, path: str) -> bool:
+        return path.split("/")[0] in self.tops
 
     def lines(self, name: str) -> int | None:
         if name not in self.counts:
@@ -59,17 +55,17 @@ class Tree:
 
     def check(self, path: str, line: int | None) -> tuple[str, str] | None:
         if GLOB.search(path):
-            hit, names = matcher([path]).match, self.files if "/" in path else self.names
-            return None if any(hit(name) for name in names) else ("doc-path", "matches no tracked file")
-        found = self.candidates(path)
+            hit = matcher([path]).match
+            return None if any(hit(name) for name in self.files) else ("doc-path", "matches no tracked file")
         if line is None:
-            return None if found or path in self.dirs else ("doc-path", "does not exist in the tracked tree")
-        if not found:
+            missing = path not in self.files and path not in self.dirs
+            return ("doc-path", "does not exist in the tracked tree") if missing else None
+        if path not in self.files:
             return "doc-path", "is not a tracked file"
-        counts = [count for count in map(self.lines, found) if count is not None]
-        if not counts or line <= max(counts):
+        count = self.lines(path)
+        if count is None or line <= count:
             return None
-        return "doc-line", f"cites line {line}, but {found[0]} has {max(counts)} lines"
+        return "doc-line", f"cites line {line}, but {path} has {count} lines"
 
 
 def _docs(ctx: Context) -> list[tuple[str, str]]:
@@ -88,7 +84,7 @@ def run(ctx: Context) -> list[Finding]:
     findings = []
     for doc, text in docs:
         for number, span, path, line in _cites(text):
-            problem = None if ignore(path) else tree.check(path, line)
+            problem = tree.check(path, line) if tree.claims(path) and not ignore(path) else None
             if problem:
                 findings.append(Finding("error", problem[0], f"`{span}` {problem[1]}",
                                         f"correct the path in {doc}, or add {doc} to hygiene.docs.ignore",

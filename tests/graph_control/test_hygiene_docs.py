@@ -9,7 +9,7 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 
-from hygiene_fixture import commit_at, make_repo, stage, write_profile
+from hygiene_fixture import commit_at, git, make_repo, stage, write_profile
 from graph_control import cli
 
 NOW = datetime(2026, 1, 15, 12, 0, tzinfo=timezone.utc)
@@ -20,7 +20,7 @@ See `scripts/missing.py` for the old entry.
 The limit lives at `scripts/real.py:999`.
 The entry is `scripts/real.py:3` and `scripts/real.py:2-10`.
 Skills: `skills/**/SKILL.md`, placeholder `<docsPath>/x.md`, url `https://x.test/a/b`.
-Sources `src/{a,b}.ts`, generated `build/out.md`, dir `scripts/` and `scripts`.
+Sources `src/{a,b}.ts`, generated `scripts/generated/out.md`, dir `scripts/` and `scripts`.
 """
 
 
@@ -37,6 +37,7 @@ class Base(unittest.TestCase):
         stage(self.root, "skills/acme-widget/SKILL.md", "# acme-widget\n")
         stage(self.root, "src/a.ts", "export {}\n")
         stage(self.root, "notes/plan.md", "plan\n")
+        stage(self.root, "README.md", "# acme-widget\nread me\n")
 
     def profile(self, roots='"docs/**/*.md"', ignore=""):
         write_profile(self.root, 'hygiene: {docs: {roots: [%s], ignore: [%s]}}\n' % (roots, ignore))
@@ -50,7 +51,7 @@ class Base(unittest.TestCase):
 
 class Paths(Base):
     def test_dead_path_and_line_past_the_end_are_errors_at_doc_line(self):
-        self.profile(ignore='"build/**"')
+        self.profile(ignore='"scripts/generated/**"')
         stage(self.root, "docs/guide.md", CITES)
         commit_at(self.root, "docs", 0, NOW)
         code, result = self.invoke("--tracked")
@@ -80,27 +81,38 @@ class Paths(Base):
         self.profile()
         stage(self.root, "docs/skip.md", "\n".join([
             "Flags `-Ivendor/include` and `--out` and `graph-control hygiene --tracked`.",
-            "Template `{{ver}}/x.md` and `$HOME/x.md` and `pr|push-main` and `fn(a/b)`.",
+            "Template `{{ver}}/x.md` and `scripts/{{name}}.py` and `$HOME/x.md` and `pr|push-main` and `fn(a/b)`.",
             "Absolute `/usr/local/bin` and version `0.18.0` and `a.b` word.",
             "```bash",
             "cat `scripts/fenced.py`",
             "```",
-            "Glob that misses `nowhere/**/*.md` is an error.", ""]))
+            "Glob that misses `skills/**/*.zz` is an error.", ""]))
         commit_at(self.root, "docs", 0, NOW)
         _, result = self.invoke("--tracked")
         self.assertEqual(finding_keys(result), [("error", "doc-path", "docs/skip.md", 7)])
 
-    def test_bare_file_name_resolves_by_basename(self):
+    def test_only_tokens_under_a_tracked_top_level_entry_are_claims(self):
         self.profile()
-        stage(self.root, "docs/names.md", "Read `plan.md` and `real.py:10`, not `ghost.md` or `real.py:11`.\n"
-                                          "Any `*.py` file, but no `*.rb` file.\n")
+        stage(self.root, "docs/names.md", "\n".join([
+            "Run files `plan.md`, `ghost.md`, `real.py:11`, `*.rb`, `research/prior-art.md`.",
+            "Consumer paths `argocd/**`, `Cargo.toml`, `manifests/app.yaml:9`.",
+            "Top level `README.md` and `README.md:2` exist, `README.md:3` does not.",
+            "Under a tracked dir `scripts/real.py:12` is past the end.", ""]))
         commit_at(self.root, "docs", 0, NOW)
         _, result = self.invoke("--tracked")
-        messages = sorted(f["message"] for f in result["findings"])
-        self.assertEqual(len(messages), 3)
-        self.assertIn("*.rb", messages[0])
-        self.assertIn("ghost.md", messages[1])
-        self.assertIn("real.py:11", messages[2])
+        self.assertEqual(finding_keys(result), [("error", "doc-line", "docs/names.md", 3),
+                                                ("error", "doc-line", "docs/names.md", 4)])
+
+    def test_a_moved_file_is_still_flagged(self):
+        self.profile()
+        stage(self.root, "scripts/old.py", "old\n")
+        commit_at(self.root, "old", 1, NOW)
+        git(self.root, "mv", "scripts/old.py", "scripts/new.py")
+        stage(self.root, "docs/moved.md", "Was `scripts/old.py`, now `scripts/new.py:1`.\n")
+        commit_at(self.root, "move", 0, NOW)
+        _, result = self.invoke("--tracked")
+        self.assertEqual(finding_keys(result), [("error", "doc-path", "docs/moved.md", 1)])
+        self.assertIn("scripts/old.py", result["findings"][0]["message"])
 
     def test_line_cite_on_a_directory_missing_file_or_past_a_range_end(self):
         self.profile()
