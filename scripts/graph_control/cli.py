@@ -11,9 +11,10 @@ from pathlib import Path
 from types import ModuleType
 
 from .commands import Output, iter_commands
-from .common import Invalid, fingerprint, load
+from .common import Invalid, fingerprint, load, require
 from .identity import snapshot
 from .plan import Plan
+from .plan_need import enforce, load_config
 from .plan_queue import critical_path
 from .preflight import preflight
 from .receipts import Receipt, verify
@@ -26,6 +27,8 @@ def parser(modules: Iterable[ModuleType] | None = None) -> argparse.ArgumentPars
     commands = root.add_subparsers(dest="command", required=True)
     for name in ("validate-plan", "validate-attempts", "fingerprint"):
         commands.add_parser(name).add_argument("artifact", type=Path)
+    for flag in ("--profile", "--root"):
+        commands.choices["validate-plan"].add_argument(flag, type=Path, help="with the other: enforce need and measure")
     snap = commands.add_parser("snapshot")
     snap.add_argument("root", type=Path)
     snap.add_argument("--repo", required=True)
@@ -64,6 +67,10 @@ def main(argv: list[str] | None = None, modules: Iterable[ModuleType] | None = N
                 return result.exit_code
         elif args.command == "validate-plan":
             plan = Plan.parse(load(args.artifact))
+            if args.profile is not None or args.root is not None:
+                require(args.profile is not None and args.root is not None,
+                        "validate-plan takes --profile and --root together")
+                enforce(plan, args.root, load_config(args.profile))
             result = {"tasks": len(plan.tasks), "cases": len(plan.cases), "critical_path": critical_path(plan)}
         elif args.command == "validate-attempts":
             result = validate_attempts(load(args.artifact))
