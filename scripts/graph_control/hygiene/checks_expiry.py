@@ -23,11 +23,8 @@ def run(ctx: Context) -> list[Finding]:
 
 
 def doctor(ctx: Context) -> list[Row]:
-    path = ctx.root / CONFIG
-    if not path.is_file():
-        return []
     try:
-        checks = _checks_config(ctx.plugin_root).load(path).checks
+        checks = _checks_config(ctx.plugin_root).load(ctx.root / CONFIG).checks
     except (ValueError, OSError):
         return []
     today, rows = ctx.now.date(), []
