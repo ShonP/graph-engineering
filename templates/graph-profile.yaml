@@ -20,7 +20,9 @@ instructionPaths: ["CLAUDE.md", "**/CLAUDE.md", "AGENTS.md", ".claude/**"]
 # Optional owner access map; the engine injects it into planner and spike briefs.
 ownerAccess: ""
 
-# Where specs and plans go.
+# Where specs, decisions and research reports go. Per-run plans live in
+# .graph/<run>/; a repo that keeps them under docsPath lists them in
+# hygiene.docs.ephemeral.
 docsPath: "docs/superpowers"
 
 # Before/after evidence for every visible change, committed as
@@ -34,6 +36,45 @@ uxEvidence:
     push: ""
     pull: ""
     link: ""
+
+# `graph-control hygiene` rules; git and files only, never a project command.
+# The commit guard runs --staged, the repo gate --base, run end --run-end,
+# `/graph-doctor --sweep` the sweep; --tracked is a full sweep by hand. Every
+# key is at its default; levels are warn, error or off. Detail and finding ids:
+# docs/graph-controls.md (hygiene).
+hygiene:
+  media:            # added files over max_kb, and design or stored evidence media
+    enabled: true
+    max_kb: 500
+    deny: []        # globs that are always an error
+    allow: []       # globs exempt from the media checks
+  paths:
+    home: warn      # absolute home-directory paths in text files
+  privateNames: warn  # level when check-private-names has no list
+  literals: []      # [{id, pattern, owner: [globs], allow: [globs]}]: a value only its owner may spell
+  docs:             # backticked paths and path:line cites in these docs must resolve
+    roots: []
+    ignore: []
+    ephemeral: []   # dated docs; older than ephemeralDays warns, twice that errors
+    ephemeralDays: 14
+  context:          # always-on instruction bytes
+    budgets: []     # [{id, globs, max_bytes}]
+    warn_pct: 80
+    builtin: true   # warn-only: CLAUDE.md plus unscoped .claude/rules/*.md
+  comments:
+    mode: any       # none: an added comment-only line is an error
+    allow: []       # regexes a comment may match
+  surfaces:         # the sweep: idle dirs under roots with few callers
+    roots: []
+    idleDays: 30
+    minCallers: 1
+  runEnd:           # run-end checks, each switchable
+    mainClean: true
+    worktrees: true
+    branchMerged: true
+    strayFiles: true
+  measure:
+    paths: []       # a plan task writing these globs needs `measure`
 
 # How qa stands this repo up on an isolated live stack; each field is a
 # repo-root shell command. Ships empty; /graph-init fills what it detects, and an
