@@ -1,6 +1,7 @@
 import contextlib
 import io
 import json
+import re
 import tempfile
 import unittest
 from datetime import datetime, timezone
@@ -11,6 +12,7 @@ from helpers import dump, plan_data
 from graph_control import cli
 from graph_control.common import Invalid
 from graph_control.plan import Plan
+from graph_control.plan_need import need_fields
 
 NEED = {"user": "example-user", "trigger": "weekly export takes 40 min by hand",
         "run": ["bash", "tools/newtool/run.sh"]}
@@ -174,6 +176,34 @@ class Enforce(unittest.TestCase):
     def test_empty_profile_enforces_nothing(self):
         self.profile.write_text("", encoding="utf-8")
         self.assertEqual(self.check(["tools/newtool/**", "web/package.json"])[0], 0)
+
+
+class Documented(unittest.TestCase):
+    DOC = Path(__file__).resolve().parents[2] / "docs" / "graph-controls.md"
+    MESSAGES = ("must not be null; omit the key instead", "requires schema_version 2", "must be an object",
+                "has unknown fields", "is missing fields", "must be nonempty text",
+                "must be a nonempty argv of nonempty strings", "creates new surface", "without need",
+                "without measure", "validate-plan takes --profile and --root together",
+                "not a git repository with a HEAD commit", "hygiene.surfaces.roots", "hygiene.measure.paths")
+
+    def setUp(self):
+        self.doc = self.DOC.read_text(encoding="utf-8")
+        start = self.doc.index("### Need and measure (version 2)")
+        self.assertLess(self.doc.index("### Task budget (version 2)"), start)
+        self.section = self.doc[start:self.doc.index("\n## ", start)]
+
+    def test_example_rows_parse_with_both_keys(self):
+        block = re.search(r"```json\n(.*?)```", self.section, re.S).group(1)
+        for row in json.loads(block)["tasks"]:
+            self.assertEqual(sorted(need_fields(row, 2)), ["measure", "need"])
+
+    def test_rules_and_messages_are_documented(self):
+        flat = re.sub(r"\s+", " ", self.section)
+        self.assertEqual([m for m in self.MESSAGES if m not in flat], [])
+
+    def test_usage_block_shows_the_enforcing_flags(self):
+        (line,) = [x for x in self.doc.splitlines() if x.startswith("uv run scripts/graph-control.py validate-plan")]
+        self.assertIn("[--profile /absolute/repo/.claude/graph-profile.yaml --root /absolute/repo]", line)
 
 
 if __name__ == "__main__":
