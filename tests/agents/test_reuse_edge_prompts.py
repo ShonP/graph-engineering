@@ -7,7 +7,15 @@ from test_roster_policy import ROOT, split
 PLANNER = ROOT / "agents" / "planner.md"
 RESEARCHER = ROOT / "agents" / "researcher.md"
 REVIEWER = ROOT / "agents" / "reviewer.md"
+IMPLEMENTERS = (ROOT / "agents" / "implementer.md", ROOT / "agents" / "implementer-simple.md")
+QA_VERIFICATION = ROOT / "skills" / "process" / "qa-verification" / "SKILL.md"
 EDGE_CASES = ("empty", "limits", "invalid input", "permissions", "concurrency", "time")
+REUSE_LINE = "`Reuse: <file:line> | none - searched <terms>`"
+
+
+def prior_art_step(body):
+    (line,) = [ln for ln in body.split("\n") if ln.startswith("4. **Prior art**")]
+    return line
 
 
 class PlannerReuse(GenericText):
@@ -67,6 +75,41 @@ class ReviewerReuse(GenericText):
         self.assertIn("single consumer", text)
         self.assertRegex(text, r"misses an edge case the plan listed")
         self.assert_generic(body, "reviewer")
+
+    def test_reviewer_flags_a_new_helper_without_a_reuse_line(self):
+        _, body = split(REVIEWER)
+        text = flat(section(body, "## Reviewing"))
+        self.assertRegex(text, r"A new helper, fake or wrapper with no `Reuse:` line in the report is Important\.")
+
+
+class ImplementerReuse(GenericText):
+    def test_both_implementers_search_before_a_new_helper(self):
+        for path in IMPLEMENTERS:
+            with self.subTest(agent=path.stem):
+                _, body = split(path)
+                step = prior_art_step(body)
+                self.assertRegex(
+                    step,
+                    r"Before writing a new helper, fake, wrapper or test utility, "
+                    r"search the repo and its test-support dirs \(`rg`\)",
+                )
+                self.assertIn("reuse what exists or say why not", step)
+                self.assertIn(REUSE_LINE, step)
+                self.assertNotIn("jscpd", body)
+                self.assert_generic(step, path.stem)
+
+
+class QaDefaultSettings(GenericText):
+    def test_qa_runs_the_stack_on_default_settings(self):
+        text = QA_VERIFICATION.read_text(encoding="utf-8")
+        protocol = flat(section(text, "## Protocol"))
+        self.assertRegex(
+            protocol,
+            r"The stack runs on default settings, with only the `runtime\.env` names "
+            r"and no developer overrides or local flags; "
+            r"a row that passes only with an override is `FAILED`\.",
+        )
+        self.assert_generic(protocol, "qa-verification protocol")
 
 
 if __name__ == "__main__":
