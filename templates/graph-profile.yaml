@@ -444,10 +444,13 @@ gates:
 integration: pr
 
 # A diff over `panel_lines` changed lines, or touching every stack of one `seams`
-# list (e.g. [[api, web]]), gets a panel review.
+# list (e.g. [[api, web]]), gets a panel review. `cadence`: `per-task` reviews each
+# task before it merges; `per-run` merges tasks on their tests and quick gate, then
+# reviews the whole run diff once, with qa, and runs one batched fix round.
 review:
   panel_lines: 2000
   seams: []
+  cadence: per-task
 
 # Globs excluded from LOC in the change digest at the merge gate, so it tracks
 # the product change. Brace-free; add this repo's fixtures or snapshots.

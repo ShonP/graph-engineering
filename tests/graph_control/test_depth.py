@@ -24,7 +24,8 @@ from graph_control.preflight import read_profile  # noqa: E402
 
 CLI = Path(__file__).resolve().parents[2] / "scripts" / "graph-control.py"
 TEMPLATE = Path(__file__).resolve().parents[2] / "templates" / "graph-profile.yaml"
-KEYS = {"depth", "changed_lines", "files", "risk_rows", "reasons", "untracked_excluded", "regex_skipped_long_lines"}
+KEYS = {"depth", "changed_lines", "files", "risk_rows", "reasons", "untracked_excluded", "regex_skipped_long_lines",
+        "cadence"}
 LINT = ("prose only: every changed file is *.md, *.markdown, *.rst, *.adoc or a named prose file "
         "(README, CHANGELOG, LICENSE and the like) and none matches instructionPaths")
 RISK = {"risk": [{"id": "db-schema", "paths": ["**/{migrations,schemas}/**"]},
@@ -84,7 +85,8 @@ class Lint(Fixture):
         self.append("README.md", "more prose\n")
         result = self.decide()
         self.assertEqual(result, {"depth": "lint", "changed_lines": 1, "files": 1, "risk_rows": [],
-                                  "reasons": [LINT], "untracked_excluded": True, "regex_skipped_long_lines": 0})
+                                  "reasons": [LINT], "untracked_excluded": True, "regex_skipped_long_lines": 0,
+                                  "cadence": "per-task"})
 
     def test_claude_md_is_never_lint_even_without_instruction_paths(self):
         self.append("CLAUDE.md", "a new rule\n")
@@ -195,6 +197,21 @@ class SizeAndSeams(Fixture):
         result = self.decide(SEAMS)
         self.assertEqual(result["depth"], "single")
         self.assertEqual(result["reasons"], ["default: no risk row or seam, 1 changed lines <= review.panel_lines 2000"])
+
+
+class Cadence(Fixture):
+    def test_cadence_defaults_to_per_task(self):
+        self.append("src/app.py", "a = 1\n")
+        self.assertEqual(self.decide()["cadence"], "per-task")
+
+    def test_cadence_comes_from_the_profile(self):
+        self.append("src/app.py", "a = 1\n")
+        self.assertEqual(self.decide({"review": {"cadence": "per-run"}})["cadence"], "per-run")
+
+    def test_unknown_cadence_is_invalid(self):
+        self.append("src/app.py", "a = 1\n")
+        with self.assertRaises(Invalid):
+            decide(self.repo, self.base, {"review": {"cadence": "per_run"}})
 
 
 class OutsideTheRun(Fixture):
@@ -385,7 +402,8 @@ class Cli(Fixture):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(json.loads(result.stdout), {
             "status": "PASS", "depth": "panel", "changed_lines": 1, "files": 1, "risk_rows": ["db-schema"],
-            "reasons": ["risk rows: db-schema"], "untracked_excluded": True, "regex_skipped_long_lines": 0})
+            "reasons": ["risk rows: db-schema"], "untracked_excluded": True, "regex_skipped_long_lines": 0,
+            "cadence": "per-task"})
 
     def test_cli_decides_with_the_shipped_template_profile(self):
         self.append("README.md", "more prose\n")
