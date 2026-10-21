@@ -7,11 +7,11 @@ description: Use when planning, implementing or reviewing any task, to know what
 
 Done means the code works **and** the change can be operated: someone can see it misbehave, roll it back and understand it later.
 
-Sources: Google code review and SRE launch guides, DORA, Fowler's ParallelChange, the house rules the cells name.
+Sources: Google code review and SRE launch guides, DORA, Fowler's ParallelChange.
 
 ## Use
 
-- **Classify** each task by every row it matches, small ones too (an endpoint adding a column is API + DB; a config tweak is a short Config row).
+- **Classify** each task by every row it matches, small ones too (an endpoint adding a column is API + DB).
 - **Stamp** matched cells into its acceptance criteria, tickable at review. An *if* cell applies only when its condition holds; say which way.
 - **Floor, not menu**: a cell may be "not applicable, because ..." in one line, never silently skipped.
 - **Ship** every cell, observability included, in the code's PR.
@@ -36,7 +36,7 @@ Sources: Google code review and SRE launch guides, DORA, Fowler's ParallelChange
 
 Every row also carries tests first (`review-testing-rules`), the run's `prior-art` note (on the plan), fresh verification before any "done" claim (`superpowers:verification-before-completion`), and the quick gate: when the profile declares `gates.quick`, run it in the worktree before reporting `DONE`, report its exit line, and fix a red one like a red test. None declared: say so in one line.
 
-**No code comments.** Names and structure explain the code. The only exception is a non-obvious why citing something outside it: an upstream issue URL, a platform bug, an external constraint. Never narrate, restate code, add section banners, TODO prose or docstrings repeating the signature. Reviewers flag each added comment that breaks this: a Nit, Important when it misleads.
+**No code comments.** Names and structure explain the code. Exceptions: a non-obvious why citing something outside it (upstream issue URL, platform bug, external constraint), and a comment a routed house skill requires (`helm` values, `ruff` rule sets), which wins. Never narrate, restate code, add section banners, TODO prose or docstrings repeating the signature. Reviewers flag each added comment breaking this: a Nit, Important when it misleads.
 
 ## Anti-patterns
 

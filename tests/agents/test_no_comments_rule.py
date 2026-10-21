@@ -6,6 +6,8 @@ from test_roster_policy import AGENTS, SKILLS, split
 DOD = SKILLS / "process" / "definition-of-done" / "SKILL.md"
 DOD_NAME = "graph-engineering:definition-of-done"
 RULE = re.compile(r"no (code )?comments|comments? (only|unless)", re.I)
+COMMENT_DUTY = re.compile(r"carries a comment|Document every property", re.I)
+EXTERNAL_WHY = {"pydantic-house-rules"}
 
 
 class NoCommentsRule(unittest.TestCase):
@@ -24,6 +26,16 @@ class NoCommentsRule(unittest.TestCase):
             with self.subTest(role=role):
                 fm, _ = split(AGENTS / f"{role}.md")
                 self.assertIn(DOD_NAME, fm["skills"])
+
+    def test_every_house_skill_that_requires_comments_is_a_named_exception(self):
+        text = DOD.read_text(encoding="utf-8")
+        self.assertIn("a comment a routed house skill requires", text)
+        demanding = {p.parent.name for p in SKILLS.rglob("SKILL.md")
+                     if COMMENT_DUTY.search(p.read_text(encoding="utf-8"))}
+        self.assertEqual(demanding - EXTERNAL_WHY, {"helm", "ruff"})
+        for name in demanding - EXTERNAL_WHY:
+            with self.subTest(skill=name):
+                self.assertIn(f"`{name}`", text)
 
     def test_the_rule_has_exactly_one_home(self):
         homes = [p for p in sorted(SKILLS.rglob("SKILL.md")) + sorted(AGENTS.glob("*.md"))
