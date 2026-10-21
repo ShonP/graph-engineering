@@ -401,7 +401,7 @@ def doctor(ctx):
 '''
 
 
-class Hygiene(unittest.TestCase):  # AC-HY-DOCTOR
+class Hygiene(unittest.TestCase):
     def stub_rules(self) -> None:
         name = "stub_doctor_rules_" + uuid.uuid4().hex[:8]
         folder = Path(self.enterContext(tempfile.TemporaryDirectory())) / name
