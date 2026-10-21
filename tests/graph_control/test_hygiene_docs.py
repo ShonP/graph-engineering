@@ -102,12 +102,14 @@ class Paths(Base):
         self.assertIn("ghost.md", messages[1])
         self.assertIn("real.py:11", messages[2])
 
-    def test_line_cite_on_a_directory_or_missing_file_is_a_dead_path(self):
+    def test_line_cite_on_a_directory_missing_file_or_past_a_range_end(self):
         self.profile()
-        stage(self.root, "docs/dir.md", "Bad `skills/acme-widget:4` and `scripts/gone.py:1`.\n")
+        stage(self.root, "docs/dir.md", "Bad `skills/acme-widget:4` and `scripts/gone.py:1`.\n"
+                                        "Range `scripts/real.py:3-11` runs past the end.\n")
         commit_at(self.root, "docs", 0, NOW)
         _, result = self.invoke("--tracked")
-        self.assertEqual([f["id"] for f in result["findings"]], ["doc-path", "doc-path"])
+        self.assertEqual([(f["id"], f["line"]) for f in result["findings"]],
+                         [("doc-path", 1), ("doc-path", 1), ("doc-line", 2)])
 
 
 class Text(Base):
