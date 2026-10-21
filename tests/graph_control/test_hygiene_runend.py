@@ -100,6 +100,10 @@ class RunEnd(unittest.TestCase):
                          ("CLEAN", "warn", "worktree-left", str(path)))
         self.assertIn(f"git worktree remove {path}", finding["fix"])
         git(self.root, "worktree", "remove", str(path))
+        renamed = self.tmp / "wt" / "integration"
+        git(self.root, "worktree", "add", "-q", str(renamed), BRANCH)
+        self.assertEqual([(f["level"], f["path"]) for f in self.invoke()["findings"]], [("warn", str(renamed))])
+        git(self.root, "worktree", "remove", str(renamed))
         detached = self.tmp / "wt2" / RUN
         git(self.root, "worktree", "add", "-q", "--detach", str(detached), "main")
         self.assertEqual([(f["level"], f["id"]) for f in self.invoke()["findings"]], [("warn", "worktree-left")])
