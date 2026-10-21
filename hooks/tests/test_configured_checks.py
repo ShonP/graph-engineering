@@ -358,7 +358,7 @@ class Schema(unittest.TestCase):  # AC-W1-CFG-01
         self.assertEqual(config.checks, ())
 
 
-class GateChecksSchema(unittest.TestCase):  # AC-GC-SHAPE
+class GateChecksSchema(unittest.TestCase):
     load = Schema.load
     ADVISORY = {'id': 'dup-code', 'argv': ['jscpd', '.'], 'mode': 'advisory', 'expires': '2026-11-01'}
 

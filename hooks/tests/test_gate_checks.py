@@ -10,7 +10,7 @@ import unittest
 GATE = Path(__file__).resolve().parents[1] / 'scripts' / 'gate_checks.py'
 
 
-class GateChecks(unittest.TestCase):  # AC-GC-RUN
+class GateChecks(unittest.TestCase):
     def setUp(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
