@@ -106,8 +106,8 @@ class Sweep(unittest.TestCase):
 
     def test_the_repo_root_is_never_a_surface(self):
         self.add(40, tools__old__a="x\n")
-        rows, _ = self.rows(self.check('hygiene:\n  surfaces:\n    roots: [".", "tools/*"]\n    minCallers: 100\n'))
-        self.assertEqual(rows, ["| tools/old | 40 | 0 | 1 | delete |"])
+        rows, small = self.rows(self.check('hygiene:\n  surfaces:\n    roots: [".", "tools/*"]\n    minCallers: 100\n'))
+        self.assertEqual((rows, small), (["| tools/old | 40 | 0 | 1 | delete |"], 1))
 
     def test_a_root_glob_matching_a_file_is_skipped(self):
         self.add(90, tools__README___md="acme-widget notes\n")
