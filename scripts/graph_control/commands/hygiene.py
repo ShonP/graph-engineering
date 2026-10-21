@@ -18,6 +18,7 @@ NAME = "hygiene"
 HELP = "repo hygiene findings over the staged, base, tracked, run-end, sweep or text scope, as JSON"
 RULES = "graph_control.hygiene"
 INTEGRATIONS = ("pr", "push-main")
+SCOPES = ("staged", "base", "tracked", "run_end", "sweep", "text")
 
 
 def add_arguments(parser: ArgumentParser) -> None:
@@ -55,10 +56,7 @@ def _toplevel(root: Path) -> Path:
 
 
 def _mode(args: Namespace) -> str:
-    for flag in ("staged", "base", "tracked", "run_end", "sweep", "text"):
-        if getattr(args, flag) not in (None, False):
-            return flag.replace("_", "-")
-    raise Invalid("no scope flag given")
+    return next(flag.replace("_", "-") for flag in SCOPES if getattr(args, flag) not in (None, False))
 
 
 def run(args: Namespace, package: str = RULES, now: datetime | None = None) -> Output:
