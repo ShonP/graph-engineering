@@ -10,6 +10,16 @@ commits.
 
 ## [Unreleased]
 
+### Added
+
+- **No-comments rule** in `definition-of-done`, the one skill every writer and reviewer preloads: names and structure explain the code; the only exception is a non-obvious why citing something outside it. Reviewers flag each added comment that breaks it as a Nit, Important when it misleads. `backend-rules` drops its looser duplicate.
+- **`review.cadence`** profile key: `per-task` (default, unchanged) or `per-run`, which merges tasks on their tests and quick gate, then reviews the whole run diff once beside qa with one batched fix round. `graph-control depth` validates it and echoes it.
+- **Lifted rules**: `review-testing-rules` gains worktree per task (never commit on the default branch in the main checkout), official-CLI scaffolding, `.env.example` upkeep, deferred work filed before finishing, and the ~250 LOC split signal; `frontend-rules` gains UI edge states (loading/empty/error per query, submit disabled while pending, null is not zero).
+
+### Changed
+
+- **Token diet.** `researcher`, `qa`, `qa-lead` and `retro` run with `omitClaudeMd: true` (about 4-6k tokens less per dispatch in a repo with a large CLAUDE.md); the engine's dispatch shape now carries their rule packs and project invariants, and `qa-lead` passes them to its leaves. The template's `always.impl` drops `prior-art` (6,123 bytes per implementer dispatch): the planner keeps it preloaded and implementers load it only when the brief flags a library or design choice. `implementer` stops preloading `impact-map` (5,945 bytes) and loads it for mid-task triage. `definition-of-done` shrinks 6,322 -> 6,197 bytes and is back under its ceiling.
+
 ## [0.18.0] - 2026-10-11
 
 ### Added
