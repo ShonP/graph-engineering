@@ -40,19 +40,27 @@ def add_arguments(parser: ArgumentParser) -> None:
     parser.add_argument("run", type=Path, help="the run directory holding plan.json and tasks/")
 
 
-def fenced_lines(lines: list[str]) -> int:
-    """Lines inside fenced code blocks, opening and closing fences included."""
-    count, opening = 0, ""
+def fence_mask(lines: list[str]) -> list[bool]:
+    """True for each line inside a fenced code block, opening and closing fences included."""
+    mask, opening = [], ""
     for line in lines:
         match = FENCE.match(line)
         if opening:
-            count += 1
+            mask.append(True)
             if (match and match[1][0] == opening[0] and len(match[1]) >= len(opening)
                     and not match[2].strip()):
                 opening = ""
         elif match and not (match[1][0] == "`" and "`" in match[2]):
-            count, opening = count + 1, match[1]
-    return count
+            mask.append(True)
+            opening = match[1]
+        else:
+            mask.append(False)
+    return mask
+
+
+def fenced_lines(lines: list[str]) -> int:
+    """Lines inside fenced code blocks, opening and closing fences included."""
+    return sum(fence_mask(lines))
 
 
 def skills_lists(lines: list[str]) -> list[str]:
