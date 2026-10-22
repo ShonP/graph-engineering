@@ -32,7 +32,7 @@ No task may depend on one person's laptop login or key. In order of preference:
 
 - Repeatable manual work becomes a pipeline run by `workflow_dispatch` or by CI/CD triggers (push, PR, release).
 - Never automate repeatable work on a timer: no `on: schedule` workflow, no cron job or CronJob that runs a task, no cloud scheduler, no agent routine, unless the owner lifts it for that repo in writing, recorded as `access.schedule_allowed: true` in the profile.
-- Exempt: operator-native data-protection schedules, such as a CNPG `ScheduledBackup` (`cloudnativepg`) or certificate renewal run by cert-manager. They are not automation of manual work.
+- Exempt: operator-native data-protection schedules, such as a CNPG `ScheduledBackup` (`cloudnativepg`) or certificate renewal run by cert-manager. They are not automation of manual work. A retention-expiry deletion job (`gdpr-erasure-retention`) is not exempt: it runs work, so it waits for the owner's `access.schedule_allowed` lift.
 
 ## Review flags
 
