@@ -46,12 +46,19 @@ def _log_tail(log: Path | None) -> str:
     return "; last 20 lines:\n" + "\n".join(lines[-LOG_TAIL_LINES:]) if lines else "; no log"
 
 
+def _strings(profile: dict[str, Any], key: str, meaning: str) -> list[str]:
+    value = profile.get(key) or []
+    if not isinstance(value, list) or not all(isinstance(item, str) and item for item in value):
+        raise _needs_setup(f"{key} must be a list of {meaning}")
+    return value
+
+
 def run(args: Namespace) -> dict[str, Any]:
-    from ..preflight import read_profile  # imports PyYAML
+    from ..preflight import read_profile
 
     profile = read_profile(args.profile)
-    bootstrap = profile.get("bootstrap") or []
-    ready = profile.get("bootstrap_ready") or []
+    bootstrap = _strings(profile, "bootstrap", "command strings")
+    ready = _strings(profile, "bootstrap_ready", "relative paths")
     if not bootstrap and not ready:
         return {"noop": True}
     for entry in ready:
@@ -60,6 +67,8 @@ def run(args: Namespace) -> dict[str, Any]:
             raise _needs_setup(f"bootstrap_ready {entry} must be a relative path inside the worktree")
     if _git_path(args.worktree, "--git-dir") == _git_path(args.worktree, "--git-common-dir"):
         raise _needs_setup(f"{args.worktree} is the main checkout; bootstrap runs only in a task worktree")
+    if bootstrap and args.bootstrap_exit is None:
+        raise _needs_setup("bootstrap is set but no --bootstrap-exit was given")
     if args.bootstrap_exit:
         raise _needs_setup(f"bootstrap exited {args.bootstrap_exit}{_log_tail(args.bootstrap_log)}")
     missing = [entry for entry in ready if not (args.worktree / entry).exists()]
