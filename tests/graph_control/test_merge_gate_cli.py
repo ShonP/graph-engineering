@@ -210,6 +210,12 @@ class Refusals(MergeGate):
         self.assertEqual((code, out["status"]), (1, "BLOCKED"), out)
         self.assertIn("is a tree, not a profile file", out["reason"])
 
+    def test_malformed_base_profile_blocks(self):
+        base = self.commit({PROFILE: "gates: [unclosed\n"}, "malformed")
+        code, out = self.gate(base)
+        self.assertEqual((code, out["status"]), (1, "BLOCKED"), out)
+        self.assertTrue(out["reason"].startswith(f"invalid profile YAML at {base}:{PROFILE}"), out)
+
     def test_base_profile_that_is_not_a_mapping_blocks(self):
         base = self.commit({PROFILE: "- merge_auto\n"}, "list")
         code, out = self.gate(base)
