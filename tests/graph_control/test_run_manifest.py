@@ -98,6 +98,12 @@ class RunManifestTests(unittest.TestCase):
         self.assertIn("--profile must be absolute", out["reason"])
         self.assertFalse((self.run_dir / "run.draft.json").exists())
 
+    def test_init_refuses_a_plugin_manifest_that_is_not_an_object(self):
+        (self.plugin / ".claude-plugin/plugin.json").write_text('["9.8.7"]')
+        code, out = self.init()
+        self.assertEqual(code, 1)
+        self.assertEqual(out["reason"], "plugin.json must be an object")
+
     def test_init_twice_writes_the_same_bytes(self):
         self.init()
         first = (self.run_dir / "run.draft.json").read_bytes()
@@ -108,7 +114,7 @@ class RunManifestTests(unittest.TestCase):
         self.init()
         code, out = self.bind()
         self.assertEqual((code, out["status"]), (1, "BLOCKED"))
-        self.assertIn("plan.json", out["reason"])
+        self.assertEqual(out["reason"], f"missing {self.run_dir / 'plan.json'}")
         self.assertFalse((self.run_dir / "run.json").exists())
 
     def test_bind_without_a_draft_is_blocked(self):
