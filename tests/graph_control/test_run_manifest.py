@@ -91,6 +91,13 @@ class RunManifestTests(unittest.TestCase):
         self.assertIn("review", out["reason"])
         self.assertFalse((self.run_dir / "run.draft.json").exists())
 
+    def test_init_refuses_a_relative_profile(self):
+        code, out = self.cli("init", str(self.run_dir), "--profile", "graph-profile.yaml",
+                             "--plugin-root", str(self.plugin))
+        self.assertEqual(code, 1)
+        self.assertIn("--profile must be absolute", out["reason"])
+        self.assertFalse((self.run_dir / "run.draft.json").exists())
+
     def test_init_twice_writes_the_same_bytes(self):
         self.init()
         first = (self.run_dir / "run.draft.json").read_bytes()
@@ -145,6 +152,14 @@ class RunManifestTests(unittest.TestCase):
         self.assertEqual((code, out["status"]), (1, "BLOCKED"))
         self.assertIn("available_models", out["reason"])
         self.assertFalse((self.run_dir / "run.json").exists())
+
+    def test_host_that_is_not_an_object_is_blocked(self):
+        self.init()
+        self.write_plan()
+        dump(self.host, [self.host_data()])
+        code, out = self.bind()
+        self.assertEqual(code, 1)
+        self.assertIn("must be an object", out["reason"])
 
     def test_host_with_an_unknown_key_is_blocked(self):
         self.init()
