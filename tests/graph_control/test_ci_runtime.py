@@ -172,6 +172,12 @@ class TagsNoCredentials(unittest.TestCase):
                      "scripts/release.sh": RELEASE})
         self.assertEqual(rows_with(findings(root, {}), "ci-tags-no-credentials"), [])
 
+    def test_default_credentials(self):
+        text = TAGS.replace("        with:\n          persist-credentials: false\n", "").replace(
+            '        with:\n          persist-credentials: "false"\n', "        with:\n          fetch-depth: 0\n")
+        root = repo({".github/workflows/ci.yml": text, "scripts/release.sh": RELEASE})
+        self.assertEqual(rows_with(findings(root, {}), "ci-tags-no-credentials"), [])
+
     def test_two_level_chain(self):
         root = repo({".github/workflows/ci.yml": TAGS.replace("git fetch origin --tags", "make test"),
                      "scripts/release.sh": "#!/bin/sh\nbash scripts/inner.sh\n",
