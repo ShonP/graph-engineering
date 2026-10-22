@@ -20,6 +20,14 @@ instructionPaths: ["CLAUDE.md", "**/CLAUDE.md", "AGENTS.md", ".claude/**"]
 # Optional owner access map; the engine injects it into planner and spike briefs.
 ownerAccess: ""
 
+# Who may hold what, decided at repo start (`access-and-automation`). `matrix` is the
+# access matrix, `onboarding` the day-0 guide, `doctor` validates the matrix and
+# `<doctor> --live` probes each check. Empty: no matrix yet, /graph-init proposes one.
+access:
+  matrix: "docs/ops/access.yaml"
+  onboarding: "docs/ops/onboarding.md"
+  doctor: ""
+
 # Where specs and plans go.
 docsPath: "docs/superpowers"
 
@@ -333,6 +341,9 @@ routing:
     impl: [graph-engineering:promql, graph-engineering:loki, graph-engineering:tempo]
     review: [graph-engineering:promql, graph-engineering:loki, graph-engineering:tempo]
     qa: [graph-engineering:promql, graph-engineering:loki, graph-engineering:tempo]
+  "{.github/workflows/**,infra/**,docs/ops/**}":
+    impl: [graph-engineering:access-and-automation]
+    review: [graph-engineering:access-and-automation, graph-engineering:security-review]
   always:
     # Preloaded, so not listed: definition-of-done (writers, reviewers, planner); prior-art and impact-map (planner).
     impl: [graph-engineering:review-testing-rules]

@@ -26,6 +26,7 @@ Normally your dispatch names your REQUIRED skills (the spine derives them from t
 | `kustomization.yaml` | kustomize |
 | Any infra file above (`argocd/**`, `manifests/**`, charts, kustomize) | infra-verification (render, validate, rendered diff; qa also runs the ephemeral apply) |
 | `.sops.yaml`, `*.enc.yaml` | sops-age |
+| `.github/workflows/**`, `infra/**`, `docs/ops/**`, scripts calling cloud CLIs, new tooling needing a credential | access-and-automation (reviewer flags: stored cloud keys where OIDC works, `schedule` triggers, argv secrets, no `access.yaml` row) |
 | `tests/**/*.spec.ts`, `playwright.config.ts` | playwright-cli, playwright-component-testing, playwright-trace (reading a recorded trace) |
 | `*.bru`, `bruno.json` | bruno, api-contract |
 | Server-side API surface (`routers/`, `controllers/`, `endpoints/`, server-language `routes/` / `handlers/`, NestJS `*.controller.ts`, Next.js `app/api/**/route.ts`, OpenAPI/AsyncAPI spec - never frontend `src/routes/`) | bruno, schemathesis, api-contract |
@@ -88,6 +89,7 @@ Your dispatch names the conditional stack lenses (the spine derives them from th
 | Gateway API kinds (`HTTPRoute`, `SecurityPolicy`, `BackendTLSPolicy`, ...), `gateway*/**` | envoy-gateway |
 | `ai-gateway/**`, `agent-router/**`, `llm-gateway/**` | agent-router |
 | `.sops.yaml`, `*.enc.yaml` | sops-age |
+| `.github/workflows/**`, `infra/**`, `docs/ops/**`, scripts calling cloud CLIs, new tooling needing a credential | access-and-automation (reviewer flags: stored cloud keys where OIDC works, `schedule` triggers, argv secrets, no `access.yaml` row) |
 | `tests/**/*.spec.ts` | playwright-cli |
 | `*.bru`, `bruno.json` | bruno, api-contract |
 | Server-side API surface (`routers/`, `controllers/`, `endpoints/`, server-language `routes/` / `handlers/`, NestJS `*.controller.ts`, Next.js `app/api/**/route.ts`, OpenAPI/AsyncAPI spec - never frontend `src/routes/`) | api-contract (+ schemathesis when judging the qa evidence) |

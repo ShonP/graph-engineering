@@ -1,0 +1,12 @@
+version: 1
+rows:
+  - id: <capability-id>
+    what: <what this lets you do>
+    holds: <pipeline identity, group or vault that holds the access>
+    role: <narrowest role and its scope>
+    who: [<group-or-login>]
+    owner_only: false
+    check: <read-only command that exits 0 when the access works>
+    request: <how a person asks for it>
+    pipeline: <workflow file that uses it, or empty>
+    status: active
