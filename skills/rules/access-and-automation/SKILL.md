@@ -31,14 +31,15 @@ No task may depend on one person's laptop login or key. In order of preference:
 ## 3. Automation is on demand, never scheduled
 
 - Repeatable manual work becomes a pipeline run by `workflow_dispatch` or by CI/CD triggers (push, PR, release).
-- Never `on: schedule`, a cloud scheduler or an agent routine, unless the owner lifts it for that repo in writing, recorded as `access.schedule_allowed: true` in the profile.
+- Never automate repeatable work on a timer: no `on: schedule` workflow, no cron job or CronJob that runs a task, no cloud scheduler, no agent routine, unless the owner lifts it for that repo in writing, recorded as `access.schedule_allowed: true` in the profile.
+- Exempt: operator-native data-protection schedules, such as a CNPG `ScheduledBackup` (`cloudnativepg`) or certificate renewal run by cert-manager. They are not automation of manual work.
 
 ## Review flags
 
 Raise each as Important, Blocking when a secret is exposed:
 
 - A stored cloud key or secret in repo secrets where OIDC is possible.
-- A `schedule` trigger, a cron resource or a scheduled routine.
+- A `schedule` trigger, a cron job or CronJob running a task, a cloud scheduler or a scheduled routine (not a CNPG `ScheduledBackup` or cert-manager renewal).
 - A plaintext secret in argv, a log line, a prompt or a committed file; an input interpolated into a `run` script.
 - An unpinned third-party action in a credential-touching job.
 - New access with no `access.yaml` row, or a paid API row with no spend cap.

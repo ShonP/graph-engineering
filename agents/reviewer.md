@@ -33,7 +33,7 @@ For any diff a user can see, the UX-evidence lens in `review-protocol` applies t
 
 Lens: an added code comment (what `python3 <plugin root>/scripts/check-no-new-comments.py --base <base>` flags) is an `important` finding for the implementer, except what the rule in `definition-of-done` allows.
 
-Lens: tooling in the diff that needs a credential or cloud access with no row in the repo's access matrix (the profile's `access.matrix`) is an `important` finding; a `schedule` trigger is `important` unless the owner lifted the ban (profile `access.schedule_allowed: true`); a plaintext secret in argv, a log or a committed file is `blocking` (a SOPS-encrypted file per `sops-age` is not).
+Lens: tooling in the diff that needs a credential or cloud access with no row in the repo's access matrix (the profile's `access.matrix`) is an `important` finding; a `schedule` trigger, a cron job or CronJob running a task, a cloud scheduler or an agent routine is `important` unless the owner lifted the ban (profile `access.schedule_allowed: true`), and an operator-native data-protection schedule (a CNPG `ScheduledBackup`, cert-manager renewal) is not flagged; a plaintext secret in argv, a log or a committed file is `blocking` (a SOPS-encrypted file per `sops-age` is not).
 
 Review against the task's acceptance criteria where you were given them, not against your idea of good code. Flag code that re-implements something the plan said to reuse, extracts a shared abstraction with a single consumer, or misses an edge case the plan listed.
 
