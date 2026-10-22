@@ -140,6 +140,8 @@ CASES = {
     "quick gate is a number": (swap("merge: owner", "merge: owner\n  quick: 1"), {("warn", "gates-quick")}),
     "auto class lists agent-control": (swap("auto_classes: [none]", "auto_classes: [none, agent-control]"),
                                        {("warn", "gates-control")}),
+    "merge_auto set to sometimes": (swap("merge: owner", "merge: owner\n  merge_auto: sometimes"),
+                                    {("error", "gates-merge-auto")}),
     "risk table redefines agent-control": (swap(LIST_ROW, LIST_ROW + "  - {id: agent-control, paths: []}\n"),
                                            {("error", "risk-reserved")}),
     "risk table as a mapping": (swap(LIST_ROW, MAP_ROW), {("error", "risk-shape")}),
@@ -306,6 +308,39 @@ class Gates(unittest.TestCase):  # AC-W2-DR-03
         [finding] = diagnose(fixture.root, PLUGIN, quick=False)
         self.assertIn("gates.merge", finding.message)
         self.assertIn("auto_classes", finding.fix)
+        self.assertIn("gates.merge_auto: when-green", finding.fix)
+
+    def test_merge_auto_accepts_only_off_or_when_green(self):
+        cases = {"absent": None, "quoted off": '"off"', "bare off": "off", "when-green": '"when-green"',
+                 "bare when-green": "when-green", "sometimes": '"sometimes"', "true": "true", "zero": "0", "a list": "[off]"}
+        for name, value in cases.items():
+            with self.subTest(name):
+                fixture = Fixture(self)
+                line = "" if value is None else f"\n  merge_auto: {value}"
+                fixture.profile(CLEAN.replace("merge: owner", "merge: owner" + line))
+                found = ids(diagnose(fixture.root, PLUGIN, quick=False))
+                bad = name in ("sometimes", "true", "zero", "a list")
+                self.assertEqual(found, {("error", "gates-merge-auto")} if bad else set())
+
+    def test_bare_ci_on_is_one_config_row_not_a_crash(self):
+        fixture = Fixture(self)
+        fixture.profile(CLEAN + "ci: on\n")
+        found = [(f.level, f.id) for f in diagnose(fixture.root, PLUGIN, quick=False)]
+        self.assertEqual(found, [("warn", "ci-config-invalid")])
+
+    def test_merge_auto_finding_names_the_value_and_both_settings(self):
+        fixture = Fixture(self)
+        fixture.profile(CLEAN.replace("merge: owner", 'merge: owner\n  merge_auto: "sometimes"'))
+        [finding] = diagnose(fixture.root, PLUGIN, quick=False)
+        self.assertIn("'sometimes'", finding.message)
+        self.assertEqual(finding.fix, 'set gates.merge_auto to "off" or "when-green"')
+
+    def test_control_finding_names_merge_auto(self):
+        fixture = Fixture(self)
+        fixture.profile(CLEAN.replace("auto_classes: [none]", "auto_classes: [none, agent-control]"))
+        [finding] = diagnose(fixture.root, PLUGIN, quick=False)
+        self.assertEqual(finding.id, "gates-control")
+        self.assertIn("gates.merge_auto: when-green", finding.fix)
 
     def test_full_mode_needs_no_wcmatch(self):
         """doctor runs where only PyYAML is installed: wcmatch is the glob matcher's pin, not doctor's."""

@@ -10,6 +10,27 @@ commits.
 
 ## [Unreleased]
 
+### Added
+
+- **`gates.merge_auto`** profile key (`off` default, or `when-green`): a green run merges without the owner, with the profile read at the run base; a diff to the profile, `.claude/graph-checks.json` or the gate code always waits.
+- **`ci.gate`, `ci.hook`, `ci.affected`, `ci.expensive`, `ci.prod_data_steps`, `ci.deploy`** profile keys declaring the repo's CI, and **`templates/ci/`** (pre-push hook, status script, `gate.yml`) rendered with the profile's `ci.gate` by `templates/ci/scaffold.py` in a new `/graph-init` step, which never replaces an existing husky, pre-commit, lefthook or `.git/hooks` setup. The hook's status publisher runs in the background and posts once the remote has the commit; `pull_request` runs check the merge commit and so always run the full gate. `doctor` full mode adds `ci-*` findings: gate run twice, a hook or scaffolded job calling a missing gate script, a malformed `ci` block, unscoped expensive suites, prod-data steps on every run, prod deploy without its promote step (reusable-workflow jobs included), background QoS, tag jobs without credentials.
+- **`writable_companions`** profile key: a task owning a `when` path must also own the `also` path, checked by `validate-plan --profile`.
+- **`bootstrap_ready`** profile key: paths that must exist after `bootstrap`, checked by `worktree-ready`.
+- **`cases[].evidence`** (plan schema version 2): a relative path that `task-gate` requires to exist.
+- **`graph-control merge-gate`**: the merge gate as code, exit 0 with `open` true or false and the reasons.
+- **`graph-control run init` / `run bind`**: write `run.draft.json` at open and `run.json` once `plan.json` exists, from engine-written `host.json`.
+- **`graph-control decision apply`**: lists every run artifact copy of a changed decision literal; `--write` rewrites them and appends a ledger line.
+- **`graph-control plan check`**: BLOCKS stale paths and line numbers in task briefs.
+- **`graph-control task-gate`**: the check before a task becomes `gated`.
+- **`graph-control worktree-ready`**: checks a task worktree after bootstrap, executing no project command.
+- **`graph-control validate-plan --profile`**: adds the `writable_companions` check.
+
+### Changed
+
+- The merge gate is code: it reads the profile at the run base and the floor always waits.
+- A `PARTIAL` task is `superseded`, never `gated`.
+- `Run.validate` rejects another run's role-prefixed actor ids; legacy ids are accepted.
+
 ## [0.19.0] - 2026-10-22
 
 ### Added

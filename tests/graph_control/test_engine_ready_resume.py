@@ -39,7 +39,9 @@ class ReadySetDispatch(unittest.TestCase):
             "- <ts> dispatch <task> <agent>",
             "- <ts> merged <task> <merge sha>",
             "- <ts> gated <task>",
+            "- <ts> superseded <task>",
             "ready lag",
+            "latest `gated` or `superseded` time",
         ))
 
     def test_the_wave_view_stays_display_only(self):

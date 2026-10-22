@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+pushed="$(cat)"
+nice -n 10 bash __CI_GATE__.sh </dev/null
+head="$(git rev-parse HEAD)"
+while read -r _ local_sha _ _; do
+  if [ "$local_sha" = "$head" ]; then
+    bash scripts/ci/local-gate-status.sh publish
+    break
+  fi
+done <<<"$pushed"

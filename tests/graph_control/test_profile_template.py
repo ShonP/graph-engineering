@@ -14,14 +14,14 @@ from pathlib import Path
 import yaml
 
 import helpers  # noqa: F401  (puts scripts/ on sys.path)
-from graph_control.preflight import UniqueLoader
+from graph_control.preflight import UniqueLoader, read_profile
 
 ROOT = Path(__file__).resolve().parents[2]
 TEMPLATE = ROOT / "templates" / "graph-profile.yaml"
 FALLBACK_DOC = ROOT / "docs" / "competency-routing.md"
 MANIFEST = ROOT / ".claude-plugin" / "plugin.json"
 TEMPLATE_BYTES = 30_000
-VALUES_SHA256 = "3f53f2d046e674f8b1d90384ef83a5360959f49baab0ffec2d9afde6f847ef64"
+VALUES_SHA256 = "afb30b0db879827385dab8ecd2458ee35ac9007f46fa0c9f46c2233d30b26665"
 TITLE = "Dependency-derived rows (applied by /graph-init)"
 HAS_WCMATCH = importlib.util.find_spec("wcmatch") is not None
 
@@ -166,6 +166,15 @@ class TemplateTests(unittest.TestCase):
 
     def test_template_stays_under_its_byte_ceiling(self):
         self.assertLessEqual(len(TEMPLATE.read_bytes()), TEMPLATE_BYTES)
+
+    def test_ac_t1_keys_profile_contract_ships_its_defaults(self):
+        profile = read_profile(TEMPLATE)
+        self.assertEqual(profile["gates"]["merge_auto"], "off")
+        self.assertEqual(profile["bootstrap_ready"], [])
+        self.assertEqual(profile["writable_companions"], [])
+        self.assertEqual(profile["ci"], {"parity": "", "gate": "", "hook": ".githooks/pre-push", "affected": {},
+                                         "expensive": [], "prod_data_steps": [], "deploy": {}})
+        self.assertEqual(next(iter(profile["ci"])), "parity")
 
     def test_parsed_template_matches_the_frozen_values(self):
         canonical = json.dumps({"profile": self.profile, "derived": derived_rows()},

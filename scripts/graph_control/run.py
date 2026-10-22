@@ -1,5 +1,7 @@
 """Run and candidate schema shared by preflight and receipt validation."""
 
+import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -8,6 +10,22 @@ from .common import array, boolean, choice, digest, integer, obj, require, strin
 
 CAPABILITIES = {"plan", "implement", "review", "qa", "verify"}
 CHECK_KINDS = {"implement": "test", "review": "analysis", "qa": "public", "verify": "final"}
+ROLE_ACTOR_ID = re.compile(
+    rf"^({'|'.join(sorted(CAPABILITIES))})-([0-9a-f]{{8}}-[0-9a-f]{{4}}(?:-[0-9a-f]{{4}}-[0-9a-f]{{4}}-[0-9a-f]{{12}})?)"
+    r"(?:-[A-Za-z0-9]+)*$")
+
+
+def actor_id(role: str, run_id: str, suffix: str = "") -> str:
+    return f"{role}-{run_id}" + (f"-{suffix}" if suffix else "")
+
+
+def foreign_actor_ids(run_id: str, ids: Iterable[str]) -> list[str]:
+    matches = ((value, ROLE_ACTOR_ID.match(value)) for value in ids)
+    return [value for value, match in matches if match and not run_id.startswith(match.group(2))]
+
+
+def legacy_actor_ids(run_id: str, ids: Iterable[str]) -> list[str]:
+    return [value for value in ids if not ROLE_ACTOR_ID.match(value)]
 
 
 @dataclass(frozen=True)
@@ -132,6 +150,11 @@ class Run:
         result.validate()
         return result
 
+    @property
+    def warnings(self) -> list[str]:
+        legacy = legacy_actor_ids(self.id, (actor.id for actor in self.actors))
+        return [f"legacy actor id {value}: not derived from run {self.id}" for value in legacy]
+
     def validate(self) -> None:
         unique(self.checks)
         unique(self.actors)
@@ -139,6 +162,8 @@ class Run:
                 "checks must cover implement, independent review, QA and final verify")
         require({actor.role for actor in self.actors} == CAPABILITIES,
                 "actors must cover the full lifecycle")
+        foreign = foreign_actor_ids(self.id, (actor.id for actor in self.actors))
+        require(not foreign, f"actor ids from another run: {', '.join(foreign)} (this run is {self.id})")
         for actor in self.actors:
             require(actor.resolved_model in self.available_models,
                     f"{actor.id}: resolved model unavailable")

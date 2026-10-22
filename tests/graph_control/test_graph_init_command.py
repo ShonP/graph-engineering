@@ -128,6 +128,16 @@ class GraphInitCommandTests(unittest.TestCase):
         self.assertIn('["npm", "exec", "--no", "--", "eslint", "{file}"]', checks)
         self.assertNotIn('["npm", "exec", "eslint"', checks)
 
+    def test_ci_scaffold_paragraph_names_the_manifest_and_job_level_skip(self):
+        checks = section("**Propose `.claude/graph-checks.json`")
+        start = checks.index("**CI run-once scaffold.**")
+        paragraph = checks[start:checks.index("\n\n", start) if "\n\n" in checks[start:] else len(checks)]
+        for needle in ("templates/ci/manifest.json", "if:", "paths:", "core.hooksPath .githooks", "ci.gate",
+                       "ci.hook", "ci.affected", "step 14", "templates/ci/scaffold.py", "--write", "husky",
+                       "chain", "once the remote has the sha", "pull_request", "merge commit"):
+            self.assertIn(needle, paragraph, needle)
+        self.assertLessEqual(len(paragraph.encode()), 1400)
+
     def test_settings_proposal(self):
         settings = section("**Propose `.claude/settings.json`")
         self.assertIn('"CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "2"', settings)

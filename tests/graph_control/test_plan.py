@@ -1,10 +1,14 @@
+import contextlib
 import copy
+import io
 import json
 import re
+import tempfile
 import unittest
 from pathlib import Path
 
-from helpers import plan_data
+from helpers import dump, plan_data
+from graph_control import cli
 from graph_control.common import Invalid
 from graph_control.plan import Plan, Signal
 
@@ -198,6 +202,36 @@ class SuccessSignalTests(unittest.TestCase):
         with self.assertRaisesRegex(Invalid, "cyclic or unknown"):
             Plan.parse(data)
 
+
+def with_evidence(data, value="docs/ux/changes/x.png"):
+    data["cases"][0]["evidence"] = value
+    return data
+
+
+class CaseEvidenceTests(unittest.TestCase):
+    """AC-T12-SCHEMA: the optional v2 case key `evidence`."""
+
+    def test_v2_case_carries_evidence(self):
+        self.assertEqual(Plan.parse(with_evidence(v2())).cases[0].evidence, "docs/ux/changes/x.png")
+
+    def test_v1_rejects_evidence(self):
+        with self.assertRaisesRegex(Invalid, r"^case AC-1: evidence needs schema_version 2$"):
+            Plan.parse(with_evidence(plan_data()))
+
+    def test_evidence_must_be_relative_text_inside_the_repo(self):
+        for value in ("/abs/x", "a/../x", "..", "", "  ", 3, None):
+            with self.subTest(value=value), self.assertRaises(Invalid):
+                Plan.parse(with_evidence(v2(), value))
+
+    def test_cases_without_evidence_are_unchanged(self):
+        for data in (plan_data(), v2()):
+            with self.subTest(schema=data["schema_version"]):
+                self.assertIsNone(Plan.parse(data).cases[0].evidence)
+                out = io.StringIO()
+                with tempfile.TemporaryDirectory() as temp, contextlib.redirect_stdout(out):
+                    code = cli.main(["validate-plan", dump(Path(temp) / "plan.json", data)])
+                self.assertEqual((code, json.loads(out.getvalue())),
+                                 (0, {"status": "PASS", "tasks": 1, "cases": 1, "critical_path": 1}))
 
 
 class DocumentedSignalTests(unittest.TestCase):

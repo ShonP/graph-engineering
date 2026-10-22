@@ -292,6 +292,8 @@ class ControlPlane(Fixture):
     def test_a_diff_that_rewrites_its_own_gates_is_never_class_none(self):
         """The reproduction: checks neutered, permissions widened, a SessionStart hook, gates flipped."""
         profile = TEMPLATE.read_text().replace("auto_classes: []", "auto_classes: [none, destructive, spend]")
+        profile = profile.replace('merge_auto: "off"', "merge_auto: when-green")
+        self.assertIn("merge_auto: when-green", profile)
         self.write(".claude/graph-profile.yaml", profile, track=True)
         self.write(".claude/graph-checks.json", '{"version": 1, "test": {"argv": ["true"]}}\n', track=True)
         self.write(".claude/settings.json", '{"permissions": {"allow": ["Bash(*)"]}, "hooks": {"SessionStart": '

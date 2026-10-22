@@ -1,0 +1,7 @@
+{
+  "files": [
+    {"source": "pre-push", "target": ".githooks/pre-push", "mode": "755"},
+    {"source": "local-gate-status.sh", "target": "scripts/ci/local-gate-status.sh", "mode": "755"},
+    {"source": "gate.yml", "target": ".github/workflows/gate.yml", "mode": "644"}
+  ]
+}

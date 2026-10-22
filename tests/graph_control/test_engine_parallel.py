@@ -124,8 +124,13 @@ class EngineParallelTests(unittest.TestCase):
         self.assertEqual(rows, {
             "pending": "omitted", "implementing": "`--running`", "in review": "`--hold`",
             "in fix": "`--running`", "merge queued": "`--hold`", "merged, awaiting gate": "`--hold`",
-            "parked": "`--hold`", "gated": "`--done`",
+            "parked": "`--hold`", "gated": "`--done`", "superseded": "`--done`",
         })
+        gated = next(l for l in self.steps[3].splitlines() if l.lstrip().startswith("| `gated`"))
+        self.assertIn("`task-gate` passed", gated)
+        self.assertNotIn("PARTIAL", gated)
+        superseded = next(l for l in self.steps[3].splitlines() if l.lstrip().startswith("| `superseded`"))
+        self.assert_tokens(superseded, ("`PARTIAL`", "green commit", "`<id>b`"))
         self.assert_tokens(self.steps[3], (
             "`<n>` is 4 minus the run-branch fix writers in flight",
             "without counting against it",
@@ -197,9 +202,29 @@ class EngineParallelTests(unittest.TestCase):
         # green_commit equal to the dispatch base means nothing was green.
         self.assert_tokens(self.steps[4], (
             "`green_commit` equal to the dispatch base SHA",
-            "counts as merged with no change",
+            "`superseded`, passed as `--done`",
             "`<id>b` is ready at once",
+            "becomes `superseded` once its batch gate passes",
         ))
+        self.assertNotIn("counts as merged with no change (`gated`", self.steps[4])
+        self.assertNotRegex(self.text, r"PARTIAL[^.|]*becomes `gated`")
+
+    def test_controls_are_called_where_the_prose_rules_were(self):
+        self.assert_tokens(self.steps[2], (
+            "graph-control run init <run> --profile <profile> --plugin-root <plugin-root>",
+            "graph-control run bind <run> --host <run>/host.json",
+            "never hand-build or copy a `run.json`",
+            "graph-control worktree-ready <worktree> --profile <profile> --bootstrap-exit",
+            "--bootstrap-log <log>",
+        ))
+        self.assertNotIn("Initialize run metadata", self.steps[2])
+        self.assert_tokens(self.steps[4], (
+            "graph-control task-gate <run> --task <id> --report <report path> --root <worktree>",
+            "validate-plan <run>/plan.json --profile <profile>",
+            "plan check <run> --root <run worktree>",
+        ))
+        ready = self.steps[2][self.steps[2].index("worktree-ready"):]
+        self.assertIn("NEEDS_SETUP", ready[:400])
 
     def test_ac_en_1_remainder_is_wired_into_the_original_dependents(self):
         # Fix round 1, F4: consumers of <id> started while <id>b's cases were still unbuilt.
