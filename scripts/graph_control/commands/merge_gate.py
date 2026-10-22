@@ -54,8 +54,23 @@ def qa_verdict(path: Path) -> str:
     import re
 
     pattern = re.compile(rf"({'|'.join(VERDICTS)})\b")
-    matches = [pattern.match(line.strip()) for line in path.read_text().splitlines()]
-    return next((match.group(1) for match in reversed(matches) if match), "")
+    lines = [line.strip() for line in path.read_text().splitlines()]
+    return next((line for line in reversed(lines) if pattern.match(line)), "")
+
+
+def uncommitted(root: Path) -> tuple[str, ...]:
+    import os
+
+    from ..identity import git
+
+    tokens = iter(os.fsdecode(git(root, "status", "--porcelain=v1", "-z", "--untracked-files=all")).split("\0"))
+    paths = []
+    for token in tokens:
+        if token:
+            paths.append(token[3:])
+            if token[0] in "RC":
+                next(tokens, None)
+    return tuple(paths)
 
 
 def verified(run_dir: Path) -> tuple[bool, str]:
@@ -92,14 +107,16 @@ def run(args: Namespace) -> dict[str, Any]:
     profile = base_profile(args.root, commit, path)
     plan = load(args.run / "plan.json")
     risk_rows = depth(args.root, commit, profile, plan)["risk_rows"]
-    changed = _numstat(git(args.root, *DIFF, "--numstat", "-z", commit, "--"))[2]
+    changed = _numstat(git(args.root, *DIFF, "--numstat", "-z", commit, "HEAD", "--"))[2]
     files = [Path(item) for item in review_files(args.run, profile, plan)["latest"]] + [args.run / "qa-findings.json"]
     for item in files:
         require(item.is_file(), f"missing findings file: {item}")
     severity = counts(files)
     ok, why = verified(args.run)
-    decision = decide(profile, Inputs(tuple(risk_rows), tuple(changed), severity["blocking"], severity["important"],
-                                      qa_verdict(args.run / "qa.md"), ok, args.auto_merge))
+    decision = decide(profile, Inputs(risk_rows=tuple(risk_rows), changed_paths=tuple(changed),
+                                      blocking=severity["blocking"], important=severity["important"],
+                                      qa_verdict=qa_verdict(args.run / "qa.md"), verify_ok=ok,
+                                      uncommitted=uncommitted(args.root), auto_merge=args.auto_merge))
     reasons = [f"{reason}: {why}" if why and reason.startswith("failed: verify") else reason
                for reason in decision.reasons]
     return {"open": decision.open, "mode": decision.mode, "reasons": reasons, "risk_rows": list(risk_rows),
