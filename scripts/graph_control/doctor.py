@@ -24,6 +24,7 @@ from .skill_resolve import resolves, ships
 LEVELS = ("error", "warn", "info")
 TIERS = ("opus", "sonnet")
 CLASS_KEYS = ("owner_classes", "auto_classes")
+MERGE_AUTO = ("off", "when-green")
 SKILL_KEYS = {"impl", "review", "qa", "design"}
 UPGRADE = "run /graph-init --upgrade"
 
@@ -136,7 +137,12 @@ def _gates(profile: dict[str, Any]) -> list[Finding]:
         if gates.get(key, "owner") != "owner":
             findings.append(Finding("warn", "gates-value", f"gates.{key} is {gates[key]!r}; the only value is owner, "
                                     f"so the {key} gate still stops for the owner",
-                                    f"set gates.{key}: owner; merges open on their own only through gates.auto_classes"))
+                                    f"set gates.{key}: owner; merges open on their own only through gates.auto_classes "
+                                    "or gates.merge_auto: when-green"))
+    merge_auto = gates.get("merge_auto", "off")
+    if merge_auto is not False and merge_auto not in MERGE_AUTO:
+        findings.append(Finding("error", "gates-merge-auto", f"gates.merge_auto is {gates['merge_auto']!r}; the merge "
+                                "gate reads only off or when-green", 'set gates.merge_auto to "off" or "when-green"'))
     if not isinstance(gates.get("quick", ""), str):
         findings.append(Finding("warn", "gates-quick", f"gates.quick is {gates['quick']!r}; it must be one command "
                                 "string, so implementers skip the quick gate",
@@ -144,8 +150,9 @@ def _gates(profile: dict[str, Any]) -> list[Finding]:
                                 'or "" for none'))
     auto = gates.get("auto_classes")
     if CONTROL in (auto if isinstance(auto, list) else [auto]):
-        findings.append(Finding("warn", "gates-control", f"gates.auto_classes lists `{CONTROL}`, which always waits "
-                                "for the owner", f"remove `{CONTROL}` from gates.auto_classes"))
+        findings.append(Finding("warn", "gates-control", f"gates.auto_classes lists `{CONTROL}`, which auto_classes "
+                                "never opens", f"remove `{CONTROL}` from gates.auto_classes; to merge it on full green, "
+                                "set gates.merge_auto: when-green"))
     known = (ids or set()) | {"none", CONTROL}
     for key in CLASS_KEYS:
         value = gates.get(key)

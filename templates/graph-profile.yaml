@@ -86,7 +86,7 @@ pulse:
 
 # How qa proves an infra change. `cluster` is a THROWAWAY cluster with its own
 # kubeconfig, never ~/.kube/config; empty means static-only verification
-# (`PASS (static-only)`, which --auto-merge refuses). Fields and examples: see
+# (`PASS (static-only)`, which never opens the merge gate). Fields and examples: see
 # `infra-verification`.
 infra:
   cluster: { create: "", delete: "", context: "" }
@@ -100,6 +100,9 @@ infra:
 #   bootstrap:
 #     - uv sync --frozen                           # uv.lock
 bootstrap: []
+# Paths that must exist in each task worktree after `bootstrap`, e.g.
+# node_modules; `graph-control worktree-ready` checks them. Relative, no `..`.
+bootstrap_ready: []
 
 # Host resources serialized across agents: lane name -> slots. Each command that
 # uses a lane runs as
@@ -443,7 +446,8 @@ risk:
 # Who approves. The plan gate always stops; merge stops unless the class lists
 # open it. `owner_classes` (risk ids) always wait for the owner. A diff whose
 # every class is in `auto_classes` merges on full green; `[none]` covers diffs
-# matching no risk row. `agent-control` always waits, even under --auto-merge.
+# matching no risk row. `agent-control` waits unless `merge_auto: when-green`
+# or --auto-merge (a one-run `when-green`).
 # `quick` is a command, not an approver: the fast pre-push check every
 # implementer runs before DONE; "" means none. See `definition-of-done`.
 gates:
@@ -451,7 +455,17 @@ gates:
   merge: owner
   owner_classes: [destructive, credentials-and-access, spend, outbound-messaging]
   auto_classes: []
+  # off | when-green. `when-green` opens the merge gate on full green for every
+  # class not in `owner_classes`, `agent-control` included. The gate reads this
+  # profile from the run base, never the branch; a diff to the profile,
+  # .claude/graph-checks.json or the gate code always waits.
+  merge_auto: "off"
   quick: ""     # e.g. "bash scripts/ci/quick-gate.sh"
+
+# A plan task whose writable_paths match `when` must also own `also`:
+# [{when: <glob>, also: <glob>}]; `validate-plan --profile` reports the glob to
+# add. Companion paths count toward the 8-path cap.
+writable_companions: []
 
 # `pr` opens a pull request; `push-main` pushes to the default branch after the merge gate.
 integration: pr
@@ -481,8 +495,21 @@ digest:
     - "**/androidTest/**"
 
 # `parity`: the CI job that asserts local and CI environments match; "" when none.
+# `gate`: the script both pre-push and CI run, e.g. scripts/ci/gate.sh; `hook`
+# is the pre-push hook that runs it. `affected`: stack id -> affected command, e.g. turbo
+# `query affected --exit-code` (exit 1 means something is affected), `nx affected`,
+# `melos list --diff`, `git diff --name-only <base>...HEAD -- <globs>`.
+# `expensive`: [{run: <CI step text>, inputs: [globs]}]. `prod_data_steps`:
+# [{run: <backup or migrate step text>}]. `deploy`: {dev, smoke, prod: <job id>}.
+# doctor checks the workflow against these declarations; undeclared guesses are info only.
 ci:
   parity: ""
+  gate: ""
+  hook: ".githooks/pre-push"
+  affected: {}
+  expensive: []
+  prod_data_steps: []
+  deploy: {}
 
 board:
   platform: github
