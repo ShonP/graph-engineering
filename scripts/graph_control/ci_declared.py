@@ -144,6 +144,8 @@ def _deploy(workflows: list[Workflow], deploy: dict[str, str]) -> list[Row]:
 
 def findings(root: Path, profile: dict[str, Any]) -> list[Row]:
     ci = profile.get("ci") or {}
+    if not isinstance(ci, dict):
+        return []
     workflows, _ = load_workflows(root)
     values, rows = {}, []
     for key, (shape, valid) in SHAPES.items():

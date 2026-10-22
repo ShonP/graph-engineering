@@ -310,7 +310,7 @@ class Gates(unittest.TestCase):  # AC-W2-DR-03
         self.assertIn("auto_classes", finding.fix)
         self.assertIn("gates.merge_auto: when-green", finding.fix)
 
-    def test_merge_auto_accepts_only_off_or_when_green(self):  # AC-T1-DOCTOR
+    def test_merge_auto_accepts_only_off_or_when_green(self):
         cases = {"absent": None, "quoted off": '"off"', "bare off": "off", "when-green": '"when-green"',
                  "bare when-green": "when-green", "sometimes": '"sometimes"', "true": "true", "zero": "0", "a list": "[off]"}
         for name, value in cases.items():
@@ -321,6 +321,12 @@ class Gates(unittest.TestCase):  # AC-W2-DR-03
                 found = ids(diagnose(fixture.root, PLUGIN, quick=False))
                 bad = name in ("sometimes", "true", "zero", "a list")
                 self.assertEqual(found, {("error", "gates-merge-auto")} if bad else set())
+
+    def test_bare_ci_on_is_one_config_row_not_a_crash(self):
+        fixture = Fixture(self)
+        fixture.profile(CLEAN + "ci: on\n")
+        found = [(f.level, f.id) for f in diagnose(fixture.root, PLUGIN, quick=False)]
+        self.assertEqual(found, [("warn", "ci-config-invalid")])
 
     def test_merge_auto_finding_names_the_value_and_both_settings(self):
         fixture = Fixture(self)
