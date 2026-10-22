@@ -185,6 +185,16 @@ class RunManifestTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("review", out["reason"])
 
+    def test_host_role_model_without_resolved_is_blocked(self):
+        self.init()
+        self.write_plan()
+        host = self.host_data()
+        del host["models"]["qa"]["resolved"]
+        dump(self.host, host)
+        code, out = self.bind()
+        self.assertEqual(code, 1)
+        self.assertIn("resolved", out["reason"])
+
     def test_run_that_fails_parse_writes_nothing(self):
         self.init()
         self.write_plan()
