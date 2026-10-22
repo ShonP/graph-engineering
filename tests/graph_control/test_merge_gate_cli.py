@@ -124,6 +124,13 @@ class Committed(MergeGate):
         self.assertEqual((code, out["open"]), (0, False), out)
         self.assert_failed(out, "tree 1 uncommitted paths in the worktree, first notes.txt")
 
+    def test_staged_rename_counts_once_by_its_new_path(self):
+        base = self.commit({PROFILE: profile_text("when-green"), "src/app.py": "print('ok')\n"}, "base")
+        git(self.repo, "mv", "src/app.py", "src/moved.py")
+        code, out = self.gate(base)
+        self.assertEqual((code, out["open"]), (0, False), out)
+        self.assert_failed(out, "tree 1 uncommitted paths in the worktree, first src/moved.py;")
+
 
 class Open(MergeGate):
     def test_ac_t7_open_green_inputs_under_a_when_green_base_open_the_gate(self):
