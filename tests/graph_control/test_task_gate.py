@@ -124,6 +124,11 @@ class TaskGate(unittest.TestCase):
                      "; ".join([PARTIAL_REASON, "skills not loaded: graph-engineering:backend-rules",
                                 f"case AC-1: evidence {EVIDENCE} missing"]))
 
+    def test_malformed_skills_line_blocks(self):
+        code, result = self.gate("DONE\nskills_loaded: graph engineering uv\n")
+        self.assertEqual((code, result["status"]), (1, "BLOCKED"))
+        self.assertTrue(result["reason"].startswith("skills unreadable: not a skill name: 'graph engineering uv'"))
+
     def test_missing_brief_blocks(self):
         (self.run / "tasks" / "T1.md").unlink()
         self.blocked(f"DONE\n{LOADED}", "tasks/T1.md is missing")
