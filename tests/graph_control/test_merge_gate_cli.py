@@ -207,6 +207,17 @@ class Refusals(MergeGate):
     def test_profile_path_naming_a_directory_blocks(self):
         code, out = self.gate(self.base, "--profile-path", ".claude")
         self.assertEqual((code, out["status"]), (1, "BLOCKED"), out)
+        self.assertIn("is a tree, not a profile file", out["reason"])
+
+    def test_base_profile_that_is_not_a_mapping_blocks(self):
+        base = self.commit({PROFILE: "- merge_auto\n"}, "list")
+        code, out = self.gate(base)
+        self.assertEqual((code, out["reason"]), (1, "profile must be a YAML mapping"), out)
+
+    def test_oversized_base_profile_blocks(self):
+        base = self.commit({PROFILE: profile_text("when-green") + "#" * (1024 * 1024) + "\n"}, "huge")
+        code, out = self.gate(base)
+        self.assertEqual((code, out["status"], out["reason"]), (1, "BLOCKED", "profile exceeds 1 MiB"), out)
 
     def test_base_that_is_not_a_commit_blocks(self):
         code, out = self.gate("no-such-revision")
