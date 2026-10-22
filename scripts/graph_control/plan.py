@@ -67,17 +67,24 @@ class Case:
     witness_reference: str
     witness_claim: str
     transitions: tuple[str, ...]
+    evidence: str | None = None
 
     @classmethod
-    def parse(cls, value: Any) -> "Case":
-        row = obj(value, "id given when then oracle runner requires_real witness transitions")
+    def parse(cls, value: Any, schema: int = 1) -> "Case":
+        row = obj(value, "id given when then oracle runner requires_real witness transitions", "evidence")
         witness = obj(row["witness"], "kind reference claim")
         kind = choice(witness["kind"], {"real", "synthetic"})
         real = boolean(row["requires_real"])
         require(not real or kind == "real", f"case {row['id']}: real evidence required")
+        evidence = None
+        if "evidence" in row:
+            require(schema == 2, f"case {row['id']}: evidence needs schema_version 2")
+            evidence = text(row["evidence"])
+            require(not evidence.startswith("/") and ".." not in evidence.split("/"),
+                    f"case {row['id']}: evidence must be a relative path without '..'")
         return cls(*(text(row[key]) for key in ("id", "given", "when", "then", "oracle", "runner")),
                    real, kind, text(witness["reference"]), text(witness["claim"]),
-                   strings(row["transitions"]))
+                   strings(row["transitions"]), evidence)
 
 
 @dataclass(frozen=True)
@@ -131,7 +138,7 @@ class Plan:
         keys = [measure_key(signal.goal) for signal in signals]
         for key in keys:
             require(keys.count(key) == 1, f"duplicate success signal goal {key!r}: each is measured by its goal")
-        result = cls(tuple(Case.parse(x) for x in array(row["cases"])),
+        result = cls(tuple(Case.parse(x, schema) for x in array(row["cases"])),
                      tuple(Task.parse(x, schema) for x in array(row["tasks"])),
                      tuple(Contract.parse(x) for x in array(row["external_contracts"])),
                      signals, reason)
