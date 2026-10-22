@@ -39,6 +39,17 @@ class ValidateTest(unittest.TestCase):
         self.assertTrue(doctor.validate([row(check="")]))
         self.assertEqual(doctor.validate([row(check="", who=[], owner_only=True)]), [])
 
+    def test_owner_only_must_be_bool(self):
+        self.assertIn("deploy: owner_only must be true or false", doctor.validate([row(owner_only="no")]))
+
+    def test_paid_row_needs_spend_cap(self):
+        self.assertIn("deploy: paid row needs spend_cap", doctor.validate([row(paid=True)]))
+        self.assertIn("deploy: paid row needs spend_cap", doctor.validate([row(paid=True, spend_cap="")]))
+        self.assertEqual(doctor.validate([row(paid=True, spend_cap="$50/month, vendor console")]), [])
+
+    def test_paid_must_be_bool(self):
+        self.assertIn("deploy: paid must be true or false", doctor.validate([row(paid="yes")]))
+
     def test_bad_status(self):
         self.assertTrue(doctor.validate([row(status="done")]))
 
@@ -53,6 +64,13 @@ class ProbeTest(unittest.TestCase):
 
 
 class MainTest(unittest.TestCase):
+    def test_missing_and_invalid_files_exit_cleanly(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            broken = Path(tmp, "broken.yaml")
+            broken.write_text("rows: [unclosed")
+            self.assertEqual(doctor.main([str(Path(tmp, "absent.yaml"))]), 1)
+            self.assertEqual(doctor.main([str(broken)]), 1)
+
     def test_exit_codes(self):
         with tempfile.TemporaryDirectory() as tmp:
             good = Path(tmp, "good.yaml")

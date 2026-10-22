@@ -32,6 +32,10 @@ def validate(rows):
         seen.add(row.get("id"))
         if not isinstance(row.get("owner_only"), bool):
             problems.append(f"{name}: owner_only must be true or false")
+        if "paid" in row and not isinstance(row["paid"], bool):
+            problems.append(f"{name}: paid must be true or false")
+        elif row.get("paid") and not row.get("spend_cap"):
+            problems.append(f"{name}: paid row needs spend_cap")
         if row.get("status") not in STATUSES:
             problems.append(f"{name}: status must be one of {', '.join(STATUSES)}")
         if not row.get("owner_only"):
@@ -47,7 +51,7 @@ def probe(row):
         return None
     try:
         done = subprocess.run(
-            shlex.split(command), capture_output=True, timeout=CHECK_TIMEOUT_SECONDS, check=False
+            shlex.split(command), capture_output=True, stdin=subprocess.DEVNULL, timeout=CHECK_TIMEOUT_SECONDS, check=False
         )
     except (OSError, subprocess.TimeoutExpired) as error:
         return f"{row['id']}: check did not run ({type(error).__name__})"
@@ -61,8 +65,12 @@ def main(argv):
     parser.add_argument("matrix", nargs="?", default="docs/ops/access.yaml")
     parser.add_argument("--live", action="store_true")
     args = parser.parse_args(argv)
-    with open(args.matrix, encoding="utf-8") as handle:
-        document = yaml.safe_load(handle)
+    try:
+        with open(args.matrix, encoding="utf-8") as handle:
+            document = yaml.safe_load(handle)
+    except (OSError, yaml.YAMLError) as error:
+        print(f"{args.matrix}: cannot read matrix ({type(error).__name__})", file=sys.stderr)
+        return 1
     rows = document.get("rows") if isinstance(document, dict) else None
     if not isinstance(rows, list):
         print(f"{args.matrix}: no rows list", file=sys.stderr)
