@@ -11,6 +11,7 @@ replaces each changed file atomically and appends one ledger line:
 
 import json
 import os
+import shutil
 import tempfile
 from argparse import ArgumentParser, Namespace
 from datetime import datetime, timezone
@@ -39,38 +40,73 @@ def _artifacts(run_dir: Path) -> list[Path]:
     return [path for path in named if path.is_file()]
 
 
-def _hits(name: str, body: str, old: str) -> list[str]:
+def _variants(name: str, old: str, new: str) -> list[tuple[str, str]]:
+    plain = (old, new)
+    if name != "plan.json":
+        return [plain]
+    escaped = (json.dumps(old)[1:-1], json.dumps(new)[1:-1])
+    return [plain] if escaped == plain else [escaped, plain]
+
+
+def _hits(name: str, body: str, old: str, new: str) -> list[str]:
+    needles = [needle for needle, _ in _variants(name, old, new)]
     return [f"{name}:{number}: {line.strip()[:LINE_LIMIT]}"
-            for number, line in enumerate(body.splitlines(), 1) if old in line]
+            for number, line in enumerate(body.splitlines(), 1) if any(needle in line for needle in needles)]
 
 
-def _replace(path: Path, body: str) -> None:
+def _rewrite(name: str, body: str, old: str, new: str) -> str:
+    for needle, replacement in _variants(name, old, new):
+        body = body.replace(needle, replacement)
+    return body
+
+
+def _stage(path: Path, body: str) -> str:
     fd, temporary = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}-")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as stream:
             stream.write(body)
             stream.flush()
             os.fsync(stream.fileno())
-        os.replace(temporary, path)
+        shutil.copymode(path, temporary)
+    except BaseException:
+        os.unlink(temporary)
+        raise
+    return temporary
+
+
+def _replace_all(run_dir: Path, rewritten: dict[str, str], originals: dict[str, str]) -> None:
+    staged: dict[str, str] = {}
+    replaced: list[str] = []
+    try:
+        for name, body in rewritten.items():
+            staged[name] = _stage(run_dir / name, body)
+        for name, temporary in staged.items():
+            os.replace(temporary, run_dir / name)
+            replaced.append(name)
+    except BaseException:
+        for name in replaced:
+            os.replace(_stage(run_dir / name, originals[name]), run_dir / name)
+        raise
     finally:
-        if os.path.exists(temporary):
-            os.unlink(temporary)
+        for temporary in staged.values():
+            if os.path.exists(temporary):
+                os.unlink(temporary)
 
 
 def _write(run_dir: Path, texts: dict[str, str], old: str, new: str) -> dict[str, Any]:
     from ..common import Invalid, require
     from ..state import locked
 
-    rewritten = {name: body.replace(old, new) for name, body in texts.items() if old in body}
+    candidates = {name: _rewrite(name, body, old, new) for name, body in texts.items()}
+    rewritten = {name: body for name, body in candidates.items() if body != texts[name]}
     if "plan.json" in rewritten:
         try:
             json.loads(rewritten["plan.json"])
         except json.JSONDecodeError as error:
             raise Invalid(f"plan.json would no longer parse after the rewrite: {error}") from None
-    left = [hit for name, body in rewritten.items() for hit in _hits(name, body, old)]
+    left = [hit for name, body in rewritten.items() for hit in _hits(name, body, old, new)]
     require(not left, f"the rewrite would leave the old literal in place: {left}")
-    for name, body in rewritten.items():
-        _replace(run_dir / name, body)
+    _replace_all(run_dir, rewritten, texts)
     if rewritten:
         ledger = run_dir / "ledger.md"
         stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -89,7 +125,7 @@ def run(args: Namespace) -> dict[str, Any] | Output:
              for path in _artifacts(args.run_dir)}
     if args.write:
         return _write(args.run_dir, texts, old, new)
-    hits = [hit for name, body in texts.items() for hit in _hits(name, body, old)]
+    hits = [hit for name, body in texts.items() for hit in _hits(name, body, old, new)]
     if not hits:
         return {"hits": 0}
     return Output("\n".join([*hits, f"decision apply: {len(hits)} stale copies of the old literal"]) + "\n", 1)

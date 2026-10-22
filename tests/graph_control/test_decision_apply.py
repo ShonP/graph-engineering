@@ -7,10 +7,13 @@ decided literal, and the run directory is a temp directory.
 import contextlib
 import io
 import json
+import os
 import re
+import stat
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import helpers  # noqa: F401  (puts scripts/ on sys.path)
 from graph_control import cli
@@ -141,6 +144,71 @@ class DecisionApply(unittest.TestCase):
         self.assertBlocked(code, out)
         self.assertIn("plan.json", json.loads(out)["reason"])
         self.assertEqual(self.snapshot(), before)
+
+    def test_write_is_all_or_nothing_when_staging_a_file_fails(self):
+        if os.geteuid() == 0:
+            self.skipTest("root ignores directory permissions")
+        before = self.snapshot()
+        tasks = self.run_dir / "tasks"
+        tasks.chmod(0o555)
+        try:
+            code, out = self.apply(write=True)
+        finally:
+            tasks.chmod(0o755)
+        self.assertBlocked(code, out)
+        self.assertEqual(self.snapshot(), before)
+        self.assertEqual([p.name for p in self.run_dir.rglob(".*")], [])
+
+    def test_write_restores_every_file_when_a_replace_fails_midway(self):
+        before = self.snapshot()
+        real = os.replace
+        calls = []
+
+        def flaky(source, target):
+            calls.append(target)
+            if len(calls) == 2:
+                raise OSError("disk went away")
+            return real(source, target)
+
+        with mock.patch("graph_control.commands.decision.os.replace", flaky):
+            code, out = self.apply(write=True)
+        self.assertBlocked(code, out)
+        self.assertEqual(self.snapshot(), before)
+        self.assertEqual([p.name for p in self.run_dir.rglob(".*")], [])
+
+    def test_write_keeps_the_file_mode(self):
+        target = self.run_dir / "plan.md"
+        target.chmod(0o644)
+        code, out = self.apply(write=True)
+        self.assertEqual(code, 0, out)
+        self.assertEqual(stat.S_IMODE(target.stat().st_mode), 0o644)
+
+    def quoted_plan(self):
+        plan = {"schema_version": 1, "cases": [{"id": "AC-1", "then": 'merge_auto: "off" stays'}]}
+        (self.run_dir / "plan.json").write_text(json.dumps(plan, indent=2) + "\n", encoding="utf-8")
+        (self.run_dir / "plan.md").write_text('merge_auto: "off" stays\n', encoding="utf-8")
+
+    def test_detect_finds_a_literal_that_plan_json_stores_escaped(self):
+        self.quoted_plan()
+        code, out = self.apply(old='merge_auto: "off"', new='merge_auto: "when-green"')
+        self.assertEqual(code, 1)
+        self.assertTrue(any(line.startswith("plan.json:") for line in out.splitlines()), out)
+
+    def test_write_rewrites_a_literal_that_plan_json_stores_escaped(self):
+        self.quoted_plan()
+        code, out = self.apply(old='merge_auto: "off"', new='merge_auto: "when-green"', write=True)
+        self.assertEqual(code, 0, out)
+        plan = json.loads((self.run_dir / "plan.json").read_text(encoding="utf-8"))
+        self.assertEqual(plan["cases"][0]["then"], 'merge_auto: "when-green" stays')
+        self.assertEqual(self.apply(old='merge_auto: "off"', new='merge_auto: "when-green"')[0], 0)
+
+    def test_write_rewrites_a_non_ascii_literal_that_plan_json_stores_escaped(self):
+        plan = {"schema_version": 1, "cases": [{"id": "AC-1", "then": "café open"}]}
+        (self.run_dir / "plan.json").write_text(json.dumps(plan, indent=2) + "\n", encoding="utf-8")
+        code, out = self.apply(old="café", new="tea", write=True)
+        self.assertEqual(code, 0, out)
+        stored = json.loads((self.run_dir / "plan.json").read_text(encoding="utf-8"))
+        self.assertEqual(stored["cases"][0]["then"], "tea open")
 
 
 if __name__ == "__main__":
