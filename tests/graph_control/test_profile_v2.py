@@ -77,7 +77,7 @@ class SchemaV2Tests(unittest.TestCase):
     def test_gate_defaults_keep_the_owner_in_the_loop(self):
         self.assertEqual(self.profile["gates"], {"plan": "owner", "merge": "owner",
                                                  "owner_classes": OWNER_CLASSES, "auto_classes": [],
-                                                 "quick": ""})  # quick: a command, empty = none
+                                                 "merge_auto": "off", "quick": ""})
         text = comment_before("gates:")
         self.assertIn("none", text)
         self.assertIn("full green", text)
@@ -88,6 +88,30 @@ class SchemaV2Tests(unittest.TestCase):
         self.assertIn("auto_classes", text)
         self.assertIn("agent-control", text)
         self.assertIn("--auto-merge", text)
+        self.assertIn("unless `merge_auto: when-green`", text)
+        self.assertNotIn("always waits, even under --auto-merge", text)
+
+    def test_merge_auto_comment_names_its_values_and_what_always_waits(self):
+        text = comment_before("  merge_auto:")
+        for token in ("off | when-green", "owner_classes", "agent-control", "run base", "never the branch",
+                      ".claude/graph-checks.json", "always waits"):
+            self.assertIn(token, text, token)
+
+    def test_static_only_infra_never_opens_the_merge_gate(self):
+        text = comment_before("infra:")
+        self.assertIn("never opens the merge gate", text)
+        self.assertNotIn("refuses", text)
+
+    def test_new_key_comments_name_their_checks(self):
+        for key, tokens in {"bootstrap_ready:": ("graph-control worktree-ready", "node_modules", "`..`"),
+                            "writable_companions:": ("when", "also", "validate-plan --profile", "8-path cap"),
+                            "ci:": ("parity", "gate", "hook", "affected", "query affected --exit-code",
+                                    "nx affected", "melos list --diff", "git diff --name-only", "expensive",
+                                    "prod_data_steps", "deploy", "doctor", "info only")}.items():
+            text = comment_before(key)
+            for token in tokens:
+                with self.subTest(key=key, token=token):
+                    self.assertIn(token, text)
 
     def test_risk_comment_names_the_built_in_control_plane_row(self):
         text = comment_before("risk:")
@@ -112,7 +136,7 @@ class SchemaV2Tests(unittest.TestCase):
         self.assertEqual(p["instructionPaths"], ["CLAUDE.md", "**/CLAUDE.md", "AGENTS.md", ".claude/**"])
         self.assertEqual(p["review"], {"panel_lines": 2000, "seams": [], "cadence": "per-task"})
         self.assertEqual(p["ownerAccess"], "")
-        self.assertEqual(p["ci"], {"parity": ""})
+        self.assertEqual(p["ci"]["parity"], "")
 
     def test_stale_keys_are_gone(self):
         self.assertNotIn("content", self.profile)
