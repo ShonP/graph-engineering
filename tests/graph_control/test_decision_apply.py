@@ -109,20 +109,23 @@ class DecisionApply(unittest.TestCase):
         self.assertEqual(self.snapshot(), before)
         self.assertEqual(len(self.ledger.read_text(encoding="utf-8").splitlines()), 2)
 
-    def test_new_containing_old_is_blocked(self):
+    def assertRefusedLiterals(self, old, new):
         before = self.snapshot()
-        self.assertBlocked(*self.apply(new=f"{OLD}.v2", write=True))
+        for write in (False, True):
+            with self.subTest(write=write):
+                code, out = self.apply(old=old, new=new, write=write)
+                self.assertBlocked(code, out)
+                self.assertIn("--old", json.loads(out)["reason"])
         self.assertEqual(self.snapshot(), before)
+
+    def test_new_containing_old_is_blocked(self):
+        self.assertRefusedLiterals(OLD, f"{OLD}.v2")
 
     def test_old_equal_to_new_is_blocked(self):
-        before = self.snapshot()
-        self.assertBlocked(*self.apply(new=OLD, write=True))
-        self.assertEqual(self.snapshot(), before)
+        self.assertRefusedLiterals(OLD, OLD)
 
     def test_empty_old_is_blocked(self):
-        before = self.snapshot()
-        self.assertBlocked(*self.apply(old="", write=True))
-        self.assertEqual(self.snapshot(), before)
+        self.assertRefusedLiterals("", NEW)
 
     def test_rewrite_that_would_leave_the_old_literal_writes_nothing(self):
         (self.run_dir / "plan.md").write_text("old.old.exampleexample\n", encoding="utf-8")
