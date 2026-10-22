@@ -23,7 +23,8 @@ class PlanCheck(unittest.TestCase):
         self.run = base / "run"
         self.root = base / "worktree"
         (self.run / "tasks").mkdir(parents=True)
-        (self.root / "src").mkdir(parents=True)
+        for folder in ("src", "new", "anc", "lib/deep"):
+            (self.root / folder).mkdir(parents=True)
         (self.root / "src" / "app.py").write_text("".join(f"line {n}\n" for n in range(1, 11)))
         data = plan_data()
         template = data["tasks"][0]
@@ -73,6 +74,41 @@ class PlanCheck(unittest.TestCase):
             "Also `<plugin root>/x`, `tests/*.py`, `-p/x`, `~/a/b`, `/abs/path`, `$P/x`, `a|b/c`, `{a,b}/c`.",
         ]) + "\n")
         self.assertEqual(self.check(), (0, {"status": "PASS", "briefs": 3, "refs": 5}))
+
+    def test_code_expressions_are_not_paths(self):
+        self.write("T1", "Call `src/gone(\"a\")`, `open(src/gone.py)`, `src/a=b`, `src/'x'` and `src/a,src/b`.\n")
+        self.assertEqual(self.check(), (0, {"status": "PASS", "briefs": 3, "refs": 0}))
+
+    def test_paths_outside_existing_repo_dirs_are_not_refs(self):
+        self.write("T1", "Push `origin/main`, read `artifacts/` and `pkg/sub/f.py:9`, use `@scope/pkg`.\n")
+        self.assertEqual(self.check(), (0, {"status": "PASS", "briefs": 3, "refs": 0}))
+
+    def test_dot_segments_are_not_paths(self):
+        self.write("T1", "Refuse `src/../gone.py` and `src/./gone.py`.\n")
+        self.assertEqual(self.check(), (0, {"status": "PASS", "briefs": 3, "refs": 0}))
+
+    def test_pinned_approximate_and_git_internal_refs_are_not_paths(self):
+        for folder in (".worktrees/run-T1/src", ".git/hooks"):
+            (self.root / folder).mkdir(parents=True)
+        self.write("T1", "See `src/gone.py@abc123:3`, `src/gone.py:~4`, `src/.../gone.py`, "
+                         "`.worktrees/run-T1/src/gone.py` and `.git/hooks/gone`.\n")
+        self.assertEqual(self.check(), (0, {"status": "PASS", "briefs": 3, "refs": 0}))
+
+    def test_missing_directory_refs_are_not_blocked(self):
+        self.write("T1", "Evidence goes under `src/evidence/`, `src/later` and `src/.well-known`.\n")
+        self.assertEqual(self.check(), (0, {"status": "PASS", "briefs": 3, "refs": 0}))
+
+    def test_run_dir_and_plugin_files_are_not_repo_refs(self):
+        for folder in ("tasks", "scripts"):
+            (self.root / folder).mkdir()
+        self.write("T1", "Read `tasks/T0.md` and run `scripts/graph-control.py`.\n")
+        self.assertEqual(self.check(), (0, {"status": "PASS", "briefs": 3, "refs": 0}))
+
+    def test_missing_file_in_existing_nested_dir_is_blocked(self):
+        (self.root / "src" / "deep").mkdir()
+        self.write("T1", "Edit `src/deep/gone.py`.\n")
+        self.assertEqual(self.check(), (1, {"status": "BLOCKED",
+                                            "reason": "tasks/T1.md:1: `src/deep/gone.py` does not exist"}))
 
     def test_sibling_writable_paths_do_not_excuse(self):
         self.write("T1", "Use `new/mod.py`.\n")
