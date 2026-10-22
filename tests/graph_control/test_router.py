@@ -127,9 +127,23 @@ class GateTests(unittest.TestCase):
     def setUpClass(cls):
         cls.step = steps(engine_text())[5]
 
-    def test_control_plane_always_waits_for_the_owner(self):
-        for token in ("`agent-control`", "even under `--auto-merge`"):
-            self.assertIn(token, self.step)
+    def test_merge_gate_is_the_merge_gate_call(self):
+        for token in ("graph-control merge-gate <run> --root <run worktree> --base <run base> [--auto-merge]",
+                      '`"open": true`', "`gates.merge_auto`", "`when-green`", "run base",
+                      "`gates.owner_classes`", "`--auto-merge`", "`agent-control`", "`reasons`",
+                      "`.claude/graph-checks.json`", "missing findings file is BLOCKED"):
+            with self.subTest(token=token):
+                self.assertIn(token, self.step)
+        for prose in ("even under `--auto-merge`", "all four hold", "(a) every risk row",
+                      "only when (b), (c) and (d) hold"):
+            with self.subTest(prose=prose):
+                self.assertNotIn(prose, self.step)
+
+    def test_decision_answer_rewrites_literals_through_the_command(self):
+        for token in ("graph-control decision apply <run> --old <literal> --new <literal> --write",
+                      "never `sed`", "stale copies"):
+            with self.subTest(token=token):
+                self.assertIn(token, self.step)
 
     def test_plan_gate_always_stops(self):
         self.assertIn("`gates.plan` and `gates.merge` take only `owner`", self.step)
@@ -150,15 +164,11 @@ class GateTests(unittest.TestCase):
                       "credentials", "first publish", "real people"):
             self.assertIn(token, self.step)
 
-    def test_auto_merge_predicate(self):
-        for token in ("`gates.owner_classes`", "`gates.auto_classes`", "`none`",
-                      "graph-control depth --root <run worktree> --base <run base> --profile <profile>"
-                      " --plan <run>/plan.json", "`outside-the-run`",
-                      "risk_rows",
-                      "graph-control findings <run>/findings.json <run>/qa-findings.json --counts",
-                      "blocking 0 and important 0", "absent file is BLOCKED",
-                      "full PASS", "verify", "`[]`", "`--auto-merge`"):
-            self.assertIn(token, self.step)
+    def test_class_names_and_template_default(self):
+        for token in ("`gates.owner_classes`", "`gates.auto_classes`", "`none`", '`merge_auto: "off"`',
+                      "`auto_classes: []`"):
+            with self.subTest(token=token):
+                self.assertIn(token, self.step)
 
     def test_push_notifications_only_on_transitions(self):
         for token in ("NEEDS YOU", "first 429", "already happens"):
