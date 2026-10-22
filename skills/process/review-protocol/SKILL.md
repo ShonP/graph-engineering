@@ -175,7 +175,7 @@ The profile's `instructionPaths` globs name the files that steer agents:
 prompts, skills, agent definitions, rule packs, `CLAUDE.md`. They join the
 built-in `agent-control` risk row (`.claude/**`, `CLAUDE.md`, `AGENTS.md`,
 `.mcp.json`, `.github/**`), so a diff to one of them changes agent behavior,
-gets a full review and always waits for the owner at merge. Any other
+gets a full review and waits for the owner at merge unless the repo sets `gates.merge_auto: when-green`. Any other
 prose-only diff (docs, changelogs, READMEs) gets the `lint` depth: scripted
 checks only, no LLM review. The engine runs `graph-control depth` before each
 review leg; at `lint` no reviewer is dispatched: the engine runs the repo's

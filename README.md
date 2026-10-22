@@ -173,13 +173,17 @@ the first line of the run's ledger; the owner sees them at the first gate.
 | `research` | brief -> research (1 / 3 / 6 leaves, or the product preset) -> verify (deep only) -> **report gate** | a comparison, a decision, "is this worth building"; writes no code |
 
 `/graph-ship --resume <run-id>` picks a run back up from its ledger.
-`/graph-ship --auto-merge` relaxes only the merge gate, only for that run.
-A repo can opt risk classes into auto-merge on full green with
-`gates.auto_classes` (no blocking or important findings left, qa a full PASS,
-`verify` green, no class in `gates.owner_classes`); the template ships `[]`, so
-the owner merges everything until the repo opts in. `agent-control` always
-waits for the owner, even under `--auto-merge`: that diff can rewrite the
-gates themselves. `gates.plan` and `gates.merge` take only `owner`. `gates.quick`
+`/graph-ship --auto-merge` relaxes only the merge gate, as a one-run `when-green`.
+A repo can opt in for every run with `gates.merge_auto: when-green` (default
+`"off"`). On full green (no blocking or important findings, qa a full PASS,
+`verify` green) the gate then opens for every class not in `gates.owner_classes`,
+including `agent-control`. The trade-off: an agent-written change to prompts,
+hooks or CI merges without the owner's eyes, so leave it off unless review and
+qa are trusted for those files. The gate reads the profile from the run base,
+and a diff to the profile, `.claude/graph-checks.json` or the gate code always
+waits; `destructive`, `credentials-and-access`, `spend` and `outbound-messaging`
+still wait. With `off`, the `gates.auto_classes` rule holds (template ships
+`[]`) and `agent-control` waits. `gates.plan` and `gates.merge` take only `owner`. `gates.quick`
 is the one command among them: the repo's fast pre-push check, which every
 implementer runs in its worktree before reporting DONE (`""` for none).
 `integration: pr | push-main` picks how approved work lands.
