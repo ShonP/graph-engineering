@@ -95,7 +95,7 @@ class PlanCheck(unittest.TestCase):
         self.assertEqual(self.check(), (0, {"status": "PASS", "briefs": 3, "refs": 0}))
 
     def test_missing_directory_refs_are_not_blocked(self):
-        self.write("T1", "Evidence goes under `src/evidence/`, `src/later` and `src/.well-known`.\n")
+        self.write("T1", "Evidence goes under `src/evidence/`, `src/notes.d/`, `src/later` and `src/.well-known`.\n")
         self.assertEqual(self.check(), (0, {"status": "PASS", "briefs": 3, "refs": 0}))
 
     def test_run_dir_and_plugin_files_are_not_repo_refs(self):

@@ -49,8 +49,8 @@ def path_ref(token: str) -> tuple[str, int | None] | None:
 
 def names_repo_file(ref: str, root: Path, elsewhere: tuple[Path, ...]) -> bool:
     path = PurePosixPath(ref)
-    return (not ref.endswith("/") and bool(path.suffix) and path.parent != PurePosixPath(".")
-            and (root / path.parent).is_dir() and not any((base / ref).exists() for base in elsewhere))
+    return (not ref.endswith("/") and bool(path.suffix) and (root / path.parent).is_dir()
+            and not any((base / ref).exists() for base in elsewhere))
 
 
 def owners(plan: Any) -> dict[str, Any]:
