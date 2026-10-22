@@ -124,11 +124,14 @@ class TaskGate(unittest.TestCase):
                      "; ".join([PARTIAL_REASON, "skills not loaded: graph-engineering:backend-rules",
                                 f"case AC-1: evidence {EVIDENCE} missing"]))
 
+    def test_missing_brief_blocks(self):
+        (self.run / "tasks" / "T1.md").unlink()
+        self.blocked(f"DONE\n{LOADED}", "tasks/T1.md is missing")
+
     def test_unknown_task_blocks(self):
         self.report_path.write_text(f"DONE\n{LOADED}")
-        code, result = invoke(["task-gate", str(self.run), "--task", "T9", "--report", str(self.report_path)])
-        self.assertEqual((code, result["status"]), (1, "BLOCKED"))
-        self.assertIn("T9", result["reason"])
+        self.assertEqual(invoke(["task-gate", str(self.run), "--task", "T9", "--report", str(self.report_path)]),
+                         (1, {"status": "BLOCKED", "reason": "unknown task 'T9': not in plan.json"}))
 
 
 if __name__ == "__main__":
