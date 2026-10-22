@@ -203,6 +203,7 @@ class Refusals(MergeGate):
             with self.subTest(path=path):
                 code, out = self.gate(self.base, f"--profile-path={path}")
                 self.assertEqual((code, out["status"]), (1, "BLOCKED"), out)
+                self.assertIn("--profile-path must be a repo-relative path inside the tree", out["reason"])
 
     def test_profile_path_naming_a_directory_blocks(self):
         code, out = self.gate(self.base, "--profile-path", ".claude")
