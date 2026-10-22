@@ -10,6 +10,8 @@ commits.
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-10-22
+
 ### Added
 
 - **`access-and-automation`** rule pack (`skills/rules`): centralized access (pipeline OIDC identity, then group-based roles, then one vault; no personal keys; secrets only by stdin or env; spend caps), an access matrix plus onboarding guide decided at repo start, and pipelines run on demand or on CI triggers, never on a schedule. Ships `references/bootstrap.md` (Azure group, role, managed identity with federated credential, workflow skeleton), `templates/access.yaml`, `templates/onboarding.md` and `scripts/access-doctor.py` (static validation, `--live` probes each check). `/graph-init` step 7a records who works on the repo and what it needs and proposes both files; the profile gains an `access:` block and a routing row for `.github/workflows/**`, `infra/**` and `docs/ops/**`; the reviewer flags a missing matrix row, a `schedule` trigger and an exposed secret.
