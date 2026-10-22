@@ -5,7 +5,7 @@ Use `uv run scripts/graph-control.py …` from the plugin checkout. The PEP 723 
 Successful commands return JSON `{"status":"PASS",…}` and exit 0. Invalid, missing, stale or incomplete evidence returns `{"status":"BLOCKED","reason":"…"}` and exit 1. Parser errors use argparse's exit 2. There is no N/A/skip route for required checks. Every check declared in the run is required; keep optional diagnostics outside this gate manifest.
 
 ```
-uv run scripts/graph-control.py validate-plan /absolute/run/plan.json
+uv run scripts/graph-control.py validate-plan /absolute/run/plan.json [--profile /absolute/repo/.claude/graph-profile.yaml]
 uv run scripts/graph-control.py snapshot /absolute/candidate --repo backend
 uv run scripts/graph-control.py fingerprint /absolute/run/run.json
 uv run scripts/graph-control.py preflight /absolute/run/run.json --profile /absolute/profile.yaml --graph /absolute/run/graph.md
@@ -27,6 +27,13 @@ uv run scripts/graph-control.py digest --root /absolute/candidate --base <rev> [
 uv run scripts/graph-control.py render [--root /absolute/plugin] [--write|--check]
 uv run scripts/graph-control.py host-check --root /absolute/repo [--min-free-gb <n>] [--profile /absolute/repo/.claude/graph-profile.yaml]
 uv run scripts/graph-control.py skills-check --required graph-engineering:bruno,superpowers:test-driven-development --loaded "<the child's skills_loaded: value>" [--agent-id <id>]
+uv run scripts/graph-control.py merge-gate /absolute/run --root /absolute/worktree --base <rev> [--auto-merge] [--profile-path .claude/graph-profile.yaml]
+uv run scripts/graph-control.py run init /absolute/run --profile /absolute/profile.yaml --plugin-root /absolute/plugin [--requires-api] [--requires-design]
+uv run scripts/graph-control.py run bind /absolute/run --host /absolute/run/host.json
+uv run scripts/graph-control.py decision apply /absolute/run --old "<old literal>" --new "<new literal>" [--write]
+uv run scripts/graph-control.py plan check /absolute/run --root /absolute/worktree
+uv run scripts/graph-control.py task-gate /absolute/run --task <id> --report /absolute/run/reports/<id>.md [--root /absolute/task-worktree]
+uv run scripts/graph-control.py worktree-ready /absolute/task-worktree --profile /absolute/profile.yaml [--bootstrap-exit <n>] [--bootstrap-log /absolute/bootstrap.log]
 ```
 
 `preflight --readiness-only` is for the stage before implementation/runtime startup: it checks configuration, plan, tools, models and baseline source, but does not require the runtime observation file yet. Its `phase: readiness` result cannot authorize completion. Use a planned runtime artifact path and placeholder fingerprint until the runner reports actual identity, then refresh the candidate manifest. Recording and verification never accept readiness-only mode.
@@ -35,7 +42,7 @@ uv run scripts/graph-control.py skills-check --required graph-engineering:bruno,
 
 ## Plan schema (versions 1 and 2)
 
-`schema_version` is 1 or 2; any other value is rejected. Version 2 is version 1 plus the optional success signals and task budget keys below. Every field in this example is required in both versions; the only optional task keys are `estimate_min`, `path_cap_reason` and `proof`, version 2 only, with the rules under [Task budget](#task-budget-version-2). Unknown/duplicate keys and duplicate IDs are rejected. Arrays below may be empty unless the example/comment says otherwise.
+`schema_version` is 1 or 2; any other value is rejected. Version 2 is version 1 plus the optional success signals and task budget keys below. Every field in this example is required in both versions; the only optional task keys are `estimate_min`, `path_cap_reason` and `proof`, version 2 only, with the rules under [Task budget](#task-budget-version-2). A case may also carry `evidence`, version 2 only: a relative path without `..` that `task-gate` expects to exist. Unknown/duplicate keys and duplicate IDs are rejected. Arrays below may be empty unless the example/comment says otherwise.
 
 ```json
 {
@@ -119,6 +126,8 @@ A version 2 task may add three optional keys (shown alone below, merged into the
 - An explicit `null` for any of the three is rejected (omit the key instead), and a version 1 plan carrying any of them is rejected. Every rejection starts with `task <id>:` and names the limit.
 
 ## Run schema (version 1)
+
+Actor ids that start with a role (`plan-`, `implement-`, `review-`, `qa-`, `verify-`) and end in another run's id are rejected by `Run.validate`; ids with no role prefix (legacy) still pass. `run init` writes `run.draft.json` at run open (plugin version, profile and graph paths and hashes, capability nodes, the requires flags), never `run.json`. `run bind` completes it once `plan.json` exists: it hashes plan, profile and graph again, derives one actor id per role as `<role>-<run id>`, copies the host observations, runs `Run.parse`, and writes `run.json` atomically, or writes nothing. The engine writes `host.json`, an object with exactly `available_models`, `tools`, `resolution_source`, `models` (per role `{requested, resolved}`), `checks`, `candidate` and `runtime_identity`; a missing or unknown key is BLOCKED.
 
 ```json
 {
@@ -269,6 +278,19 @@ The Stop hook (`hooks/scripts/configured_check.py test`) memoizes the verdict of
 - **Kill switch and rollback**: any nonempty `GRAPH_CHECKS_NO_MEMO` (for example `GRAPH_CHECKS_NO_MEMO=1` in the environment Claude Code runs hooks with) disables lookup and store in the hook and makes `check --reuse` BLOCKED, so every Stop runs the suite. Deleting `checks-state.json` clears the memo; reverting the change removes it. A replay is observable by its `replayed` or `tree unchanged` text.
 
 `graph-control check <root> --reuse` reads `<root>/.claude/graph-checks.json`, where `<root>` is the directory holding that config (the Git worktree root, or a monorepo package with its own), computes the same key and returns `{"status":"PASS","verdict":"pass|fail|timeout","observed_at":"...","exit_code":0}`. It never executes anything. A tree with no stored verdict returns BLOCKED `no memo for the current tree`; a missing config, a config with no test block or a malformed `test.argv`, a root outside any Git worktree, and a set `GRAPH_CHECKS_NO_MEMO` are BLOCKED with the reason. `--reuse` is required: graph-control never runs project commands, so replay is the only mode. The memo is a speed cache, not merge evidence: the merge gate still proves checks with receipts (`record-receipt`, `verify`).
+
+## New run commands
+
+None of these executes a project command; `worktree-ready` only runs `git rev-parse`.
+
+- `merge-gate <run> --root <worktree> --base <rev> [--auto-merge] [--profile-path <p>]` decides whether a green run merges without the owner. It reads the profile from `<rev>`, never the branch, so a run cannot open its own gate. It returns PASS `{open, mode, reasons, risk_rows, profile_source}` and exits 0 whether `open` is true or false; each reason starts `held:` or `failed:`. `mode` is `gates.merge_auto` (`off` or `when-green`; `--auto-merge` counts as `when-green` for one run). A diff to the profile, `.claude/graph-checks.json` or the gate code always waits. Missing findings files are BLOCKED; a missing `qa.md` or red `verify` is a `failed:` reason.
+- `run init` and `run bind`: see the Run schema. Both print PASS JSON; a bad input is BLOCKED and writes nothing.
+- `decision apply <run> --old <literal> --new <literal> [--write]` lists every run artifact copy of a decision literal that changed. Without `--write` it changes nothing and exits 1 listing the hits (BLOCKED); with `--write` it rewrites them all and appends one ledger line. `--new` containing `--old`, or an empty `--old`, is BLOCKED.
+- `plan check <run> --root <worktree>` reads each task brief and BLOCKS a path or `file:line` reference that is missing in the worktree and not owned by a `writable_paths` entry, or a line past the end of file. Fenced code is skipped. PASS prints `{briefs, refs}`.
+- `task-gate <run> --task <id> --report <file> [--root <worktree>]` is the check before a task becomes `gated`: the report status is `DONE` or `DONE_WITH_CONCERNS`, its last `skills_loaded:` covers the brief's `REQUIRED skills:`, and each owned case's `evidence` file exists. A `PARTIAL` report never gates; it is `superseded` once its green commit passes, and its follow-on carries the rest. Every failing condition is reported in one BLOCKED reason.
+- `worktree-ready <worktree> --profile <p> [--bootstrap-exit <n>] [--bootstrap-log <f>]` runs after the engine ran the profile's `bootstrap` commands. It returns `{noop: true}` when neither `bootstrap` nor `bootstrap_ready` is set; otherwise it BLOCKS with a `NEEDS_SETUP:` reason on the main checkout, a nonzero bootstrap exit (with the last 20 log lines), or a `bootstrap_ready` path still missing. Entries must be relative paths inside the worktree.
+- `validate-plan --profile <p> <plan>` also checks the profile's `writable_companions` (`when` glob, `also` glob): a task owning a `when` path must own the `also` path; the BLOCKED message names the glob to add. Without the flag, or with the key absent or `[]`, the output is unchanged.
+- Profile keys: `gates.merge_auto` (`off` default, or `when-green`); `ci.gate`, `ci.hook`, `ci.affected`, `ci.expensive`, `ci.prod_data_steps` and `ci.deploy` declare the repo's CI so `doctor` can check it. `/graph-init` scaffolds `templates/ci/` (pre-push hook, status script, `gate.yml`). Full-mode `doctor` reports six `ci-*` findings: the gate run twice (`ci-gate-twice`), expensive suites with no path scoping (`ci-expensive-unscoped`), declared production-data steps that run on every run (`ci-prod-data-unconditional`), a prod deploy not behind its promote step (`ci-prod-no-promote`), background QoS on the gate (`ci-background-qos`), and a checkout with `persist-credentials: false` in a job that fetches or pushes tags (`ci-tags-no-credentials`).
 
 ## doctor, status, depth, review-files, findings, waves, ready, validate-briefs, digest, render, host-check, skills-check, qa-lanes
 
