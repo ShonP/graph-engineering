@@ -137,7 +137,7 @@ it can see, not the payload that crossed a queue, a workflow history replay or a
 
 ### The framework adapter exception
 
-The only exemption from rule 1. It carries this name here, in the code comment it requires and
+The only exemption from rule 1. It carries this name here, in the directive it requires and
 in `Verify` check 4, so a grep for the phrase lands on all three.
 
 If a library calls `dataclasses.replace()` or `dataclasses.fields()` on an object you hand
@@ -148,20 +148,22 @@ it, that object must be a stdlib dataclass and rule 1 cannot reach it. The vendo
 is clients, per-run counters and configuration primitives. Any domain data it carries is a
 `BaseModel` field on it, and the dataclass never crosses a serialization boundary.
 
-An exempt `@dataclass` carries a comment naming the library call that forces it, on the line
-above the decorator, so the exemption is checkable in a diff rather than judged by eye:
+An exempt `@dataclass` carries the machine directive `# graph: allow-dataclass <reason-id>` on the line
+above the decorator (the reason id names the library call that forces it, for example
+`pydantic_ai-for_run`; the comment check allowlists exactly this shape and no prose), so the
+exemption is checkable in a diff rather than judged by eye:
 
 ```python
-# framework adapter exception: pydantic_ai calls dataclasses.replace() in for_run()
+# graph: allow-dataclass pydantic_ai-for_run
 @dataclass
 class RequestCounter(AbstractCapability[Any]): ...
 ```
 
-A `@dataclass` with no such comment is a finding, whatever its author intended.
+A `@dataclass` with no such directive is a finding, whatever its author intended.
 
-Where ruff enforces the ban (`Verify` check 4), the exemption carries the same phrase on a
+Where ruff enforces the ban (`Verify` check 4), the exemption carries the same directive on a
 **narrow** suppression, so one grep still finds every exempt site:
-`# noqa: TID251  # framework adapter exception: <the library call>`. A bare `# noqa` silences
+`# noqa: TID251  # graph: allow-dataclass <reason-id>`. A bare `# noqa` silences
 every rule on that line, present and future, and is never the exemption.
 
 ## Anti-patterns
@@ -215,7 +217,7 @@ uv run lint tests/fixtures/has_dataclass.py; echo "exit=$?"
 #     two, treat the rest as guard rail. No bare `# noqa` (it silences TID251 unnamed):
 #     PGH004 reads comment tokens, so exit=0, or `PGH004 Use specific rule codes` + exit=1.
 uv run ruff check --select PGH004 src tools tests; echo "exit=$?"
-grep -rn '# noqa: TID251' src/ tools/ | grep -v 'framework adapter exception:' || echo "all named"
+grep -rn '# noqa: TID251' src/ tools/ | grep -v 'graph: allow-dataclass ' || echo "all named"
 ```
 
 5. Every id default really produces a v7. One assertion per model with an id, in the test

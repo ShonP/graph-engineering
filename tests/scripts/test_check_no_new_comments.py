@@ -33,6 +33,9 @@ ALLOWED = {
     "e.swift": "// swiftlint:disable force_cast\nlet s = \"// no\"\n",
     "g.go": "// SPDX-License-Identifier: MIT\n//go:generate stringer\n",
     "h.cs": "// Copyright 2026 Someone\nvar u = \"http://x\";\n",
+    "i.py": "# graph: allow-dataclass pydantic_ai-for_run\n@dataclass\nclass A: ...\n",
+    "j.cs": 'var a = @"// verbatim \\";\nvar b = @"C:\\dir\\";\nvar c = """\n// raw\n""";\n',
+    "k.sh": "cat <<EOF\n# title\nEOF\ncat <<-'END'\n\t# t\n\tEND\n",
 }
 
 
@@ -58,6 +61,7 @@ class CheckNoNewComments(unittest.TestCase):
 
     def write(self, cwd, files):
         for name, text in files.items():
+            Path(cwd, name).parent.mkdir(parents=True, exist_ok=True)
             Path(cwd, name).write_text(text)
 
     def test_added_comment_in_every_language_fails(self):
@@ -91,6 +95,34 @@ class CheckNoNewComments(unittest.TestCase):
         self.write(cwd, {"a.py": "x = 1\n# why\n", "b.py": "y = 1\n# why\n"})
         result = run("--base", "HEAD", "a.py", cwd=cwd)
         self.assertEqual((result.returncode, result.stdout), (1, "a.py:2: added code comment\n"))
+
+    def test_prefix_lookalikes_and_prose_licence_mentions_fail(self):
+        cwd = self.repo({"a.js": "", "b.js": ""})
+        self.write(cwd, {"a.js": "// pragmatic hack\n// region of the map\n", "b.js": "// uses Copyright law here\n"})
+        result = run("--base", "HEAD", cwd=cwd)
+        self.assertEqual(result.stdout, "a.js:1: added code comment\na.js:2: added code comment\nb.js:1: added code comment\n")
+
+    def test_binary_file_is_skipped(self):
+        cwd = self.repo({"keep.txt": "x\n"})
+        Path(cwd, "x.js").write_bytes(b"\0\x01// why\n")
+        self.assertEqual(run("--base", "HEAD", cwd=cwd).returncode, 0)
+
+    def test_subdirectory_cwd_and_absolute_paths_resolve_against_the_repo_root(self):
+        cwd = self.repo({"pkg/src/a.py": "x = 1\n"})
+        self.write(cwd, {})
+        Path(cwd, "pkg/src/a.py").write_text("x = 1\n# added\n")
+        pkg = str(Path(cwd, "pkg"))
+        for args in (("--base", "HEAD", "src/a.py"), ("--base", "HEAD"), ("--base", "HEAD", str(Path(pkg, "src/a.py"))), ("src/a.py",)):
+            with self.subTest(args=args):
+                result = run(*args, cwd=pkg)
+                self.assertEqual((result.returncode, result.stdout), (1, "pkg/src/a.py:2: added code comment\n"))
+
+    def test_the_lint_wrapper_fails_on_a_comment(self):
+        cwd = self.repo({"a.py": "x = 1\n"})
+        Path(cwd, "a.py").write_text("x = 1\n# why\n")
+        wrapper = ROOT / "scripts" / "graph-lint.sh"
+        result = subprocess.run(["bash", str(wrapper), "a.py"], cwd=cwd, env=ENV, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 1, result.stdout)
 
     def test_unknown_ref_is_a_usage_failure(self):
         cwd = self.repo({"a.py": "x = 1\n"})

@@ -93,7 +93,7 @@ This is the rule this skill exists for, and it was decided by measurement rather
 - **Every ban carries a `msg` that names the replacement and the one sanctioned way out.**
   A ban that only says "banned" gets worked around; one that says what to use instead gets
   followed. The escape hatch is a *narrow* `# noqa` with a reason beside it —
-  `# noqa: TID251  # framework adapter exception: <the library call that forces it>` —
+  `# noqa: TID251  # graph: allow-dataclass <reason-id>` —
   never a bare `# noqa`, which silences every rule on that line forever.
 
 ### Excluding a file, and the red control that proves the lint works
