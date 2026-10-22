@@ -48,12 +48,12 @@ class PlanCheck(unittest.TestCase):
     def test_registered_as_plugin(self):
         self.assertIn("plan", [module.NAME for module in iter_commands()])
 
-    def test_missing_path_is_blocked(self):  # AC-S8-MISSING
+    def test_ac_s8_missing_path_is_blocked(self):
         self.write("T1", "# T1\n\nEdit `src/gone.py` here.\n")
         self.assertEqual(self.check(), (1, {"status": "BLOCKED",
                                             "reason": "tasks/T1.md:3: `src/gone.py` does not exist"}))
 
-    def test_line_refs_past_end_are_blocked(self):  # AC-S8-EOF
+    def test_ac_s8_eof_line_refs_past_end_are_blocked(self):
         self.write("T2", "See `src/app.py:500`.\nAnd `src/app.py:2-900` and `src/app.py:10`.\n")
         self.assertEqual(self.check(), (1, {"status": "BLOCKED", "reason": (
             "tasks/T2.md:1: `src/app.py:500` line 500 past end (10 lines); "
@@ -65,7 +65,7 @@ class PlanCheck(unittest.TestCase):
             "tasks/T2.md:1: `src/app.py:11-12` line 12 past end (10 lines); "
             "tasks/T2.md:1: `src/app.py:40-2` line 40 past end (10 lines)")}))
 
-    def test_valid_refs_pass(self):  # AC-S8-VALID
+    def test_ac_s8_valid_refs_pass(self):
         self.write("T2", "\n".join([
             "Read `src/app.py:3` and `src/app.py:1-10`.",
             "Create `new/mod.py` and use `anc/x.py` and `lib/deep/y.py`.",
@@ -79,7 +79,7 @@ class PlanCheck(unittest.TestCase):
         self.assertEqual(self.check(), (1, {"status": "BLOCKED",
                                             "reason": "tasks/T1.md:1: `new/mod.py` does not exist"}))
 
-    def test_fenced_missing_path_passes(self):  # AC-S8-FENCE
+    def test_ac_s8_fence_fenced_missing_path_passes(self):
         self.write("T1", "Prose.\n\n```bash\ncat src/gone.py `src/gone.py`\n```\n")
         self.assertEqual(self.check(), (0, {"status": "PASS", "briefs": 3, "refs": 0}))
 
