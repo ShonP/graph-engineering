@@ -19,6 +19,7 @@ ENGINE_LAND = ROOT / "docs" / "engine" / "land.md"
 ENGINE_LANES = ROOT / "docs" / "engine" / "lanes.md"
 ENGINE_PARTS = (ENGINE, ENGINE_RUN, ENGINE_LAND, ENGINE_LANES)
 ENGINE_BYTES = 8000
+ENGINE_RUN_BYTES = 41213
 PLANNER_NODES = {"goal", "plan", "report"}
 
 
@@ -69,6 +70,10 @@ class EngineSplitTests(unittest.TestCase):
 
     def test_command_stays_within_its_byte_budget(self):
         self.assertLessEqual(len(ENGINE.read_bytes()), ENGINE_BYTES)
+
+    def test_run_reference_stays_within_its_budget(self):
+        self.assertLessEqual(len(ENGINE_RUN.read_bytes()), ENGINE_RUN_BYTES)
+        self.assertLessEqual(len(ENGINE_RUN.read_text().splitlines()), 250)
 
     def test_command_holds_only_the_router(self):
         self.assertEqual(sorted(steps(ENGINE.read_text())), [1])
