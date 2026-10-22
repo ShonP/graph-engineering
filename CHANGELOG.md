@@ -10,6 +10,8 @@ commits.
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-10-22
+
 ### Added
 
 - **`gates.merge_auto`** profile key (`off` default, or `when-green`): a green run merges without the owner, with the profile read at the run base; a diff to the profile, `.claude/graph-checks.json` or the gate code always waits.
