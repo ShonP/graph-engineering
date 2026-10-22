@@ -9,8 +9,8 @@
     "timeout_seconds": 10
   },
   "lint": {
-    "argv": ["ruff", "check", "{file}"],
-    "extensions": [".py"],
+    "argv": ["python3", "scripts/check-no-new-comments.py", "--base", "HEAD", "{file}"],
+    "extensions": [".py", ".sh", ".ts", ".tsx", ".js", ".jsx", ".dart", ".swift", ".kt", ".go", ".cs"],
     "timeout_seconds": 60
   }
 }
