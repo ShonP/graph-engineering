@@ -14,7 +14,7 @@ A public Claude Code plugin. Every change serves the goals below; weigh them tog
 
 ## Rules that follow
 
-- No code comments. Names and structure explain the code. The exception is a non-obvious why that must cite something outside the code, such as an upstream issue URL.
+- No code comments. Names and structure explain the code; `definition-of-done` holds the rule and `scripts/check-no-new-comments.py` enforces it.
 - Prompts are code: a prompt change states its token delta (bytes before/after of each loaded file) and, when it changes behaviour, runs an eval before/after: the standing suite is `evals/` (`claude plugin eval . --ablation none --no-publish --allow-tools Agent Bash Write Edit Read`, on the base and the branch; each run is a metered session, so ask the owner first).
 - Prefer an executable check (test, lint, `graph-control` subcommand, hook) over a prose rule.
 - Measure, do not guess: `scripts/session_usage.py` for tokens per role, `scripts/throughput.py` for run time.

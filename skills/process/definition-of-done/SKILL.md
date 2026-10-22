@@ -36,7 +36,7 @@ Sources: Google code review and SRE launch guides, DORA, Fowler's ParallelChange
 
 Every row also carries tests first (`review-testing-rules`), the run's `prior-art` note (on the plan), fresh verification before any "done" claim (`superpowers:verification-before-completion`), and the quick gate: when the profile declares `gates.quick`, run it in the worktree before reporting `DONE`, report its exit line, and fix a red one like a red test. None declared: say so in one line.
 
-**No code comments.** Names and structure explain the code. Exceptions: a non-obvious why citing something outside it (upstream issue URL, platform bug, external constraint), and a comment a routed house skill requires (`helm` values, `ruff` rule sets), which wins. Never narrate, restate code, add section banners, TODO prose or docstrings repeating the signature. Reviewers flag each added comment breaking this: a Nit, Important when it misleads.
+**No code comments.** Allowed: tool directives (lint ignores, shebangs, type pragmas), a licence header a licence requires, a comment a routed house skill requires (`helm` values, `ruff` rule sets), and `# graph: allow-dataclass <reason-id>` above a framework-adapter `@dataclass` (`pydantic-house-rules`). Reviewers flag each added comment as Important. Check: `python3 scripts/check-no-new-comments.py --base <ref>`.
 
 ## Anti-patterns
 

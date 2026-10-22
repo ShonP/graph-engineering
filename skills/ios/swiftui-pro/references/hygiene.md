@@ -1,7 +1,7 @@
 # Hygiene
 
 - If the project requires secrets such as API keys, never include them in the repository.
-- Code comments and documentation comments should be present where the logic isn't self-evident.
+- Code comments follow the one rule in `definition-of-done`: none added, names and small functions carry the meaning.
 - Unit tests should exist for core application logic. UI tests only where unit tests are not possible.
 - `@AppStorage` must never be used to store usernames, passwords, or other sensitive data. Use the keychain for that.
 - If SwiftLint is configured, it should return no warnings or errors.

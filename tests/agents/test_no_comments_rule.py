@@ -11,15 +11,15 @@ EXTERNAL_WHY = {"pydantic-house-rules"}
 
 
 class NoCommentsRule(unittest.TestCase):
-    def test_definition_of_done_holds_the_rule_and_its_one_exception(self):
+    def test_definition_of_done_holds_the_rule_and_its_allowlist(self):
         text = DOD.read_text(encoding="utf-8")
-        for needle in ("**No code comments.**", "upstream issue", "section banners", "docstrings"):
+        for needle in ("**No code comments.**", "tool directives", "licence header", "check-no-new-comments.py"):
             with self.subTest(needle=needle):
                 self.assertIn(needle, text)
 
     def test_reviewers_are_told_to_flag_added_comments(self):
         text = DOD.read_text(encoding="utf-8")
-        self.assertRegex(text, r"Reviewers flag each added comment[^.]*Nit")
+        self.assertRegex(text, r"Reviewers flag each added comment as Important")
 
     def test_every_writer_and_reviewer_preloads_the_home(self):
         for role in ("implementer", "implementer-simple", "reviewer", "reviewer-lead"):
@@ -41,6 +41,25 @@ class NoCommentsRule(unittest.TestCase):
         homes = [p for p in sorted(SKILLS.rglob("SKILL.md")) + sorted(AGENTS.glob("*.md"))
                  if RULE.search(p.read_text(encoding="utf-8"))]
         self.assertEqual(homes, [DOD])
+
+    def test_agents_point_to_the_rule_without_restating_it(self):
+        for role in ("implementer", "implementer-simple", "reviewer"):
+            line = next(l for l in (AGENTS / f"{role}.md").read_text(encoding="utf-8").splitlines()
+                        if "code-comment rule" in l or "code comment" in l)
+            with self.subTest(role=role):
+                self.assertIn("`definition-of-done`", line)
+                self.assertNotIn("licence", line)
+
+    def test_the_dataclass_exemption_is_a_directive_not_prose(self):
+        text = DOD.read_text(encoding="utf-8")
+        self.assertIn("# graph: allow-dataclass <reason-id>", text)
+        house = (SKILLS / "python" / "pydantic-house-rules" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("# graph: allow-dataclass <reason-id>", house)
+        self.assertNotIn("# framework adapter exception:", house)
+
+    def test_no_skill_asks_for_explanatory_comments(self):
+        hygiene = (SKILLS / "ios" / "swiftui-pro" / "references" / "hygiene.md").read_text(encoding="utf-8")
+        self.assertNotIn("comments should be present", hygiene)
 
 
 if __name__ == "__main__":
