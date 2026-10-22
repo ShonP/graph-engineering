@@ -37,7 +37,6 @@ publish() {
 }
 
 verified() {
-  command -v gh >/dev/null 2>&1 || return 1
   [ -n "${GH_TOKEN:-}${GITHUB_TOKEN:-}" ] || return 1
   local value latest
   value="$(key)" || return 1

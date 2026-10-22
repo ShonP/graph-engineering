@@ -142,6 +142,11 @@ class Key(unittest.TestCase):
         expected = hashlib.sha256(b"other\n" + b"version = 1\n").hexdigest()
         self.assertEqual(repo.run(STATUS, "key", GATE_SCRIPT="ci/other.sh").stdout.strip(), expected)
 
+    def test_missing_gate_script_has_no_key(self):
+        repo = Repo(self)
+        result = repo.run(STATUS, "key", GATE_SCRIPT="ci/missing.sh")
+        self.assertEqual((result.returncode != 0, result.stdout), (True, ""))
+
 
 class Check(unittest.TestCase):
     def assertUnverified(self, repo: Repo, result: subprocess.CompletedProcess) -> None:
@@ -217,7 +222,7 @@ class Publish(unittest.TestCase):
 
     def test_missing_gh_refuses(self):
         repo = Repo(self)
-        self.assertRefused(repo, repo.run(STATUS, "publish", gh=False), "gh")
+        self.assertRefused(repo, repo.run(STATUS, "publish", gh=False), "gh not found")
 
     def test_unauthenticated_gh_refuses(self):
         repo = Repo(self)
