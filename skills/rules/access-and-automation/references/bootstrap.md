@@ -61,7 +61,7 @@ jobs:
         run: ./scripts/<task>.sh "$TARGET"
 ```
 
-The federated subject pins the default branch ref, so a run from any other ref gets no token.
+The federated subject pins the default branch ref, so a run from any other ref cannot exchange its token for an Azure token.
 
 ## Other clouds
 

@@ -22,11 +22,13 @@ ownerAccess: ""
 
 # Who may hold what, decided at repo start (`access-and-automation`). `matrix` is the
 # access matrix, `onboarding` the day-0 guide, `doctor` validates the matrix and
-# `<doctor> --live` probes each check. Empty: no matrix yet, /graph-init proposes one.
+# `<doctor> --live` probes each check. `doctor` is empty until /graph-init copies the doctor into the repo.
+# `schedule_allowed: true` records the owner lifting the no-schedule rule for this repo.
 access:
   matrix: "docs/ops/access.yaml"
   onboarding: "docs/ops/onboarding.md"
   doctor: ""
+  schedule_allowed: false
 
 # Where specs and plans go.
 docsPath: "docs/superpowers"
