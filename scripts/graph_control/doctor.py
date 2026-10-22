@@ -58,6 +58,9 @@ def diagnose(root: Path, plugin_root: Path, quick: bool) -> list[Finding]:
                 findings += _runtime(profile) + _policy(profile) + _gates(profile)
                 findings += _routing(profile, root, plugin_root, str(manifest.get("name", "")))
                 findings += [Finding(*row) for row in evidence_store.check(profile, root)]
+                from . import ci_declared, ci_runtime
+                findings += [Finding(*row) for module in (ci_runtime, ci_declared)
+                             for row in module.findings(root, profile)]
         findings += _checks(root, plugin_root, quick)
         if not quick:
             findings += _ignored(root)
