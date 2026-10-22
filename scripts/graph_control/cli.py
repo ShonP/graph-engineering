@@ -11,11 +11,12 @@ from pathlib import Path
 from types import ModuleType
 
 from .commands import Output, iter_commands
+from . import companions
 from .common import Invalid, fingerprint, load
 from .identity import snapshot
 from .plan import Plan
 from .plan_queue import critical_path
-from .preflight import preflight
+from .preflight import preflight, read_profile
 from .receipts import Receipt, verify
 from .run import Run
 from .state import event, record, store_items, validate_attempts
@@ -25,7 +26,10 @@ def parser(modules: Iterable[ModuleType] | None = None) -> argparse.ArgumentPars
     root = argparse.ArgumentParser(description=__doc__)
     commands = root.add_subparsers(dest="command", required=True)
     for name in ("validate-plan", "validate-attempts", "fingerprint"):
-        commands.add_parser(name).add_argument("artifact", type=Path)
+        command = commands.add_parser(name)
+        command.add_argument("artifact", type=Path)
+        if name == "validate-plan":
+            command.add_argument("--profile", type=Path, help="also check the profile's writable_companions")
     snap = commands.add_parser("snapshot")
     snap.add_argument("root", type=Path)
     snap.add_argument("--repo", required=True)
@@ -64,6 +68,10 @@ def main(argv: list[str] | None = None, modules: Iterable[ModuleType] | None = N
                 return result.exit_code
         elif args.command == "validate-plan":
             plan = Plan.parse(load(args.artifact))
+            if args.profile is not None:
+                pairs = companions.parse(read_profile(args.profile))
+                if messages := companions.missing_companions(plan, pairs):
+                    raise Invalid("; ".join(messages))
             result = {"tasks": len(plan.tasks), "cases": len(plan.cases), "critical_path": critical_path(plan)}
         elif args.command == "validate-attempts":
             result = validate_attempts(load(args.artifact))
