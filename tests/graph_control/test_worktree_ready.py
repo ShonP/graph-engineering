@@ -9,7 +9,7 @@ import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
 
-import helpers  # puts scripts/ on sys.path
+import helpers
 
 import importlib.util
 
@@ -112,6 +112,26 @@ class WorktreeReady(unittest.TestCase):
             self.assertEqual(code, 1)
             self.assertEqual(result["reason"],
                              f"NEEDS_SETUP: bootstrap_ready {entry} must be a relative path inside the worktree")
+
+    def test_bootstrap_without_exit_status_is_blocked(self):
+        code, result = self.call(self.linked, self.profile(bootstrap=["pnpm install"]))
+        self.assertEqual((code, result), (1, {"status": "BLOCKED", "reason":
+                                              "NEEDS_SETUP: bootstrap is set but no --bootstrap-exit was given"}))
+
+    def test_ready_paths_alone_need_no_exit_status(self):
+        (self.linked / "node_modules").mkdir()
+        code, result = self.call(self.linked, self.profile(bootstrap_ready=["node_modules"]))
+        self.assertEqual((code, result), (0, {"status": "PASS", "noop": False, "ready": ["node_modules"]}))
+
+    def test_malformed_settings_name_the_key(self):
+        commands = "NEEDS_SETUP: bootstrap must be a list of command strings"
+        paths = "NEEDS_SETUP: bootstrap_ready must be a list of relative paths"
+        for keys, reason in (({"bootstrap": "pnpm install"}, commands), ({"bootstrap": [5]}, commands),
+                             ({"bootstrap": [""]}, commands), ({"bootstrap": {"a": "b"}}, commands),
+                             ({"bootstrap_ready": "node_modules"}, paths), ({"bootstrap_ready": [5]}, paths),
+                             ({"bootstrap_ready": [""]}, paths)):
+            code, result = self.call(self.linked, self.profile(**keys), "--bootstrap-exit", "0")
+            self.assertEqual((code, result), (1, {"status": "BLOCKED", "reason": reason}), keys)
 
     def test_bootstrap_command_is_never_executed(self):
         marker = self.root / "ran"

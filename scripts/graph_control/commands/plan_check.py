@@ -2,27 +2,32 @@
 
 For each plan task with a brief at <run-dir>/tasks/<id>.md (a missing brief is
 validate-briefs' job), each backticked token outside fenced code is a path
-reference when it holds a `/`, none of `<>*?{}[]$|`, and does not start with
-`http`, `-`, `~`, `/` or `.graph/`. An optional trailing `:<n>` or `:<n>-<m>` is
-a line ref. A path missing under --root is a problem unless a writable_paths
-glob of the task or of any task it transitively depends on matches it (that
-task will create it); a line ref past the file's line count is a problem.
+reference when it holds a `/`, none of `<>*?{}[]$|"'(),=@~`, no segment of dots
+only, and does not start with `http`, `-`, `/`, `.graph/`, `.worktrees/` or
+`.git/`. An optional
+trailing `:<n>` or `:<n>-<m>` is a line ref. A reference is checked when it
+exists under --root, or when it names a file (a suffix, no trailing `/`) in an
+existing directory below the root that is not a run-dir or plugin file, so
+branch names, packages, directories still to be made and other repos' paths
+pass. A checked path that is missing is a problem unless a writable_paths glob of the
+task or of any task it transitively depends on matches it (that task will
+create it); a line ref past the file's line count is a problem.
 Reads files only.
 """
 
 import re
 from argparse import ArgumentParser, Namespace
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
-from .briefs import fence_mask
+from .briefs import PLUGIN_ROOT, fence_mask
 
 NAME = "plan"
 HELP = "check plan briefs against a worktree: named paths exist and file:line refs fit"
 TOKEN = re.compile(r"`([^`\s]+)`")
 LINE_REF = re.compile(r"(.+?):(\d+)(?:-(\d+))?")
-NOT_PATH_CHARS = frozenset("<>*?{}[]$|")
-NOT_PATH_PREFIXES = ("http", "-", "~", "/", ".graph/")
+NOT_PATH_CHARS = frozenset("<>*?{}[]$|\"'(),=@~")
+NOT_PATH_PREFIXES = ("http", "-", "/", ".graph/", ".worktrees/", ".git/")
 
 
 def add_arguments(parser: ArgumentParser) -> None:
@@ -33,12 +38,19 @@ def add_arguments(parser: ArgumentParser) -> None:
 
 
 def path_ref(token: str) -> tuple[str, int | None] | None:
-    if "/" not in token or NOT_PATH_CHARS & set(token) or token.startswith(NOT_PATH_PREFIXES):
+    if ("/" not in token or NOT_PATH_CHARS & set(token) or token.startswith(NOT_PATH_PREFIXES)
+            or any(segment and not segment.strip(".") for segment in token.split("/"))):
         return None
     match = LINE_REF.fullmatch(token)
     if match is None:
         return token, None
     return match[1], max(int(match[2]), int(match[3] or 0))
+
+
+def names_repo_file(ref: str, root: Path, elsewhere: tuple[Path, ...]) -> bool:
+    path = PurePosixPath(ref)
+    return (not ref.endswith("/") and bool(path.suffix) and (root / path.parent).is_dir()
+            and not any((base / ref).exists() for base in elsewhere))
 
 
 def owners(plan: Any) -> dict[str, Any]:
@@ -53,7 +65,8 @@ def owners(plan: Any) -> dict[str, Any]:
     return {key: matcher(dict.fromkeys(paths)) for key, paths in globs.items()}
 
 
-def brief_problems(name: str, lines: list[str], root: Path, owned: Any) -> tuple[list[str], int]:
+def brief_problems(name: str, lines: list[str], root: Path, owned: Any,
+                   elsewhere: tuple[Path, ...]) -> tuple[list[str], int]:
     found, checked = [], 0
     for number, (line, fenced) in enumerate(zip(lines, fence_mask(lines)), 1):
         if fenced:
@@ -62,9 +75,12 @@ def brief_problems(name: str, lines: list[str], root: Path, owned: Any) -> tuple
             ref = path_ref(token)
             if ref is None:
                 continue
-            checked += 1
             path, last = root / ref[0], ref[1]
-            if not path.exists():
+            exists = path.exists()
+            if not exists and not names_repo_file(ref[0], root, elsewhere):
+                continue
+            checked += 1
+            if not exists:
                 if not owned.match(ref[0]):
                     found.append(f"{name}:{number}: `{token}` does not exist")
             elif last is not None and path.is_file():
@@ -87,7 +103,8 @@ def run(args: Namespace) -> dict[str, Any]:
         if not path.is_file():
             continue
         lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-        problems, checked = brief_problems(f"tasks/{task.id}.md", lines, args.root, owned[task.id])
+        problems, checked = brief_problems(f"tasks/{task.id}.md", lines, args.root, owned[task.id],
+                                           (args.run_dir, PLUGIN_ROOT))
         found += problems
         briefs, refs = briefs + 1, refs + checked
     require(not found, "; ".join(found))

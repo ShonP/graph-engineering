@@ -167,7 +167,7 @@ class TemplateTests(unittest.TestCase):
     def test_template_stays_under_its_byte_ceiling(self):
         self.assertLessEqual(len(TEMPLATE.read_bytes()), TEMPLATE_BYTES)
 
-    def test_profile_keys_contract_ships_its_defaults(self):  # AC-T1-KEYS
+    def test_ac_t1_keys_profile_contract_ships_its_defaults(self):
         profile = read_profile(TEMPLATE)
         self.assertEqual(profile["gates"]["merge_auto"], "off")
         self.assertEqual(profile["bootstrap_ready"], [])
