@@ -26,7 +26,7 @@ def profile(merge_auto=None, auto_classes=()):
 
 def green(rows=("agent-control",), **overrides):
     values = {"risk_rows": tuple(rows), "changed_paths": ("src/app.py",), "blocking": 0, "important": 0,
-              "qa_verdict": "PASS", "verify_ok": True}
+              "qa_verdict": "PASS", "verify_ok": True, "uncommitted": ()}
     values.update(overrides)
     return Inputs(**values)
 
@@ -57,7 +57,7 @@ class MergeGateTest(unittest.TestCase):
         decision = decide(profile("when-green"), green())
         self.assertTrue(decision.open, decision.reasons)
         self.assertEqual("when-green", decision.mode)
-        self.assertEqual(5, len(decision.reasons))
+        self.assertEqual(6, len(decision.reasons))
         self.assertTrue(all(reason.startswith("held:") for reason in decision.reasons), decision.reasons)
 
     def test_s2_finding_shuts(self):
@@ -69,6 +69,12 @@ class MergeGateTest(unittest.TestCase):
         for verdict in ("PASS (static-only)", "FAIL INCOMPLETE: AC-2", "INCOMPLETE: AC-1", "", "pass", None):
             with self.subTest(verdict=verdict):
                 self.assertShut(decide(profile("when-green"), green(qa_verdict=verdict)), "qa")
+
+    def test_static_only_pass_shuts_with_its_own_reason(self):
+        for verdict in ("PASS (static-only)", "  PASS (static-only)\n"):
+            with self.subTest(verdict=verdict):
+                decision = decide(profile("when-green"), green(qa_verdict=verdict))
+                self.assertShut(decision, "qa PASS (static-only) is static-only, not a full PASS")
 
     def test_s2_verify_shuts(self):
         self.assertShut(decide(profile("when-green"), green(verify_ok=False)), "verify")
@@ -94,6 +100,12 @@ class MergeGateTest(unittest.TestCase):
                     decision = decide(profile(merge_auto), inputs)
                     self.assertShut(decision, f"gate-floor {path}")
                     self.assertTrue(decision.reasons[0].startswith("failed: gate-floor"), decision.reasons)
+
+    def test_floor_matches_any_case(self):
+        for path in (".claude/GRAPH-CHECKS.json", ".Claude/graph-checks.json", "svc/.CLAUDE/Graph-Profile.YAML",
+                     "Scripts/Graph_Control/risk.py", "scripts/GRAPH-CONTROL.py"):
+            with self.subTest(path=path):
+                self.assertShut(decide(profile("when-green"), green(changed_paths=(path,))), f"gate-floor {path}")
 
     def test_floor_ignores_neighbours(self):
         inputs = green(changed_paths=(".claude/settings.json", "scripts/graph_controller.py", "docs/graph-profile.yaml"))
@@ -124,19 +136,41 @@ class MergeGateTest(unittest.TestCase):
 
     def test_reasons_are_ordered_and_complete(self):
         inputs = green(["spend"], changed_paths=("scripts/graph-control.py",), blocking=2, qa_verdict="",
-                       verify_ok=False)
+                       verify_ok=False, uncommitted=("src/app.py",))
         decision = decide(profile("when-green"), inputs)
         self.assertFalse(decision.open)
-        self.assertEqual(5, len(decision.reasons))
-        self.assertEqual(5, len(failed(decision)))
-        for reason, needle in zip(decision.reasons, ("gate-floor", "spend", "findings", "qa", "verify")):
+        self.assertEqual(6, len(decision.reasons))
+        self.assertEqual(6, len(failed(decision)))
+        for reason, needle in zip(decision.reasons, ("gate-floor", "spend", "findings", "qa", "verify", "tree")):
             self.assertIn(needle, reason)
 
-    def test_owner_classes_read_defensively(self):
-        broken = {"gates": {"merge_auto": "when-green", "owner_classes": None}}
-        self.assertTrue(decide(broken, green()).open)
+    def test_owner_classes_single_name_waits(self):
         self.assertShut(decide({"gates": {"merge_auto": "when-green", "owner_classes": "infra"}}, green(["infra"])),
                         "infra")
+        self.assertTrue(decide({"gates": {"merge_auto": "when-green"}}, green()).open)
+        self.assertTrue(decide({"gates": {"merge_auto": "when-green", "owner_classes": []}}, green()).open)
+
+    def test_malformed_owner_classes_shut_the_gate(self):
+        for value in ({"outbound-messaging": True}, "outbound-messaging, spend", [["outbound-messaging"]], None,
+                      ["spend", 3], "", ["two words"], 7):
+            for rows in (["outbound-messaging"], ["agent-control"], ()):
+                with self.subTest(value=value, rows=rows):
+                    gates = {"merge_auto": "when-green", "owner_classes": value}
+                    decision = decide({"gates": gates}, green(rows, auto_merge=True))
+                    self.assertShut(decision, "classes gates.owner_classes must be a class id or a list of class ids")
+
+    def test_uncommitted_worktree_shuts_the_gate(self):
+        decision = decide(profile("when-green"), green(uncommitted=("src/app.py", ".claude/graph-checks.json")))
+        self.assertShut(decision, "tree 2 uncommitted paths in the worktree, first src/app.py")
+        self.assertEqual(decision.reasons[-1][:12], "failed: tree")
+        self.assertEqual(decide(profile("when-green"), green()).reasons[-1],
+                         "held: tree clean, the gate read the committed HEAD")
+
+    def test_uncommitted_input_is_required(self):
+        values = {"risk_rows": (), "changed_paths": (), "blocking": 0, "important": 0, "qa_verdict": "PASS",
+                  "verify_ok": True}
+        with self.assertRaises(TypeError):
+            Inputs(**values)
 
     def test_spend_destructive_credentials_wait_even_when_profile_drops_them(self):
         for gates in ({"merge_auto": "when-green", "owner_classes": []}, {"merge_auto": "when-green"}):

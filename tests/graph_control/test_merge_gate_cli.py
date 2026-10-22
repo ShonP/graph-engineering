@@ -46,7 +46,7 @@ class MergeGate(unittest.TestCase):
         helpers.dump(self.run_dir / "plan.json", helpers.plan_data())
         helpers.dump(self.run_dir / "findings.T1.json", GREEN)
         helpers.dump(self.run_dir / "qa-findings.json", GREEN)
-        (self.run_dir / "qa.md").write_text("# qa\n\nFAIL early draft\nPASS all cases\n")
+        (self.run_dir / "qa.md").write_text("# qa\n\nFAIL early draft\nPASS\n")
         source = self.tmp / "receipts-source"
         source.mkdir()
         run, receipts, _ = helpers.fixture(source)
@@ -93,6 +93,43 @@ class Base(MergeGate):
         self.write("src/app.py", "print('more')\n")
         code, out = self.gate(base)
         self.assertEqual((code, out["open"], out["mode"]), (0, False, "off"), out)
+        self.assert_failed(out, "tree 2 uncommitted paths in the worktree")
+
+
+class Committed(MergeGate):
+    def test_uncommitted_revert_of_a_committed_floor_change_cannot_hide_it(self):
+        base = self.commit({PROFILE: profile_text("when-green"), ".claude/graph-checks.json": "{}\n",
+                            "src/app.py": "print('ok')\n"}, "base")
+        self.commit({".claude/graph-checks.json": '{"x": 1}\n', "src/app.py": "print('more')\n"}, "branch")
+        self.write(".claude/graph-checks.json", "{}\n")
+        code, out = self.gate(base)
+        self.assertEqual((code, out["open"]), (0, False), out)
+        self.assert_failed(out, "gate-floor .claude/graph-checks.json")
+        self.assert_failed(out, "tree 1 uncommitted paths in the worktree, first .claude/graph-checks.json")
+
+    def test_uncommitted_delete_of_an_owner_class_path_keeps_the_gate_shut(self):
+        risk = "risk:\n  - id: spend\n    paths: [\"billing/**\"]\n"
+        base = self.commit({PROFILE: profile_text("when-green") + risk, "src/app.py": "print('ok')\n"}, "base")
+        self.commit({"billing/charge.py": "charge()\n"}, "branch")
+        (self.repo / "billing" / "charge.py").unlink()
+        code, out = self.gate(base)
+        self.assertEqual((code, out["open"]), (0, False), out)
+        self.assert_failed(out, "tree 1 uncommitted paths in the worktree, first billing/charge.py")
+
+    def test_untracked_file_keeps_the_gate_shut(self):
+        base = self.commit({PROFILE: profile_text("when-green"), "src/app.py": "print('ok')\n"}, "base")
+        self.commit({"src/app.py": "print('more')\n"}, "branch")
+        self.write("notes.txt", "draft\n")
+        code, out = self.gate(base)
+        self.assertEqual((code, out["open"]), (0, False), out)
+        self.assert_failed(out, "tree 1 uncommitted paths in the worktree, first notes.txt")
+
+    def test_staged_rename_counts_once_by_its_new_path(self):
+        base = self.commit({PROFILE: profile_text("when-green"), "src/app.py": "print('ok')\n"}, "base")
+        git(self.repo, "mv", "src/app.py", "src/moved.py")
+        code, out = self.gate(base)
+        self.assertEqual((code, out["open"]), (0, False), out)
+        self.assert_failed(out, "tree 1 uncommitted paths in the worktree, first src/moved.py;")
 
 
 class Open(MergeGate):
@@ -156,7 +193,19 @@ class AcT7Inputs(MergeGate):
         (self.run_dir / "qa.md").write_text("PASS draft\nnotes\n  INCOMPLETE: device lane\nPASSED is no verdict\n")
         code, out = self.gate(self.base)
         self.assertEqual((code, out["open"]), (0, False), out)
-        self.assertIn("failed: qa verdict 'INCOMPLETE' is not PASS", out["reasons"])
+        self.assertIn("failed: qa verdict 'INCOMPLETE: device lane' is not PASS", out["reasons"])
+
+    def test_static_only_pass_shuts_the_gate(self):
+        (self.run_dir / "qa.md").write_text("# qa\n\n| AC-1 | VERIFIED |\n\nPASS (static-only)\n")
+        code, out = self.gate(self.base)
+        self.assertEqual((code, out["open"]), (0, False), out)
+        self.assertIn("failed: qa PASS (static-only) is static-only, not a full PASS", out["reasons"])
+
+    def test_pass_with_trailing_words_is_not_a_full_pass(self):
+        (self.run_dir / "qa.md").write_text("PASS all cases\n")
+        code, out = self.gate(self.base)
+        self.assertEqual((code, out["open"]), (0, False), out)
+        self.assert_failed(out, "qa verdict 'PASS all cases'")
 
     def test_missing_run_json_fails_verify(self):
         (self.run_dir / "run.json").unlink()
