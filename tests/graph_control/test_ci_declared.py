@@ -168,6 +168,16 @@ class ProdNoPromote(unittest.TestCase):
         text = DEPLOY.replace("  deploy-prod:\n    needs: build", "  deploy-prod:\n    needs: [build, smoke]")
         self.assertEqual(rows_with(run(text, {"deploy": DEPLOY_KEY}), "ci-prod-no-promote"), [])
 
+    def test_reusable_workflow_jobs_count_as_defined(self):
+        text = DEPLOY.replace("  deploy-dev:\n    needs: build\n    runs-on: ubuntu-latest\n    steps:\n"
+                              "      - run: make deploy-dev\n",
+                              "  deploy-dev:\n    needs: build\n    uses: ./.github/workflows/_deploy.yml\n").replace(
+            "  deploy-prod:\n    needs: build\n    runs-on: ubuntu-latest\n    steps:\n      - run: make deploy-prod\n",
+            "  deploy-prod:\n    needs: smoke\n    uses: ./.github/workflows/_deploy.yml\n")
+        self.assertEqual(run(text, {"deploy": DEPLOY_KEY}), [])
+        [guess] = rows_with(run(text.replace("needs: smoke", "needs: build"), {}), "ci-prod-guess")
+        self.assertIn("`deploy-prod`", guess[2])
+
     def test_declared_id_no_job_defines(self):
         [row] = rows_with(run(DEPLOY, {"deploy": {**DEPLOY_KEY, "dev": "deploy-staging"}}), "ci-prod-no-promote")
         self.assertEqual(row[0], "warn")
@@ -224,6 +234,10 @@ class ConfigInvalid(unittest.TestCase):
         self.assertEqual(rows_with(run(EXPENSIVE, {"expensive": [{"inputs": ["a"]}]}), "ci-expensive-unscoped"), [])
         self.assertEqual(rows_with(run(EXPENSIVE, {"expensive": [{"run": "x", "inputs": "a"}]}),
                                    "ci-config-invalid")[0][2][:12], "ci.expensive")
+
+    def test_non_mapping_ci_is_left_to_the_runtime_row(self):
+        for ci in (True, ["x"], "on"):
+            self.assertEqual(run(GUESSES, ci), [], ci)
 
     def test_skipped_check_emits_nothing_else(self):
         rows = run(GUESSES, {"deploy": "deploy-prod"})

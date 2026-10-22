@@ -206,6 +206,67 @@ class TagsNoCredentials(unittest.TestCase):
                                    "ci-tags-no-credentials"), [])
 
 
+    def test_shell_flags_before_the_script(self):
+        text = TAGS.replace("git fetch origin --tags", "make test").replace(
+            "bash scripts/release.sh", "bash -e scripts/release.sh")
+        root = repo({".github/workflows/ci.yml": text, "scripts/release.sh": RELEASE})
+        [row] = rows_with(findings(root, {}), "ci-tags-no-credentials")
+        self.assertIn("scripts/release.sh", row[2])
+
+
+SCAFFOLD_JOB = GATE_SKIPPED.replace("bash scripts/ci/gate.sh", "nice -n 10 bash scripts/check.sh")
+
+
+class GateMissing(unittest.TestCase):
+    def test_hook_calls_a_missing_gate(self):
+        hook = "#!/usr/bin/env bash\nset -e\nnice -n 10 bash scripts/check.sh </dev/null\n"
+        [(level, _, message, fix)] = rows_with(findings(repo({".githooks/pre-push": hook}), {}), "ci-gate-missing")
+        self.assertEqual(level, "warn")
+        self.assertIn(".githooks/pre-push:3", message)
+        self.assertIn("`scripts/check.sh`", message)
+        self.assertIn("ci.gate", fix)
+
+    def test_scaffolded_job_calls_a_missing_gate(self):
+        root = repo({".github/workflows/gate.yml": SCAFFOLD_JOB, STATUS: "#!/bin/sh\n"})
+        [row] = rows_with(findings(root, {}), "ci-gate-missing")
+        self.assertIn(".github/workflows/gate.yml:11", row[2])
+        self.assertIn("`scripts/check.sh`", row[2])
+
+    def test_present_scripts_and_inline_commands_twin(self):
+        hook = "#!/bin/sh\nbash scripts/check.sh\nbash -c 'make lint'\nbash -o pipefail -c x\n"
+        root = repo({".githooks/pre-push": hook, ".github/workflows/gate.yml": SCAFFOLD_JOB,
+                     "scripts/check.sh": "#!/bin/sh\n", STATUS: "#!/bin/sh\n"})
+        self.assertEqual(rows_with(findings(root, {}), "ci-gate-missing"), [])
+
+    def test_unscaffolded_job_scripts_are_not_checked(self):
+        root = repo({".github/workflows/ci.yml": GATE_TWICE})
+        self.assertEqual(rows_with(findings(root, {}), "ci-gate-missing"), [])
+
+
+STATUS = "scripts/ci/local-gate-status.sh"
+
+
+class ConfigInvalid(unittest.TestCase):
+    def test_non_mapping_ci_is_one_row_and_runs_the_rest(self):
+        for ci in (True, ["x"], "on"):
+            rows = findings(repo({".githooks/pre-push": QOS_HOOK, GATE: "#!/bin/sh\n"}), {"ci": ci})
+            self.assertEqual([row[1] for row in rows], ["ci-config-invalid", "ci-background-qos"], ci)
+            self.assertEqual(rows[0][0], "warn")
+            self.assertTrue(rows[0][2].startswith("ci: "), rows[0][2])
+
+    def test_bad_gate_or_hook_is_one_row_and_skips_that_check(self):
+        root = repo({".github/workflows/ci.yml": GATE_TWICE, ".githooks/pre-push": HOOK, "outside": HOOK})
+        cases = {"hook": ["/etc/passwd", "../outside", 7, ["a"]], "gate": [5, "a b.sh", "../x.sh", [GATE]]}
+        for key, values in cases.items():
+            for value in values:
+                with self.subTest(key=key, value=value):
+                    rows = findings(root, {"ci": {**PROFILE["ci"], key: value}})
+                    [row] = rows_with(rows, "ci-config-invalid")
+                    self.assertTrue(row[2].startswith(f"ci.{key}: "))
+                    self.assertEqual(rows_with(rows, "ci-gate-twice"), [])
+        self.assertEqual(len(rows_with(findings(root, PROFILE), "ci-gate-twice")), 1)
+
+
 class Providers(unittest.TestCase):
     def test_gitlab_only(self):
         rows = findings(repo({".gitlab-ci.yml": "stages: [test]\n"}), PROFILE)

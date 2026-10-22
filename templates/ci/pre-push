@@ -2,7 +2,7 @@
 set -euo pipefail
 
 pushed="$(cat)"
-nice -n 10 bash "${GATE_SCRIPT:-scripts/ci/gate.sh}" </dev/null
+nice -n 10 bash __CI_GATE__.sh </dev/null
 head="$(git rev-parse HEAD)"
 while read -r _ local_sha _ _; do
   if [ "$local_sha" = "$head" ]; then

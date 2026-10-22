@@ -133,7 +133,8 @@ class GraphInitCommandTests(unittest.TestCase):
         start = checks.index("**CI run-once scaffold.**")
         paragraph = checks[start:checks.index("\n\n", start) if "\n\n" in checks[start:] else len(checks)]
         for needle in ("templates/ci/manifest.json", "if:", "paths:", "core.hooksPath .githooks", "ci.gate",
-                       "ci.hook", "ci.affected", "step 14"):
+                       "ci.hook", "ci.affected", "step 14", "templates/ci/scaffold.py", "--write", "husky",
+                       "chain", "once the remote has the sha", "pull_request", "merge commit"):
             self.assertIn(needle, paragraph, needle)
         self.assertLessEqual(len(paragraph.encode()), 1400)
 

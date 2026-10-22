@@ -112,6 +112,19 @@ jobs:
         self.assertEqual([job.id for job in wf.jobs], ["test"])
         self.assertEqual(wf.jobs[0].needs, ("build",))
 
+    def test_reusable_workflow_job_is_kept_with_its_needs(self):
+        text = """on: push
+jobs:
+  deploy-prod:
+    needs: [smoke]
+    uses: ./.github/workflows/_deploy.yml
+  broken:
+    uses: [x]
+"""
+        [wf], _ = load_workflows(repo({".github/workflows/ci.yml": text}))
+        [job] = wf.jobs
+        self.assertEqual((job.id, job.needs, job.steps, job.line), ("deploy-prod", ("smoke",), (), 3))
+
     def test_other_providers(self):
         root = repo({".gitlab-ci.yml": "stages: [test]\n", ".circleci/config.yml": "version: 2.1\n"})
         self.assertEqual(other_providers(root), [".gitlab-ci.yml", ".circleci/config.yml"])

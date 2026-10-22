@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -14,6 +15,12 @@ OTHER_PROVIDERS = (
     ".buildkite/pipeline.yml",
     ".drone.yml",
 )
+
+REPO_PATH = re.compile(r"[A-Za-z0-9._][A-Za-z0-9._-]*(?:/[A-Za-z0-9._-]+)*")
+
+
+def repo_path(value: Any) -> bool:
+    return isinstance(value, str) and bool(REPO_PATH.fullmatch(value)) and ".." not in value.split("/")
 
 
 @dataclass(frozen=True)
@@ -87,7 +94,9 @@ def _job(key: ScalarNode, node: Node) -> Job | None:
     pairs = _pairs(node)
     steps = pairs.get("steps", (None, None))[1]
     if not isinstance(steps, SequenceNode):
-        return None
+        if not _text(pairs, "uses"):
+            return None
+        steps = SequenceNode("tag:yaml.org,2002:seq", [])
     needs = _plain(pairs.get("needs", (None, None))[1])
     needs = (needs,) if isinstance(needs, str) else tuple(n for n in needs or () if isinstance(n, str))
     return Job(key.value, _text(pairs, "name"), needs, _text(pairs, "if"),

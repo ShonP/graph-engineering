@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-GATE_SCRIPT="${GATE_SCRIPT:-scripts/ci/gate.sh}"
+GATE_SCRIPT="${GATE_SCRIPT:-__CI_GATE__.sh}"
 LOCKFILES=(uv.lock pnpm-lock.yaml package-lock.json yarn.lock bun.lock Cargo.lock go.sum pubspec.lock
   Package.resolved Gemfile.lock poetry.lock)
 
@@ -28,9 +28,21 @@ publish() {
   [ -z "$(git status --porcelain)" ] || refuse "dirty tree"
   command -v gh >/dev/null 2>&1 || refuse "gh not found"
   gh auth status >/dev/null 2>&1 || refuse "gh auth status failed"
-  local sha value
+  local sha value log
   sha="$(git rev-parse HEAD)"
   value="$(key)" || refuse "no gate script at $GATE_SCRIPT"
+  log="$(git rev-parse --path-format=absolute --git-path local-gate.log)"
+  nohup bash "${BASH_SOURCE[0]}" post "$sha" "$value" </dev/null >>"$log" 2>&1 &
+  echo "local-gate: publishing key=$value on $sha once the remote has it (log: $log)"
+}
+
+post() {
+  local sha="$1" value="$2" wait="${LOCAL_GATE_WAIT:-600}"
+  local deadline=$((SECONDS + ${wait%.*}))
+  until gh api "repos/{owner}/{repo}/commits/$sha" >/dev/null 2>&1; do
+    [ "$SECONDS" -lt "$deadline" ] || refuse "$sha not on the remote after ${wait}s"
+    sleep "${LOCAL_GATE_POLL:-5}"
+  done
   gh api -X POST "repos/{owner}/{repo}/statuses/$sha" -f state=success -f context=local-gate \
     -f "description=key=$value" >/dev/null || refuse "gh api failed"
   echo "local-gate: published key=$value on $sha"
@@ -57,6 +69,7 @@ check() {
 case "${1:-}" in
   key) key ;;
   publish) publish ;;
+  post) post "$2" "$3" ;;
   check) check "${2:-}" ;;
-  *) echo "usage: local-gate-status.sh key | publish | check [<sha>]" >&2; exit 2 ;;
+  *) echo "usage: local-gate-status.sh key | publish | post <sha> <key> | check [<sha>]" >&2; exit 2 ;;
 esac
