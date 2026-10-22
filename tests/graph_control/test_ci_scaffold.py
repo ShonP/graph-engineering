@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -25,12 +26,17 @@ STATUS = "scripts/ci/local-gate-status.sh"
 GATE = "#!/usr/bin/env bash\nexit 0\n"
 PROFILE = ("schema_version: 2\nruntime:\n  none: CLI verified through public commands\n"
            "ci:\n  gate: scripts/ci/gate.sh\n  hook: .githooks/pre-push\n")
-TOOLS = ("bash", "git", "cat", "shasum", "sha256sum", "jq", "env", "nice")
+TOOLS = ("bash", "git", "cat", "shasum", "sha256sum", "jq", "env", "nice", "nohup", "sleep")
+SCAFFOLD = CI / "scaffold.py"
 STUB_GH = """#!/usr/bin/env bash
 printf '%s\\n' "$*" >> "$STUB_LOG"
 if [ "$1" = auth ]; then exit "${STUB_AUTH_RC:-0}"; fi
 if [ "$1" = api ]; then
   for arg in "$@"; do [ "$arg" = POST ] && exit 0; done
+  case "$2" in */statuses*) ;; */commits/*)
+    printf x >> "$STUB_LOG.commits"; seen="$(<"$STUB_LOG.commits")"
+    [ "${#seen}" -gt "${STUB_MISSING:-0}" ]; exit ;;
+  esac
   while [ $# -gt 0 ]; do
     if [ "$1" = --jq ]; then exec jq -r "$2" "$STUB_JSON"; fi
     shift
@@ -87,12 +93,20 @@ class Repo:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text)
 
-    def scaffold(self) -> None:
+    def scaffold(self, gate: str = "scripts/ci/gate.sh", write: bool = True) -> subprocess.CompletedProcess:
+        argv = [sys.executable, str(SCAFFOLD), "--root", str(self.root), f"--gate={gate}"]
+        return subprocess.run(argv + (["--write"] if write else []), env=self.env(), capture_output=True, text=True,
+                              timeout=60)
+
+    def copy_verbatim(self) -> None:
         for entry in MANIFEST["files"]:
             target = self.root / entry["target"]
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(CI / entry["source"], target)
-            target.chmod(int(entry["mode"], 8))
+
+    def hooks_path(self) -> str:
+        return subprocess.run(["git", "config", "--get", "core.hooksPath"], cwd=self.root, env=self.env(),
+                              capture_output=True, text=True).stdout.strip()
 
     def statuses(self, rows: list[dict[str, str]]) -> None:
         self.json.write_text(json.dumps(rows))
@@ -109,6 +123,22 @@ class Repo:
 
     def posted(self) -> list[str]:
         return [line for line in self.calls() if "POST" in line]
+
+    def wait_posted(self, count: int = 1) -> list[str]:
+        deadline = time.monotonic() + 20
+        while len(self.posted()) < count and time.monotonic() < deadline:
+            time.sleep(0.1)
+        return self.posted()
+
+    def publisher_log(self) -> Path:
+        return self.root / ".git" / "local-gate.log"
+
+    def wait_log(self, needle: str) -> str:
+        deadline = time.monotonic() + 20
+        while needle not in (text := self.publisher_log().read_text() if self.publisher_log().exists() else "") \
+                and time.monotonic() < deadline:
+            time.sleep(0.1)
+        return text
 
 
 def status(state: str, description: str, context: str = "local-gate") -> dict[str, str]:
@@ -228,13 +258,44 @@ class Publish(unittest.TestCase):
         repo = Repo(self)
         self.assertRefused(repo, repo.run(STATUS, "publish", STUB_AUTH_RC="1"), "auth")
 
-    def test_clean_authenticated_tree_posts_the_key_on_head(self):
+    def test_clean_authenticated_tree_posts_the_key_on_head_in_the_background(self):
         repo = Repo(self)
         key, head = repo.key(), repo.git("rev-parse", "HEAD")
         result = repo.run(STATUS, "publish")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(repo.posted(), [f"api -X POST repos/{{owner}}/{{repo}}/statuses/{head} -f state=success "
-                                         f"-f context=local-gate -f description=key={key}"])
+        self.assertIn("once the remote has it", result.stdout)
+        self.assertEqual(repo.wait_posted(), [f"api -X POST repos/{{owner}}/{{repo}}/statuses/{head} -f state=success "
+                                              f"-f context=local-gate -f description=key={key}"])
+
+    def test_publish_returns_before_the_remote_has_the_commit(self):
+        repo = Repo(self)
+        started = time.monotonic()
+        result = repo.run(STATUS, "publish", STUB_MISSING="1000", LOCAL_GATE_WAIT="2", LOCAL_GATE_POLL="0.2")
+        self.assertLess(time.monotonic() - started, 1.5)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("not on the remote", repo.wait_log("not on the remote"))
+        self.assertEqual(repo.posted(), [])
+
+
+class Post(unittest.TestCase):
+    def test_posts_only_after_the_remote_has_the_commit(self):
+        repo = Repo(self)
+        head = repo.git("rev-parse", "HEAD")
+        result = repo.run(STATUS, "post", head, "k", STUB_MISSING="2", LOCAL_GATE_POLL="0")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        calls = [call for call in repo.calls() if call.startswith("api")]
+        self.assertEqual([("POST" in call, f"commits/{head}" in call) for call in calls],
+                         [(False, True)] * 3 + [(True, False)])
+        self.assertIn("published key=k", result.stdout)
+
+    def test_gives_up_at_the_deadline_without_posting(self):
+        repo = Repo(self)
+        result = repo.run(STATUS, "post", "a" * 40, "k", STUB_MISSING="1000", LOCAL_GATE_WAIT="1",
+                          LOCAL_GATE_POLL="0.2")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("not published", result.stdout)
+        self.assertIn("not on the remote", result.stdout)
+        self.assertEqual(repo.posted(), [])
 
 
 class PrePush(unittest.TestCase):
@@ -246,11 +307,12 @@ class PrePush(unittest.TestCase):
         repo = Repo(self)
         result = self.push(repo, repo.git("rev-parse", "HEAD"))
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(len(repo.posted()), 1)
+        self.assertEqual(len(repo.wait_posted()), 1)
 
     def test_pushing_another_sha_does_not_publish(self):
         repo = Repo(self)
         self.assertEqual(self.push(repo, "c" * 40).returncode, 0)
+        self.assertFalse(repo.publisher_log().exists())
         self.assertEqual(repo.posted(), [])
 
     def test_red_gate_fails_the_push_and_publishes_nothing(self):
@@ -280,6 +342,7 @@ class Workflow(unittest.TestCase):
         self.assertEqual(checkout.with_, {})
         self.assertEqual(local.run.strip(), f"bash {STATUS} check || true")
         self.assertEqual(gate.run.strip(), "nice -n 10 bash scripts/ci/gate.sh")
+        self.assertIn("bash __CI_GATE__.sh", (CI / "gate.yml").read_text())
         self.assertEqual(gate.if_, "steps.local.outputs.verified != 'true'")
         text = (CI / "gate.yml").read_text()
         self.assertIn("GH_TOKEN: ${{ github.token }}", text)
@@ -287,7 +350,97 @@ class Workflow(unittest.TestCase):
         self.assertIn("statuses: read", text)
 
 
+class Render(unittest.TestCase):
+    def test_gate_is_rendered_into_every_target(self):
+        repo = Repo(self)
+        repo.write("scripts/check.sh", GATE)
+        for entry in MANIFEST["files"]:
+            (repo.root / entry["target"]).unlink()
+        result = repo.scaffold("scripts/check.sh")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for entry in MANIFEST["files"]:
+            target = repo.root / entry["target"]
+            text = target.read_text()
+            self.assertNotIn("__CI_GATE__", text)
+            self.assertIn("scripts/check.sh", text)
+            self.assertEqual(oct(target.stat().st_mode & 0o777)[2:], entry["mode"])
+        self.assertEqual(load_workflows(repo.root)[0][0].jobs[0].steps[2].run.strip(),
+                         "nice -n 10 bash scripts/check.sh")
+
+    def test_unsafe_or_missing_gate_refuses_and_writes_nothing(self):
+        repo = Repo(self)
+        for entry in MANIFEST["files"]:
+            (repo.root / entry["target"]).unlink()
+        for gate in ("../x.sh", "a b.sh", "x;rm.sh", "/abs.sh", "scripts/missing.sh", "-x.sh"):
+            with self.subTest(gate):
+                result = repo.scaffold(gate)
+                self.assertEqual(result.returncode, 2, result.stdout)
+                self.assertIn("ci.gate", result.stderr)
+                self.assertFalse(any((repo.root / e["target"]).exists() for e in MANIFEST["files"]))
+
+    def test_existing_different_target_is_kept(self):
+        repo = Repo(self)
+        repo.write(".github/workflows/gate.yml", "custom\n")
+        result = repo.scaffold()
+        self.assertEqual((repo.root / ".github/workflows/gate.yml").read_text(), "custom\n")
+        self.assertIn("kept .github/workflows/gate.yml", result.stdout)
+        self.assertIn("unchanged .githooks/pre-push", result.stdout)
+
+    def test_dry_run_writes_nothing(self):
+        repo = Repo(self)
+        repo.git("config", "--unset", "core.hooksPath")
+        (repo.root / ".githooks/pre-push").unlink()
+        result = repo.scaffold(write=False)
+        self.assertIn("would write .githooks/pre-push", result.stdout)
+        self.assertFalse((repo.root / ".githooks/pre-push").exists())
+        self.assertEqual(repo.hooks_path(), "")
+
+    def test_no_other_hooks_sets_hooks_path(self):
+        self.assertEqual(Repo(self).hooks_path(), ".githooks")
+
+    def test_existing_hook_setup_keeps_hooks_path_and_says_how_to_chain(self):
+        cases = {".husky": lambda r: r.write(".husky/pre-commit", "x\n"),
+                 ".pre-commit-config.yaml": lambda r: r.write(".pre-commit-config.yaml", "repos: []\n"),
+                 "lefthook.yml": lambda r: r.write("lefthook.yml", "pre-push: {}\n"),
+                 ".git/hooks/pre-commit": lambda r: r.write(".git/hooks/pre-commit", "x\n"),
+                 "core.hooksPath=hooks": lambda r: r.git("config", "core.hooksPath", "hooks")}
+        for name, arrange in cases.items():
+            with self.subTest(name):
+                repo = Repo(self)
+                repo.git("config", "--unset", "core.hooksPath")
+                arrange(repo)
+                before = repo.hooks_path()
+                result = repo.scaffold()
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(repo.hooks_path(), before)
+                self.assertIn(name, result.stdout)
+                self.assertIn(".githooks/pre-push", result.stdout)
+                self.assertIn("core.hooksPath not set", result.stdout)
+
+
 class Doctor(unittest.TestCase):
+    def test_verbatim_copy_with_another_gate_is_flagged(self):
+        repo = Repo(self)
+        repo.write("scripts/check.sh", GATE)
+        (repo.root / "scripts/ci/gate.sh").unlink()
+        repo.write(".claude/graph-profile.yaml", PROFILE.replace("scripts/ci/gate.sh", "scripts/check.sh"))
+        repo.copy_verbatim()
+        missing = [f.message for f in diagnose(repo.root, PLUGIN, quick=False) if f.id == "ci-gate-missing"]
+        self.assertEqual(len(missing), 2, missing)
+        self.assertTrue(all("`__CI_GATE__.sh`" in message for message in missing), missing)
+
+    def test_rendered_scaffold_with_another_gate_is_clean(self):
+        repo = Repo(self)
+        repo.write("scripts/check.sh", GATE)
+        (repo.root / "scripts/ci/gate.sh").unlink()
+        for entry in MANIFEST["files"]:
+            (repo.root / entry["target"]).unlink()
+        repo.write(".claude/graph-profile.yaml", PROFILE.replace("scripts/ci/gate.sh", "scripts/check.sh"))
+        self.assertEqual(repo.scaffold("scripts/check.sh").returncode, 0)
+        rows = [f for f in diagnose(repo.root, PLUGIN, quick=False)
+                if f.id.startswith("ci-") and f.level in ("warn", "error")]
+        self.assertEqual(rows, [])
+
     def test_scaffolded_repo_has_no_ci_warning_or_error(self):
         repo = Repo(self)
         rows = [f for f in diagnose(repo.root, PLUGIN, quick=False)

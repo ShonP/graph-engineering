@@ -16,4 +16,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
       - name: Gate
         if: steps.local.outputs.verified != 'true'
-        run: nice -n 10 bash scripts/ci/gate.sh
+        run: nice -n 10 bash __CI_GATE__.sh
