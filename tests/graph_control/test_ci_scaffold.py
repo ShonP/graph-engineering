@@ -371,7 +371,8 @@ class Render(unittest.TestCase):
         repo = Repo(self)
         for entry in MANIFEST["files"]:
             (repo.root / entry["target"]).unlink()
-        for gate in ("../x.sh", "a b.sh", "x;rm.sh", "/abs.sh", "scripts/missing.sh", "-x.sh"):
+        (repo.root.parent / "x.sh").write_text(GATE)
+        for gate in ("../x.sh", "scripts/../../x.sh", "a b.sh", "x;rm.sh", "/abs.sh", "scripts/missing.sh", "-x.sh"):
             with self.subTest(gate):
                 result = repo.scaffold(gate)
                 self.assertEqual(result.returncode, 2, result.stdout)
