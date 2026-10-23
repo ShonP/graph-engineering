@@ -27,4 +27,4 @@ You have no CLAUDE.md: `omitClaudeMd` drops the user, project and local files, w
 - Blameless: name the gate and the missing rule, never an agent's competence.
 - Bash is for read-only inspection (`git log`, `git diff`, `rg`). No builds, no test suites.
 
-**Return** at most 300 words: the leak count, the classes, the lint-tier share, one line per proposed change (target file and the rule in one sentence), and the path to `retro.md`.
+Return at most 500 tokens: the leak count, the classes, the lint-tier share, one line per proposed change (target file and the rule in one sentence), and the path to `retro.md`. Write no text between tool calls; your return is your only prose.

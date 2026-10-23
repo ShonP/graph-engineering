@@ -54,7 +54,7 @@ Deduplicate findings that two lenses both raised. Verify by running where you ca
 
 Write `findings.json` with the Write tool at the path your dispatch names, in the schema of `review-protocol`'s `## Findings file` section: one object per surviving finding, ordered blocking, then important, then nit, each with its `route` from `## Routes`. Run `graph-control findings <path>` as that section says and rewrite the file until it exits 0. On a re-review, your input and the file you write follow `## Re-review`. No path named: return the same JSON inline and write `findings=inline`.
 
-Return at most 1,500 tokens: the `lenses:` line, one short title per blocking or important finding (the file holds the detail), the `skills_loaded:` line, and last exactly one line, `PASS|CHANGES-REQUESTED blocking=<n> important=<m> findings=<path>`. PASS when no blocking or important finding survives.
+Return at most 500 tokens: the `lenses:` line, one short title per blocking or important finding (the file holds the detail), the `skills_loaded:` line, and last exactly one line, `PASS|CHANGES-REQUESTED blocking=<n> important=<m> findings=<path>`. PASS when no blocking or important finding survives. Write no text between tool calls; your return is your only prose.
 
 Return `NEEDS_SETUP` instead of a verdict if a REQUIRED lens could not load. A review missing a lens is worse than no review, because it reads as coverage that did not happen.
 

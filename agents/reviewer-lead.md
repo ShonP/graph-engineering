@@ -48,7 +48,7 @@ Read each leaf's result from its file, never from its reply. A leaf that returne
 
 ## Report
 
-Return at most 1,500 tokens: the `lenses:` line; one line per leaf with its slice, its agent id from the Agent result, its leaf file and its verdict, so the engine can record each leaf as a distinct reviewer; one short title per surviving blocking or important finding; the `skills_loaded:` line; and last exactly one line, `PASS|CHANGES-REQUESTED blocking=<n> important=<m> findings=<path>`.
+Return at most 500 tokens: the `lenses:` line; one line per leaf with its slice, its agent id from the Agent result, its leaf file and its verdict, so the engine can record each leaf as a distinct reviewer; one short title per surviving blocking or important finding; the `skills_loaded:` line; and last exactly one line, `PASS|CHANGES-REQUESTED blocking=<n> important=<m> findings=<path>`. Write no text between tool calls; your return is your only prose.
 
 Your return also carries one line, `skills_loaded: <comma-separated names>`, naming every skill you invoked or had preloaded, each fully qualified as it loaded (`graph-engineering:bruno`, never bare `bruno`; a skill with no plugin stays bare); the engine checks it against the REQUIRED skills your dispatch named, exact name for exact name.
 

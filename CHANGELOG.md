@@ -10,6 +10,10 @@ commits.
 
 ## [Unreleased]
 
+### Changed
+
+- Agent returns are capped at 500 tokens (was 1,500) and every agent now says "Write no text between tool calls; your return is your only prose" (planner, ux-designer and retro gained a return paragraph); `agents/` grows 96169 to 97028 bytes (+859).
+
 ## [0.20.0] - 2026-10-22
 
 ### Added

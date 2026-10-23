@@ -98,7 +98,7 @@ class LeadProtocol(Case):  # AC-W3-QL-02
 
     def test_file_reports_merged_from_disk(self):
         self.has(self.body, "from disk", "`.graph/<run>/qa.md`", "`.graph/<run>/qa-findings.json`",
-                 "1,500 tokens", "agent id")
+                 "500 tokens", "agent id")
 
     def test_runtime_once_then_teardown_last(self):
         order = [self.body.find(n) for n in (

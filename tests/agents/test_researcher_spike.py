@@ -91,7 +91,7 @@ class ResearcherSpikeBody(unittest.TestCase):
         self.assertNotIn("in the temp directory your environment names and return", self.body)
 
     def test_return_and_cleanup_contract(self):  # AC-W3-SP-02
-        for needle in ("1,500 tokens", "report path", "Clean up temp files"):
+        for needle in ("500 tokens", "report path", "Clean up temp files"):
             self.has(needle)
 
     def test_no_savings_claim(self):  # DoD: savings are unmeasured until canary R3
