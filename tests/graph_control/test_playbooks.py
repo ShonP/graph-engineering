@@ -142,7 +142,7 @@ class EngineDispatchTests(unittest.TestCase):
 
     def test_return_contract(self):
         step = self.steps[8]
-        for token in ("1,500 tokens", "verdict line", "never relays"):
+        for token in ("500 tokens", "verdict line", "never relays"):
             self.assertIn(token, step)
 
     def test_retro_fast_path(self):

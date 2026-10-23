@@ -47,3 +47,5 @@ Run `ux-journey` (preloaded) for the goal in your dispatch, at the size its **Sc
 - `NEEDS_SETUP` - profile names no design-system rules and the task needs visual decisions.
 
 Your return also carries one line, `skills_loaded: <comma-separated names>`, naming every skill you invoked or had preloaded, each fully qualified as it loaded (`graph-engineering:bruno`, never bare `bruno`; a skill with no plugin stays bare); the engine checks it against the REQUIRED skills your dispatch named, exact name for exact name.
+
+Return at most 500 tokens: status, the artifact paths you wrote, blockers. Write no text between tool calls; your return is your only prose.

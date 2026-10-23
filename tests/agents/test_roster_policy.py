@@ -37,13 +37,14 @@ ALLOWED_KEYS = {
     "disallowedTools", "skills", "memory", "background", "omitClaudeMd", "color",
 }
 SHARED_BLOCK = (
-    "Return at most 1,500 tokens: status, commits or artifact paths, case IDs and "
+    "Return at most 500 tokens: status, commits or artifact paths, case IDs and "
     "results, blockers. Keep logs in run artifacts. Report every suite you ran as "
     "`<command>: exit=<n> complete|partial`. Never wait with sleep or until loops. "
     "For a command that takes longer than one call, use run_in_background only if "
     "your dispatch says you run in the background; otherwise make one blocking call "
     "with an explicit timeout (at most 600000 ms). Never end your turn while you "
-    "still need a result."
+    "still need a result. Write no text between tool calls; your return is your "
+    "only prose."
 )
 SHARED_BLOCK_AGENTS = (
     "implementer", "implementer-simple", "qa", "researcher", "researcher-spike",
@@ -124,7 +125,7 @@ class RosterPolicy(unittest.TestCase):
         self.assertEqual(fm["tools"], ["Read", "Grep", "Glob", "Bash", "Write"])
         self.assertNotIn("Skill", fm["tools"])
         self.assertEqual(fm["skills"], ["graph-engineering:retro"])
-        for needle in ("retro.md", "300 words", "never edit"):
+        for needle in ("retro.md", "500 tokens", "never edit"):
             self.has(body, needle, "retro")
 
     def test_qa_verdict_rule(self):  # AC-W1-AG-04
@@ -157,6 +158,12 @@ class RosterPolicy(unittest.TestCase):
     def test_shared_block_verbatim(self):  # AC-W1-AG-05
         for name in SHARED_BLOCK_AGENTS:
             self.assertEqual(self.agents[name][1].count(SHARED_BLOCK), 1, name)
+
+    def test_terse_return_contract_in_every_agent(self):
+        for name, (_, body) in self.agents.items():
+            self.assertIn("Write no text between tool calls", body, name)
+            self.assertIn("Return at most 500 tokens", body, name)
+            self.assertNotIn("1,500 tokens", body, name)
 
     def test_no_sleep_polling_advice(self):  # AC-W1-AG-05
         polling = re.compile(r"sleep\s+\d|while\b.*\bsleep|until\b.*;\s*do|\bpoll\b", re.I)
