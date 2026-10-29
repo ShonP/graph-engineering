@@ -10,6 +10,10 @@ commits.
 
 ## [Unreleased]
 
+### Added
+
+- **`skills/process/store-review-preflight`**: the declarations-match-the-binary ledger (age rating In-App Controls, privacy label, tracking, sign-in, purchases, permissions, encryption), the pre-submit and after-rejection steps, and what the App Store Connect API can and cannot do; loaded on demand (new file, 4.7 KB; nothing preloaded).
+
 ## [0.20.1] - 2026-10-23
 
 ### Changed
